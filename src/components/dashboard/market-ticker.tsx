@@ -50,9 +50,8 @@ export function MarketTicker() {
 
   return (
     <div className="group relative">
-      {/* Decorative gradient for edges */}
-      <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
-      <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+      {/* Fade only on the right edge to hint at scrollable content */}
+      <div className="absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
       
       <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 no-scrollbar scroll-smooth">
         <div className="flex gap-4 min-w-full">
