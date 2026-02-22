@@ -62,7 +62,7 @@ function MetricLabel({ label, className }: { label: string; className?: string }
 
 function QuickActionsCard() {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
       {[
         { href: "/chat", icon: MessageSquare, label: "Chat IA", color: "text-blue-500", bg: "bg-blue-500/10" },
         { href: "/transactions", icon: Calculator, label: "Transaction", color: "text-emerald-500", bg: "bg-emerald-500/10" },
@@ -337,12 +337,12 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 pb-10">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-3">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
+          <h1 className="text-3xl font-extrabold tracking-tight">
             Bonjour, {data.profile?.full_name?.split(" ")[0] || "investisseur"} 👋
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm md:text-base">Votre cockpit financier est à jour.</p>
+          <p className="text-muted-foreground mt-1">Votre cockpit financier est à jour.</p>
         </div>
 
         {/* Wealth Score indicator */}
@@ -369,7 +369,7 @@ export default function DashboardPage() {
       <MarketTicker />
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {/* C.1 — Net Worth */}
         <Card className="group relative overflow-hidden border-none shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20 opacity-100 group-hover:opacity-80 transition-opacity" />

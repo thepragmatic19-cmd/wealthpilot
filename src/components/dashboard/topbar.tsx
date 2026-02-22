@@ -84,7 +84,7 @@ export function Topbar({ profile }: TopbarProps) {
           <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" aria-hidden="true" />
         </Button>
 
-        <div className="hidden sm:block"><LanguageSwitcher /></div>
+        <LanguageSwitcher />
 
         <NotificationBell />
 

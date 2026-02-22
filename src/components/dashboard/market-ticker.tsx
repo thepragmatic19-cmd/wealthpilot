@@ -53,19 +53,15 @@ export function MarketTicker() {
       {/* Fade only on the right edge to hint at scrollable content */}
       <div className="absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
 
-      <div
-        className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 -mx-2 px-2 no-scrollbar scroll-touch"
-        style={{ scrollSnapType: 'x mandatory' }}
-      >
-        <div className="flex gap-3 sm:gap-4 min-w-full">
+      <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 no-scrollbar scroll-smooth">
+        <div className="flex gap-4 min-w-full">
           {quotes.map((q) => {
             const isUp = q.change > 0;
             const isFlat = q.change === 0;
             return (
               <div
                 key={q.symbol}
-                className="shrink-0 min-w-[140px] sm:min-w-[180px] rounded-2xl border bg-card/40 backdrop-blur-sm p-3 sm:p-3.5 shadow-sm hover:shadow-md hover:bg-card/60 transition-all duration-200 cursor-default"
-                style={{ scrollSnapAlign: 'start' }}
+                className="shrink-0 min-w-[180px] rounded-2xl border bg-card/40 backdrop-blur-sm p-3.5 shadow-sm hover:shadow-md hover:bg-card/60 transition-all duration-200 cursor-default"
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-1.5 min-w-0">

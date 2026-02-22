@@ -69,7 +69,7 @@ function StarRating({ rating }: { rating: number }) {
 
 export function Testimonials() {
   return (
-    <section id="testimonials" className="py-12 sm:py-24 px-4">
+    <section id="testimonials" className="py-24 px-4">
       <div className="mx-auto max-w-7xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -77,49 +77,45 @@ export function Testimonials() {
           viewport={{ once: true }}
           className="text-center"
         >
-          <h2 className="text-2xl sm:text-3xl font-bold sm:text-4xl">
+          <h2 className="text-3xl font-bold sm:text-4xl">
             Ils nous font confiance
           </h2>
-          <p className="mt-3 text-base sm:text-lg text-muted-foreground">
+          <p className="mt-4 text-lg text-muted-foreground">
             Découvrez les résultats concrets de nos utilisateurs
           </p>
         </motion.div>
 
-        {/* Mobile: horizontal scroll — Desktop: 3-col grid */}
-        <div className="mt-8 sm:mt-16 -mx-4 px-4 sm:mx-0 sm:px-0">
-          <div className="flex gap-4 overflow-x-auto no-scrollbar scroll-touch pb-2 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-6 sm:overflow-visible sm:pb-0">
-            {testimonials.map((t, index) => (
-              <motion.div
-                key={t.name}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.07 }}
-                className="shrink-0 w-[85vw] sm:w-auto"
-              >
-                <Card className="h-full">
-                  <CardContent className="flex flex-col gap-3 p-5 sm:p-6">
-                    <div className="flex items-center justify-between">
-                      <StarRating rating={t.rating} />
-                      <Badge variant="secondary" className="text-xs">
-                        {t.metric}
-                      </Badge>
+        <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {testimonials.map((t, index) => (
+            <motion.div
+              key={t.name}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <Card className="h-full">
+                <CardContent className="flex flex-col gap-4 p-6">
+                  <div className="flex items-center justify-between">
+                    <StarRating rating={t.rating} />
+                    <Badge variant="secondary" className="text-xs">
+                      {t.metric}
+                    </Badge>
+                  </div>
+                  <p className="flex-1 text-muted-foreground">&ldquo;{t.content}&rdquo;</p>
+                  <div className="flex items-center gap-3 pt-2">
+                    <Avatar>
+                      <AvatarFallback>{t.initials}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-semibold">{t.name}</p>
+                      <p className="text-xs text-muted-foreground">{t.role}</p>
                     </div>
-                    <p className="flex-1 text-sm sm:text-base text-muted-foreground">&ldquo;{t.content}&rdquo;</p>
-                    <div className="flex items-center gap-3 pt-1">
-                      <Avatar>
-                        <AvatarFallback>{t.initials}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-semibold">{t.name}</p>
-                        <p className="text-xs text-muted-foreground">{t.role}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
         </div>
       </div>
     </section>

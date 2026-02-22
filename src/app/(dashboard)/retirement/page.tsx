@@ -38,10 +38,11 @@ const DEFAULT_PARAMS = {
     monthlyExpenses: 3000,
     expectedReturn: 7,
     inflationRate: 2.5,
-    portfolioVolatility: 12, // % — chargé depuis le portefeuille sélectionné
+    portfolioVolatility: 12,
     rrspBalance: 25000,
     tfsaBalance: 20000,
-    governmentPension: 15000, // RRQ/SV annual
+    governmentPension: 15000,
+    withdrawalTaxRate: 30,
 };
 
 interface SimulationResult {
@@ -62,16 +63,14 @@ function runMonteCarlo(
     const years = params.retirementAge - params.currentAge;
     const yearlyContribution = params.monthlyContribution * 12;
     const realReturn = (params.expectedReturn - params.inflationRate) / 100;
-    const volatility = params.portfolioVolatility / 100; // Volatilité du portefeuille sélectionné
+    const volatility = params.portfolioVolatility / 100;
 
-    // Run simulations
     const allPaths: number[][] = [];
     for (let sim = 0; sim < numSimulations; sim++) {
         const path: number[] = [params.currentSavings];
         let balance = params.currentSavings;
 
         for (let y = 0; y < years; y++) {
-            // Box-Muller for normal distribution
             const u1 = Math.random();
             const u2 = Math.random();
             const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
@@ -84,7 +83,6 @@ function runMonteCarlo(
         allPaths.push(path);
     }
 
-    // Calculate percentiles for each year
     const results: SimulationResult[] = [];
     for (let y = 0; y <= years; y++) {
         const values = allPaths.map((p) => p[y]).sort((a, b) => a - b);
@@ -116,7 +114,6 @@ export default function RetirementPage() {
         setParams((prev) => ({ ...prev, [key]: value }));
     }, []);
 
-    // Load selected portfolio volatility on mount
     useEffect(() => {
         async function loadPortfolioVolatility() {
             const supabase = createClient();
@@ -143,8 +140,9 @@ export default function RetirementPage() {
     const finalMedian = results[results.length - 1]?.p50 || 0;
     const yearsInRetirement = params.lifeExpectancy - params.retirementAge;
     const annualWithdrawal = yearsInRetirement > 0 ? finalMedian / yearsInRetirement : 0;
-    const monthlyIncome = annualWithdrawal / 12 + params.governmentPension / 12;
-    // FIRE number = annual expenses × 25 (règle 4% : retrait annuel de 4% du capital)
+    const grossMonthlyIncome = annualWithdrawal / 12 + params.governmentPension / 12;
+    const monthlyTax = grossMonthlyIncome * (params.withdrawalTaxRate / 100);
+    const afterTaxMonthlyIncome = grossMonthlyIncome - monthlyTax;
     const fireNumber = params.monthlyExpenses * 12 * 25;
 
     if (subLoading) {
@@ -278,6 +276,17 @@ export default function RetirementPage() {
                                 onChange={(e) => updateParam("governmentPension", Number(e.target.value))}
                             />
                         </div>
+                        <div className="space-y-2">
+                            <Label>Taux d&apos;imposition à la retraite: {params.withdrawalTaxRate}%</Label>
+                            <Slider
+                                value={[params.withdrawalTaxRate]}
+                                onValueChange={([v]: number[]) => updateParam("withdrawalTaxRate", v)}
+                                min={0} max={50} step={1}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Taux marginal effectif sur retraits REER/FERR et pension gouvernementale
+                            </p>
+                        </div>
 
                         <Button onClick={() => setSimKey((k) => k + 1)} className="w-full gap-2">
                             <RefreshCw className="h-4 w-4" />
@@ -289,17 +298,11 @@ export default function RetirementPage() {
                 {/* Results Panel */}
                 <div className="lg:col-span-2 space-y-6">
                     {/* KPI Cards */}
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
                         <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10">
                             <CardContent className="p-4">
                                 <p className="text-xs text-muted-foreground">Capital à la retraite (médian)</p>
                                 <p className="text-xl font-bold text-green-600 dark:text-green-400">{formatCurrency(finalMedian)}</p>
-                            </CardContent>
-                        </Card>
-                        <Card className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10">
-                            <CardContent className="p-4">
-                                <p className="text-xs text-muted-foreground">Revenu mensuel estimé</p>
-                                <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(monthlyIncome)}/mois</p>
                             </CardContent>
                         </Card>
                         <Card className="bg-gradient-to-br from-purple-500/10 to-pink-500/10">
@@ -308,10 +311,22 @@ export default function RetirementPage() {
                                 <p className="text-xl font-bold text-purple-600 dark:text-purple-400">{formatCurrency(fireNumber)}</p>
                             </CardContent>
                         </Card>
+                        <Card className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10">
+                            <CardContent className="p-4">
+                                <p className="text-xs text-muted-foreground">Revenu brut mensuel</p>
+                                <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(grossMonthlyIncome)}/mois</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    dont {formatCurrency(params.governmentPension / 12)}/mois de pension
+                                </p>
+                            </CardContent>
+                        </Card>
                         <Card className="bg-gradient-to-br from-orange-500/10 to-amber-500/10">
                             <CardContent className="p-4">
-                                <p className="text-xs text-muted-foreground">Années en retraite</p>
-                                <p className="text-xl font-bold text-orange-600 dark:text-orange-400">{yearsInRetirement} ans</p>
+                                <p className="text-xs text-muted-foreground">Revenu net mensuel (après impôt)</p>
+                                <p className="text-xl font-bold text-orange-600 dark:text-orange-400">{formatCurrency(afterTaxMonthlyIncome)}/mois</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    impôt estimé: {formatCurrency(monthlyTax)}/mois ({params.withdrawalTaxRate}%)
+                                </p>
                             </CardContent>
                         </Card>
                     </div>
@@ -428,8 +443,8 @@ export default function RetirementPage() {
                                         Tous les montants sont ajustés pour l&apos;inflation.
                                     </p>
                                     <p>
-                                        <strong>Revenu mensuel :</strong> Capital médian ÷ années en retraite + pension gouvernementale.
-                                        La <Badge variant="outline" className="text-[10px] px-1 py-0">règle 4%</Badge> calcule le nombre FIRE = dépenses annuelles à la retraite × 25 (capital nécessaire pour retirer 4%/an indéfiniment).
+                                        <strong>Revenu net :</strong> Capital médian ÷ années en retraite + pension gouvernementale, moins l&apos;impôt estimé au taux de {params.withdrawalTaxRate}%.
+                                        La <Badge variant="outline" className="text-[10px] px-1 py-0">règle 4%</Badge> calcule le nombre FIRE = dépenses annuelles × 25 (capital nécessaire pour retirer 4%/an indéfiniment).
                                     </p>
                                 </div>
                             </div>

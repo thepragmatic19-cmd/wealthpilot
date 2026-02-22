@@ -29,7 +29,7 @@ const steps = [
 
 export function HowItWorks() {
   return (
-    <section id="how-it-works" className="bg-muted/50 py-12 sm:py-24 px-4">
+    <section id="how-it-works" className="bg-muted/50 py-24 px-4">
       <div className="mx-auto max-w-7xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -37,8 +37,8 @@ export function HowItWorks() {
           viewport={{ once: true }}
           className="text-center"
         >
-          <h2 className="text-2xl sm:text-3xl font-bold sm:text-4xl">Comment ça marche</h2>
-          <p className="mx-auto mt-3 max-w-2xl text-base sm:text-lg text-muted-foreground">
+          <h2 className="text-3xl font-bold sm:text-4xl">Comment ça marche</h2>
+          <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
             Trois étapes simples vers un portefeuille optimisé
           </p>
         </motion.div>
