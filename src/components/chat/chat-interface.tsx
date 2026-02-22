@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -108,7 +107,8 @@ export function ChatInterface() {
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [todayMessageCount, setTodayMessageCount] = useState(0);
   const [suggestions, setSuggestions] = useState<string[]>(DEFAULT_SUGGESTIONS);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { isFree, isElite, limits } = useSubscription();
 
@@ -183,17 +183,15 @@ export function ChatInterface() {
     }
   }, []);
 
+  // Scroll to bottom on initial load (instant) and on new messages (smooth)
+  const isInitialLoad = useRef(true);
   useEffect(() => {
-    if (scrollRef.current) {
-      const scrollContainer = scrollRef.current.querySelector(
-        "[data-radix-scroll-area-viewport]"
-      );
-      if (scrollContainer) {
-        scrollContainer.scrollTo({
-          top: scrollContainer.scrollHeight,
-          behavior: "smooth",
-        });
-      }
+    if (!bottomRef.current) return;
+    if (isInitialLoad.current && messages.length > 0) {
+      bottomRef.current.scrollIntoView({ behavior: "instant" });
+      isInitialLoad.current = false;
+    } else if (!isInitialLoad.current) {
+      bottomRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, streamingText]);
 
@@ -340,7 +338,7 @@ export function ChatInterface() {
 
       {/* ── Messages ── */}
       <div className="flex-1 overflow-hidden rounded-2xl border border-border/40 bg-card/20 backdrop-blur-sm flex flex-col min-h-0">
-        <ScrollArea className="flex-1 px-5" ref={scrollRef}>
+        <div ref={messagesRef} className="flex-1 overflow-y-auto px-5 scroll-smooth">
           <div className="py-6 space-y-0.5">
 
             {/* Empty state */}
@@ -478,8 +476,9 @@ export function ChatInterface() {
                 </div>
               </div>
             )}
+            <div ref={bottomRef} />
           </div>
-        </ScrollArea>
+        </div>
 
         {/* ── Input area ── */}
         <div className="shrink-0 p-3 border-t border-border/30 bg-background/30 backdrop-blur-md">
