@@ -14,7 +14,7 @@ export function DashboardShell({ profile, children }: DashboardShellProps) {
     const [collapsed, setCollapsed] = useState(false);
 
     return (
-        <div className="flex h-screen overflow-hidden">
+        <div className="flex h-dvh overflow-hidden">
             <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
             <div className="flex flex-1 flex-col overflow-hidden">
                 <Topbar profile={profile} />

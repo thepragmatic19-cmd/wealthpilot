@@ -308,7 +308,7 @@ export default function GamificationPage() {
                             </svg>
                             <div className="absolute text-center">
                                 <p className="text-2xl font-bold">{healthScore}</p>
-                                <p className="text-[10px] text-muted-foreground">/100</p>
+                                <p className="text-xs text-muted-foreground">/100</p>
                             </div>
                         </div>
                         <div className="flex-1 text-center sm:text-left">

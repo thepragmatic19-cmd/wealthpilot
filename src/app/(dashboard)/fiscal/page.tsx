@@ -342,9 +342,9 @@ export default function FiscalPage() {
                             <>
                                 {/* Province selector */}
                                 <div className="flex items-center gap-2">
-                                    <Label className="text-xs text-muted-foreground shrink-0">Province :</Label>
+                                    <Label className="text-sm text-muted-foreground shrink-0">Province :</Label>
                                     <Select value={province} onValueChange={setProvince}>
-                                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                        <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
                                         <SelectContent>
                                             {Object.entries(PROVINCES).map(([k, v]) => (
                                                 <SelectItem key={k} value={k}>{v.label}</SelectItem>

@@ -444,7 +444,7 @@ export default function RetirementPage() {
                                     </p>
                                     <p>
                                         <strong>Revenu net :</strong> Capital médian ÷ années en retraite + pension gouvernementale, moins l&apos;impôt estimé au taux de {params.withdrawalTaxRate}%.
-                                        La <Badge variant="outline" className="text-[10px] px-1 py-0">règle 4%</Badge> calcule le nombre FIRE = dépenses annuelles × 25 (capital nécessaire pour retirer 4%/an indéfiniment).
+                                        La <Badge variant="outline" className="text-xs px-1 py-0">règle 4%</Badge> calcule le nombre FIRE = dépenses annuelles × 25 (capital nécessaire pour retirer 4%/an indéfiniment).
                                     </p>
                                 </div>
                             </div>

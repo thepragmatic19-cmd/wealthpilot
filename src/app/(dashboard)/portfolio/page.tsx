@@ -276,32 +276,32 @@ export default function PortfolioPage() {
                 </CardHeader>
                 <CardContent>
                   {/* Metrics */}
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-                    <div className="rounded-lg border p-4 text-center">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                    <div className="rounded-lg border p-3 text-center">
                       <MetricLabel label="Rendement attendu" />
-                      <p className="text-2xl font-bold text-green-600">
+                      <p className="text-xl font-bold text-green-600 sm:text-2xl">
                         {formatPercent(portfolio.expected_return || 0)}
                       </p>
                     </div>
-                    <div className="rounded-lg border p-4 text-center">
+                    <div className="rounded-lg border p-3 text-center">
                       <MetricLabel label="Volatilité" />
-                      <p className="text-2xl font-bold text-orange-500">
+                      <p className="text-xl font-bold text-orange-500 sm:text-2xl">
                         {formatPercent(portfolio.volatility || 0)}
                       </p>
                     </div>
-                    <div className="rounded-lg border p-4 text-center">
+                    <div className="rounded-lg border p-3 text-center">
                       <MetricLabel label="Ratio de Sharpe" />
-                      <p className="text-2xl font-bold">{portfolio.sharpe_ratio?.toFixed(2)}</p>
+                      <p className="text-xl font-bold sm:text-2xl">{portfolio.sharpe_ratio?.toFixed(2)}</p>
                     </div>
-                    <div className="rounded-lg border p-4 text-center">
+                    <div className="rounded-lg border p-3 text-center">
                       <MetricLabel label="Perte max. historique" />
-                      <p className="text-2xl font-bold text-red-500">
+                      <p className="text-xl font-bold text-red-500 sm:text-2xl">
                         -{formatPercent(Math.abs(portfolio.max_drawdown || 0))}
                       </p>
                     </div>
-                    <div className="rounded-lg border p-4 text-center">
+                    <div className="rounded-lg border p-3 text-center">
                       <MetricLabel label="RFG moyen pondéré" />
-                      <p className="text-2xl font-bold">
+                      <p className="text-xl font-bold sm:text-2xl">
                         {avgMer !== null ? `${avgMer}%` : '—'}
                       </p>
                     </div>

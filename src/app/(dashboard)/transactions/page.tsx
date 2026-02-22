@@ -291,7 +291,7 @@ export default function TransactionsPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="grid gap-2">
                                     <Label>Symbole</Label>
                                     <Input
@@ -309,7 +309,7 @@ export default function TransactionsPage() {
                                     />
                                 </div>
                             </div>
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                 <div className="grid gap-2">
                                     <Label>Quantité</Label>
                                     <Input
@@ -607,7 +607,7 @@ export default function TransactionsPage() {
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                            className="h-10 w-10 text-muted-foreground hover:text-destructive"
                                             onClick={() => setTxToDelete(tx.id)}
                                         >
                                             <Trash2 className="h-4 w-4" />

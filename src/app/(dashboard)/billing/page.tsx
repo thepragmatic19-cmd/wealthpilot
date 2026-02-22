@@ -57,11 +57,11 @@ function LaunchCountdown() {
           { val: minutes, label: "Minutes" },
           { val: seconds, label: "Secondes" },
         ].map(({ val, label }) => (
-          <div key={label} className="rounded-lg bg-background/80 border border-amber-200/50 py-2">
+          <div key={label} className="rounded-lg bg-background/80 border border-amber-200/50 py-3">
             <p className="text-2xl font-black tabular-nums text-amber-600 dark:text-amber-400">
               {String(val).padStart(2, "0")}
             </p>
-            <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{label}</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{label}</p>
           </div>
         ))}
       </div>
