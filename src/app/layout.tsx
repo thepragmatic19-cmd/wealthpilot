@@ -10,6 +10,8 @@ import "./globals.css";
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap", // Show fallback font immediately, swap when Inter loads
+  preload: true,
 });
 
 export const metadata: Metadata = {

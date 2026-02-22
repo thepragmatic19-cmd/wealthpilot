@@ -8,10 +8,23 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AllocationChart } from "@/components/portfolio/allocation-chart";
-import { ActivityTimeline } from "@/components/dashboard/activity-timeline";
-import { AiInsightsPanel } from "@/components/dashboard/ai-insights-panel";
-import { MarketTicker } from "@/components/dashboard/market-ticker";
+import dynamic from "next/dynamic";
+const AllocationChart = dynamic(
+  () => import("@/components/portfolio/allocation-chart").then((m) => ({ default: m.AllocationChart })),
+  { ssr: false, loading: () => <Skeleton className="h-[200px] w-full" /> }
+);
+const ActivityTimeline = dynamic(
+  () => import("@/components/dashboard/activity-timeline").then((m) => ({ default: m.ActivityTimeline })),
+  { ssr: false, loading: () => <Skeleton className="h-[180px] w-full" /> }
+);
+const AiInsightsPanel = dynamic(
+  () => import("@/components/dashboard/ai-insights-panel").then((m) => ({ default: m.AiInsightsPanel })),
+  { ssr: false, loading: () => <Skeleton className="h-[120px] w-full" /> }
+);
+const MarketTicker = dynamic(
+  () => import("@/components/dashboard/market-ticker").then((m) => ({ default: m.MarketTicker })),
+  { ssr: false, loading: () => <Skeleton className="h-10 w-full" /> }
+);
 import { computeWeightedMer } from "@/lib/portfolio/helpers";
 import { formatCurrency, RISK_PROFILES, GOAL_ICONS } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";

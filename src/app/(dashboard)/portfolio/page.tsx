@@ -8,11 +8,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AllocationChart } from "@/components/portfolio/allocation-chart";
-import { ProjectionChart } from "@/components/portfolio/projection-chart";
-import { RiskReturnChart } from "@/components/portfolio/risk-return-chart";
-import { ExportPdfButton } from "@/components/portfolio/export-pdf-button";
-import { PerformanceChart } from "@/components/portfolio/performance-chart";
+import dynamic from "next/dynamic";
+const AllocationChart = dynamic(
+  () => import("@/components/portfolio/allocation-chart").then((m) => ({ default: m.AllocationChart })),
+  { ssr: false, loading: () => <Skeleton className="h-[300px] w-full rounded-lg" /> }
+);
+const ProjectionChart = dynamic(
+  () => import("@/components/portfolio/projection-chart").then((m) => ({ default: m.ProjectionChart })),
+  { ssr: false, loading: () => <Skeleton className="h-[350px] w-full rounded-lg" /> }
+);
+const RiskReturnChart = dynamic(
+  () => import("@/components/portfolio/risk-return-chart").then((m) => ({ default: m.RiskReturnChart })),
+  { ssr: false, loading: () => <Skeleton className="h-[300px] w-full rounded-lg" /> }
+);
+const PerformanceChart = dynamic(
+  () => import("@/components/portfolio/performance-chart").then((m) => ({ default: m.PerformanceChart })),
+  { ssr: false, loading: () => <Skeleton className="h-[350px] w-full rounded-lg" /> }
+);
+const ExportPdfButton = dynamic(
+  () => import("@/components/portfolio/export-pdf-button").then((m) => ({ default: m.ExportPdfButton })),
+  { ssr: false, loading: () => null }
+);
 import { formatPercent, ASSET_CLASS_COLORS } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FINANCIAL_TERMS } from "@/lib/financial-terms";
