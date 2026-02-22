@@ -216,6 +216,8 @@ create policy "Users can view own chat messages"
   on public.chat_messages for select using (auth.uid() = user_id);
 create policy "Users can insert own chat messages"
   on public.chat_messages for insert with check (auth.uid() = user_id);
+create policy "Users can delete own chat messages"
+  on public.chat_messages for delete using (auth.uid() = user_id);
 
 -- ============================================================
 -- INDEXES
