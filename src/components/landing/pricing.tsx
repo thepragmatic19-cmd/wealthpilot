@@ -116,7 +116,7 @@ export function Pricing() {
               >
                 <Card
                   className={`relative h-full flex flex-col ${plan.popular
-                      ? "border-primary shadow-lg shadow-primary/10 md:scale-105"
+                      ? "border-primary shadow-lg shadow-primary/10"
                       : ""
                     }`}
                 >

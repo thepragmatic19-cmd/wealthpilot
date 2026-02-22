@@ -19,15 +19,19 @@ function AnimatedCounter({
   suffix: string;
   decimals?: number;
 }) {
-  const [count, setCount] = useState(0);
+  // Start at target (visible on SSR), animate only when in view on client
+  const [count, setCount] = useState(target);
   const ref = useRef<HTMLSpanElement>(null);
   const isInView = useInView(ref, { once: true });
+  const [started, setStarted] = useState(false);
 
   useEffect(() => {
-    if (!isInView) return;
-
-    const duration = 2000;
-    const steps = 60;
+    // On first in-view, restart counter from 0 for the animation
+    if (!isInView || started) return;
+    setStarted(true);
+    setCount(0);
+    const duration = 1600;
+    const steps = 50;
     const increment = target / steps;
     let current = 0;
     const timer = setInterval(() => {
@@ -39,9 +43,8 @@ function AnimatedCounter({
         setCount(current);
       }
     }, duration / steps);
-
     return () => clearInterval(timer);
-  }, [isInView, target]);
+  }, [isInView, target, started]);
 
   return (
     <span ref={ref}>
