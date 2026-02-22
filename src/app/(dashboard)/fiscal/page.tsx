@@ -12,27 +12,35 @@ import {
     AlertTriangle,
     CheckCircle,
     Info,
+    ArrowUp,
+    ArrowDown,
 } from "lucide-react";
-import type { ClientInfo, Portfolio, PortfolioAllocation } from "@/types/database";
+import type { ClientInfo, Portfolio, PortfolioAllocation, Transaction } from "@/types/database";
 import { useSubscription } from "@/hooks/use-subscription";
 import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
 import { Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
-// 2024 limits for Canada
+// 2026 limits for Canada
 const CELI_ANNUAL_LIMIT = 7000;
-const CELI_CUMULATIVE_LIMIT = 95000; // since 2009 for someone 18+ since 2009
+const CELI_CUMULATIVE_LIMIT = 109000; // cumulative since 2009 through 2026 ($102k through 2025 + $7k for 2026)
 const REER_RATE = 0.18; // 18% of earned income
-const REER_MAX = 31560; // 2024 max
+const REER_MAX = 32490; // 2025 max (indexed to inflation)
+// REEE/SCEE constants
+const SCEE_RATE = 0.20; // 20% basic SCEE
+const SCEE_MAX_ANNUAL = 500; // max grant per child per year
+const SCEE_OPTIMAL_CONTRIBUTION = SCEE_MAX_ANNUAL / SCEE_RATE; // $2,500
+const SCEE_LIFETIME_MAX = 7200; // lifetime max per child
 
 interface FiscalData {
     clientInfo: ClientInfo | null;
     portfolio: (Portfolio & { portfolio_allocations: PortfolioAllocation[] }) | null;
+    transactions: Transaction[];
 }
 
 export default function FiscalPage() {
-    const [data, setData] = useState<FiscalData>({ clientInfo: null, portfolio: null });
+    const [data, setData] = useState<FiscalData>({ clientInfo: null, portfolio: null, transactions: [] });
     const [loading, setLoading] = useState(true);
     const { canAccess, isLoading: subLoading } = useSubscription();
     const [showUpgrade, setShowUpgrade] = useState(false);
@@ -44,7 +52,7 @@ export default function FiscalPage() {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) return;
 
-                const [{ data: ci }, { data: portfolio }] = await Promise.all([
+                const [{ data: ci }, { data: portfolio }, { data: txData }] = await Promise.all([
                     supabase.from("client_info").select("*").eq("user_id", user.id).maybeSingle(),
                     supabase
                         .from("portfolios")
@@ -52,11 +60,16 @@ export default function FiscalPage() {
                         .eq("user_id", user.id)
                         .eq("is_selected", true)
                         .maybeSingle(),
+                    supabase
+                        .from("transactions")
+                        .select("*")
+                        .eq("user_id", user.id),
                 ]);
 
                 setData({
                     clientInfo: ci as ClientInfo | null,
                     portfolio: portfolio as FiscalData["portfolio"],
+                    transactions: (txData as Transaction[]) || [],
                 });
             } catch (err) {
                 console.error("Error loading fiscal data:", err);
@@ -99,7 +112,7 @@ export default function FiscalPage() {
         );
     }
 
-    const { clientInfo, portfolio } = data;
+    const { clientInfo, portfolio, transactions } = data;
     const annualIncome = Number(clientInfo?.annual_income) || 0;
     const celiBalance = Number(clientInfo?.celi_balance) || 0;
     const reerBalance = Number(clientInfo?.reer_balance) || 0;
@@ -114,29 +127,57 @@ export default function FiscalPage() {
     const celiRoom = Math.max(0, CELI_CUMULATIVE_LIMIT - celiBalance);
     const celiUsagePercent = Math.min(100, (celiBalance / CELI_CUMULATIVE_LIMIT) * 100);
 
-    // Estimated tax savings from REER contributions  
+    // Estimated tax savings from REER contributions
     const estimatedTaxBracket = annualIncome > 235675 ? 0.33 : annualIncome > 165430 ? 0.29 : annualIncome > 111733 ? 0.26 : annualIncome > 55867 ? 0.205 : 0.15;
     const estimatedTaxSavings = reerRoom * estimatedTaxBracket;
 
-    // Rebalancing suggestions (compare target vs current allocations)
+    // REEE SCEE projection
+    const sceeAccumulated = reeeBalance * SCEE_RATE; // rough estimate of grants received
+    const sceeRemainingLifetime = Math.max(0, SCEE_LIFETIME_MAX - sceeAccumulated);
+
+    // Compute actual holdings from transactions
+    const holdingsMap: Record<string, { name: string; value: number }> = {};
+    for (const tx of transactions) {
+        const ticker = tx.instrument_ticker;
+        if (!holdingsMap[ticker]) {
+            holdingsMap[ticker] = { name: tx.instrument_name, value: 0 };
+        }
+        if (tx.type === "achat" || tx.type === "cotisation") {
+            holdingsMap[ticker].value += tx.amount;
+        } else if (tx.type === "vente") {
+            holdingsMap[ticker].value -= tx.amount;
+        }
+    }
+    // Remove zero/negative holdings
+    Object.keys(holdingsMap).forEach((k) => {
+        if (holdingsMap[k].value <= 0) delete holdingsMap[k];
+    });
+    const totalHoldingsValue = Object.values(holdingsMap).reduce((s, h) => s + h.value, 0);
+    const hasTransactionData = totalHoldingsValue > 0;
+
+    // Rebalancing suggestions
     const allocations = portfolio?.portfolio_allocations || [];
-    const totalWeight = allocations.reduce((s, a) => s + Number(a.weight), 0);
     const rebalancingSuggestions = allocations
         .map((a) => {
             const targetWeight = Number(a.weight);
-            const currentWeight = totalWeight > 0 ? targetWeight : 0; // Static data, so current = target
-            const drift = Math.abs(currentWeight - targetWeight);
+            let currentWeight = 0;
+            if (hasTransactionData && holdingsMap[a.instrument_ticker]) {
+                currentWeight = (holdingsMap[a.instrument_ticker].value / totalHoldingsValue) * 100;
+            } else {
+                currentWeight = targetWeight; // No transaction data → assume on target
+            }
+            const drift = currentWeight - targetWeight;
             return {
                 name: a.instrument_name,
                 ticker: a.instrument_ticker,
                 assetClass: a.asset_class,
                 targetWeight,
-                currentWeight,
-                drift,
-                action: currentWeight < targetWeight ? "Acheter" : currentWeight > targetWeight ? "Vendre" : "OK",
+                currentWeight: Math.round(currentWeight * 10) / 10,
+                drift: Math.round(drift * 10) / 10,
+                action: drift < -2 ? "Acheter" : drift > 2 ? "Vendre" : "OK",
             };
         })
-        .sort((a, b) => b.drift - a.drift);
+        .sort((a, b) => Math.abs(b.drift) - Math.abs(a.drift));
 
     return (
         <div className="space-y-6">
@@ -178,7 +219,7 @@ export default function FiscalPage() {
                                 ${celiRoom.toLocaleString("fr-CA")}
                             </p>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                                Limite annuelle {CELI_ANNUAL_LIMIT.toLocaleString("fr-CA")}$ (2024)
+                                Limite annuelle {CELI_ANNUAL_LIMIT.toLocaleString("fr-CA")}$ (2026)
                             </p>
                         </div>
                     </CardContent>
@@ -213,13 +254,13 @@ export default function FiscalPage() {
                                 ${reerRoom.toLocaleString("fr-CA")}
                             </p>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                                18% du revenu, max {REER_MAX.toLocaleString("fr-CA")}$ (2024)
+                                18% du revenu, max {REER_MAX.toLocaleString("fr-CA")}$ (2025)
                             </p>
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* REEE Card */}
+                {/* REEE Card — improved with SCEE calculator */}
                 <Card className="border-purple-200 dark:border-purple-900/50">
                     <CardHeader className="pb-2">
                         <CardTitle className="flex items-center gap-2 text-base">
@@ -227,21 +268,36 @@ export default function FiscalPage() {
                             REEE
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div>
-                            <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground">Solde actuel</span>
-                                <span className="font-semibold">${reeeBalance.toLocaleString("fr-CA")}</span>
-                            </div>
+                    <CardContent className="space-y-3">
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Solde actuel</span>
+                            <span className="font-semibold">${reeeBalance.toLocaleString("fr-CA")}</span>
                         </div>
-                        <div className="rounded-lg bg-purple-50 dark:bg-purple-900/20 p-3">
+                        <div className="rounded-lg bg-purple-50 dark:bg-purple-900/20 p-3 space-y-2">
                             <div className="flex items-center gap-2">
                                 <Info className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                                <span className="text-sm font-medium">Subvention SCEE</span>
+                                <span className="text-sm font-medium">Calculateur SCEE</span>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">
-                                Le gouvernement peut contribuer jusqu&apos;à 20% de vos cotisations (max 500$/an par enfant)
-                            </p>
+                            <div className="space-y-1.5 text-xs">
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Cotisation optimale/an</span>
+                                    <span className="font-medium">{SCEE_OPTIMAL_CONTRIBUTION.toLocaleString("fr-CA")}$</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Subvention max/an (20%)</span>
+                                    <span className="font-medium text-purple-600 dark:text-purple-400">{SCEE_MAX_ANNUAL.toLocaleString("fr-CA")}$</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Subvention max à vie</span>
+                                    <span className="font-medium text-purple-600 dark:text-purple-400">{SCEE_LIFETIME_MAX.toLocaleString("fr-CA")}$</span>
+                                </div>
+                                {reeeBalance > 0 && (
+                                    <div className="flex justify-between border-t pt-1.5">
+                                        <span className="text-muted-foreground">Subventions restantes est.</span>
+                                        <span className="font-semibold text-purple-600 dark:text-purple-400">~{sceeRemainingLifetime.toLocaleString("fr-CA")}$</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -313,31 +369,50 @@ export default function FiscalPage() {
                             </div>
                         ) : (
                             <div className="space-y-2">
+                                {!hasTransactionData && (
+                                    <div className="rounded-lg bg-muted/50 p-2.5 mb-2">
+                                        <p className="text-xs text-muted-foreground">
+                                            <Info className="inline h-3 w-3 mr-1" />
+                                            Ajoutez vos transactions pour calculer la dérive réelle de votre portefeuille.
+                                        </p>
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-3 text-xs text-muted-foreground px-1 mb-1">
+                                    <span>Instrument</span>
+                                    <span className="text-center">Actuel / Cible</span>
+                                    <span className="text-right">Dérive</span>
+                                </div>
                                 {rebalancingSuggestions.slice(0, 8).map((item) => (
                                     <div
                                         key={item.ticker}
-                                        className="flex items-center justify-between rounded-lg border p-3"
+                                        className="flex items-center justify-between rounded-lg border p-2.5"
                                     >
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <p className="text-sm font-medium">{item.name}</p>
-                                                <Badge variant="outline" className="text-[10px]">{item.ticker}</Badge>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-1.5">
+                                                <p className="text-sm font-medium truncate">{item.name}</p>
+                                                <Badge variant="outline" className="text-[10px] shrink-0">{item.ticker}</Badge>
                                             </div>
                                             <p className="text-xs text-muted-foreground">{item.assetClass}</p>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-sm font-medium">{item.targetWeight}%</p>
-                                            <Badge variant={item.action === "OK" ? "secondary" : "outline"} className="text-[10px]">
-                                                {item.action === "OK" ? "✓ Aligné" : item.action}
-                                            </Badge>
+                                        <div className="flex items-center gap-2 ml-2 shrink-0">
+                                            <span className="text-xs tabular-nums text-muted-foreground">
+                                                {hasTransactionData ? `${item.currentWeight}%` : "—"} / {item.targetWeight}%
+                                            </span>
+                                            {hasTransactionData ? (
+                                                <Badge
+                                                    variant={item.action === "OK" ? "secondary" : "outline"}
+                                                    className={`text-[10px] gap-0.5 ${item.action === "Acheter" ? "text-green-600 border-green-200" : item.action === "Vendre" ? "text-red-500 border-red-200" : ""}`}
+                                                >
+                                                    {item.action === "Acheter" && <ArrowUp className="h-2.5 w-2.5" />}
+                                                    {item.action === "Vendre" && <ArrowDown className="h-2.5 w-2.5" />}
+                                                    {item.action === "OK" ? "✓" : `${item.drift > 0 ? "+" : ""}${item.drift}%`}
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="secondary" className="text-[10px]">✓ Cible</Badge>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
-                                <div className="rounded-lg bg-muted/50 p-3 text-center">
-                                    <p className="text-xs text-muted-foreground">
-                                        💡 Les données de rééquilibrage seront dynamiques une fois le suivi en temps réel activé
-                                    </p>
-                                </div>
                             </div>
                         )}
                     </CardContent>

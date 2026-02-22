@@ -25,8 +25,6 @@ import {
   Shield,
   ArrowRight,
   Lightbulb,
-  ClipboardList,
-  Sparkles,
   Info,
   Calculator,
   Wallet,
@@ -64,42 +62,26 @@ function MetricLabel({ label, className }: { label: string; className?: string }
 
 function QuickActionsCard() {
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Sparkles className="h-4 w-4 text-primary" />
-          Actions rapides
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 gap-3">
-          <Link href="/chat">
-            <Button variant="outline" className="w-full justify-start gap-2 h-auto py-3">
-              <MessageSquare className="h-4 w-4 text-primary" />
-              <span className="text-sm">Chat IA</span>
-            </Button>
-          </Link>
-          <Link href="/transactions">
-            <Button variant="outline" className="w-full justify-start gap-2 h-auto py-3">
-              <Calculator className="h-4 w-4 text-primary" />
-              <span className="text-sm">Ajouter transaction</span>
-            </Button>
-          </Link>
-          <Link href="/portfolio">
-            <Button variant="outline" className="w-full justify-start gap-2 h-auto py-3">
-              <PieChart className="h-4 w-4 text-primary" />
-              <span className="text-sm">Gérer le portefeuille</span>
-            </Button>
-          </Link>
-          <Link href="/fiscal">
-            <Button variant="outline" className="w-full justify-start gap-2 h-auto py-3">
-              <Shield className="h-4 w-4 text-primary" />
-              <span className="text-sm">Planification fiscale</span>
-            </Button>
-          </Link>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {[
+        { href: "/chat", icon: MessageSquare, label: "Chat IA", color: "text-blue-500", bg: "bg-blue-500/10" },
+        { href: "/transactions", icon: Calculator, label: "Transaction", color: "text-emerald-500", bg: "bg-emerald-500/10" },
+        { href: "/portfolio", icon: PieChart, label: "Portefeuille", color: "text-orange-500", bg: "bg-orange-500/10" },
+        { href: "/fiscal", icon: Shield, label: "Planification", color: "text-purple-500", bg: "bg-purple-500/10" },
+      ].map((action, i) => (
+        <Link key={i} href={action.href}>
+          <div className="group flex items-center gap-4 p-4 rounded-2xl border bg-card/50 backdrop-blur-sm hover:border-primary/30 hover:bg-card transition-all cursor-pointer shadow-sm">
+            <div className={`h-10 w-10 rounded-xl ${action.bg} flex items-center justify-center ${action.color} group-hover:scale-110 transition-transform`}>
+              <action.icon className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-bold">{action.label}</p>
+              <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">Accès rapide</p>
+            </div>
+          </div>
+        </Link>
+      ))}
+    </div>
   );
 }
 
@@ -282,16 +264,42 @@ export default function DashboardPage() {
   // Not onboarded
   if (!data.profile?.onboarding_completed) {
     return (
-      <div className="flex flex-col items-center justify-center gap-6 py-16">
-        <ClipboardList className="h-20 w-20 text-muted-foreground" />
-        <h2 className="text-2xl font-bold">Bienvenue sur WealthPilot!</h2>
-        <p className="max-w-md text-center text-muted-foreground">
-          Complétez votre profil pour recevoir des recommandations personnalisées.
-        </p>
-        <Link href="/onboarding">
-          <Button size="lg" className="gap-2">
-            Commencer l&apos;évaluation
-            <ArrowRight className="h-4 w-4" />
+      <div className="flex flex-col items-center justify-center min-h-[70vh] gap-8 py-16 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="relative">
+          <div className="absolute -inset-4 rounded-full bg-primary/20 blur-2xl animate-pulse" />
+          <div className="relative flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/60 shadow-2xl">
+            <TrendingUp className="h-16 w-16 text-white" />
+          </div>
+        </div>
+
+        <div className="max-w-xl text-center space-y-4">
+          <h2 className="text-4xl font-extrabold tracking-tight">Bonjour, {data.profile?.full_name?.split(" ")[0] || "investisseur"} 👋</h2>
+          <p className="text-xl text-muted-foreground">
+            Prêt à devenir le pilote de votre patrimoine ? <br />
+            WealthPilot analyse votre situation pour optimiser votre avenir financier.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl w-full">
+          {[
+            { icon: Shield, title: "Profil de risque IA", desc: "Analyse profonde de votre tolérance psychologique" },
+            { icon: PieChart, title: "Portefeuille optimal", desc: "Allocation personnalisée en ETFs canadiens" },
+            { icon: Lightbulb, title: "Conseils fiscaux", desc: "Optimisation de vos CELI, REER et REEE" }
+          ].map((feat, i) => (
+            <div key={i} className="flex flex-col items-center text-center p-6 rounded-2xl border bg-card/50 backdrop-blur-sm">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                <feat.icon className="h-5 w-5 text-primary" />
+              </div>
+              <h4 className="font-bold text-sm mb-1">{feat.title}</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">{feat.desc}</p>
+            </div>
+          ))}
+        </div>
+
+        <Link href="/onboarding" className="mt-4">
+          <Button size="lg" className="h-14 px-10 gap-3 text-lg rounded-full shadow-xl shadow-primary/20 hover:scale-105 transition-transform group">
+            Commencer mon évaluation
+            <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
           </Button>
         </Link>
       </div>
@@ -328,53 +336,69 @@ export default function DashboardPage() {
     : null;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">
-          Bonjour, {data.profile?.full_name?.split(" ")[0] || "investisseur"} 👋
-        </h1>
-        <p className="text-muted-foreground">Voici un résumé de votre situation.</p>
+    <div className="space-y-8 pb-10">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight">
+            Bonjour, {data.profile?.full_name?.split(" ")[0] || "investisseur"} 👋
+          </h1>
+          <p className="text-muted-foreground mt-1">Votre cockpit financier est à jour.</p>
+        </div>
+        
+        {/* Wealth Score indicator */}
+        <div className="flex items-center gap-4 p-3 rounded-2xl border bg-card/50 backdrop-blur-sm shadow-sm">
+          <div className="relative h-12 w-12">
+             <svg className="h-full w-full" viewBox="0 0 36 36">
+                <path className="stroke-muted fill-none" strokeWidth="3" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                <path className="stroke-primary fill-none transition-all duration-1000" strokeDasharray={`${Math.min(100, savingsRate * 2)}, 100`} strokeLinecap="round" strokeWidth="3" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+             </svg>
+             <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold">
+               {savingsRate}%
+             </div>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Taux d&apos;épargne</p>
+            <p className="text-sm font-bold">
+              {savingsRate >= 30 ? "Excellent 🚀" : savingsRate >= 20 ? "Bon travail 👍" : savingsRate >= 10 ? "En progrès" : savingsRate > 0 ? "À améliorer" : "Non renseigné"}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Market Ticker */}
       <MarketTicker />
 
       {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* C.1 — Net Worth with account breakdown + trend arrow */}
-        <Card className="relative overflow-hidden border-none bg-gradient-to-br from-green-500/10 to-emerald-500/10 dark:from-green-500/20 dark:to-emerald-500/20">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">Actifs Totaux</p>
-              <Wallet className="h-4 w-4 text-emerald-600" />
-            </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold">{formatCurrency(totalInvested)}</p>
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {/* C.1 — Net Worth */}
+        <Card className="group relative overflow-hidden border-none shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20 opacity-100 group-hover:opacity-80 transition-opacity" />
+          <CardContent className="p-6 relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="h-10 w-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                <Wallet className="h-5 w-5" />
+              </div>
               {trendPct !== null && (
-                <div className={`flex items-center gap-1 text-xs mt-0.5 ${trendPct >= 0 ? "text-green-600" : "text-red-500"}`}>
-                  {trendPct >= 0
-                    ? <TrendingUp className="h-3 w-3" />
-                    : <TrendingDown className="h-3 w-3" />
-                  }
+                <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${trendPct >= 0 ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-500"}`}>
+                  {trendPct >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                   {trendPct >= 0 ? "+" : ""}{trendPct.toFixed(1)}%
-                  <span className="text-muted-foreground ml-1">ce mois</span>
                 </div>
               )}
+            </div>
+            <div>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Actifs Totaux</p>
+              <p className="text-3xl font-black mt-1 tracking-tight">{formatCurrency(totalInvested)}</p>
+              
               {totalRegistered > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-2">
+                <div className="flex flex-wrap gap-1.5 mt-4">
                   {celiBalance > 0 && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-green-200 bg-green-50/50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
-                      CELI {totalRegistered > 0 ? Math.round(celiBalance / totalRegistered * 100) : 0}%
+                    <Badge variant="outline" className="text-[9px] h-5 bg-background/50 border-emerald-500/20">
+                      CELI {Math.round(celiBalance / totalRegistered * 100)}%
                     </Badge>
                   )}
                   {reerBalance > 0 && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-blue-200 bg-blue-50/50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
-                      REER {totalRegistered > 0 ? Math.round(reerBalance / totalRegistered * 100) : 0}%
-                    </Badge>
-                  )}
-                  {reeeBalance > 0 && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-purple-200 bg-purple-50/50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400">
-                      REEE {totalRegistered > 0 ? Math.round(reeeBalance / totalRegistered * 100) : 0}%
+                    <Badge variant="outline" className="text-[9px] h-5 bg-background/50 border-blue-500/20">
+                      REER {Math.round(reerBalance / totalRegistered * 100)}%
                     </Badge>
                   )}
                 </div>
@@ -384,71 +408,74 @@ export default function DashboardPage() {
         </Card>
 
         {/* C.2 — Projection 1 an */}
-        <Card className="border-none bg-gradient-to-br from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Projection 1 an</p>
-              <TrendingUp className="h-4 w-4 text-blue-600" />
+        <Card className="group relative overflow-hidden border-none shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20" />
+          <CardContent className="p-6 relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="h-10 w-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                <TrendingUp className="h-5 w-5" />
+              </div>
+              <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-none text-[10px]">PROJECTION</Badge>
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+            <div>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Cible 1 an</p>
+              <p className="text-3xl font-black mt-1 tracking-tight text-blue-700 dark:text-blue-300">
                 {projectedValue > 0 ? formatCurrency(projectedValue) : "—"}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {expectedReturn > 0 ? `+${expectedReturn}% rendement + épargne` : "Sélectionnez un portefeuille"}
+              <p className="text-[10px] text-muted-foreground mt-2 font-medium">
+                {expectedReturn > 0 ? `Inclus ${expectedReturn}% de rendement estimé` : "Aucun portefeuille sélectionné"}
               </p>
             </div>
           </CardContent>
         </Card>
 
         {/* Score de Risque */}
-        <Card className="border-none bg-gradient-to-br from-orange-500/10 to-red-500/10 dark:from-orange-500/20 dark:to-red-500/20">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-orange-600 dark:text-orange-400">Score de Risque</p>
-              <Shield className="h-4 w-4 text-orange-600" />
+        <Card className="group relative overflow-hidden border-none shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
+          <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-rose-500/10 dark:from-orange-500/20 dark:to-rose-500/20" />
+          <CardContent className="p-6 relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="h-10 w-10 rounded-xl bg-orange-500/20 flex items-center justify-center text-orange-600 dark:text-orange-400">
+                <Shield className="h-5 w-5" />
+              </div>
+              <Badge variant="secondary" className="bg-orange-500/10 text-orange-600 border-none text-[10px]">PROFIL</Badge>
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">
-                {data.riskAssessment?.risk_score || "—"}/10
-              </p>
-              <div className="flex items-center gap-2 mt-1">
-                <Badge
-                  variant="outline"
-                  className="h-4 text-[10px] px-1 border-orange-200 bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
-                >
-                  {riskProfile?.label || "—"}
+            <div>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Score de Risque</p>
+              <div className="flex items-baseline gap-2">
+                <p className="text-3xl font-black mt-1 tracking-tight text-orange-700 dark:text-orange-300">
+                  {data.riskAssessment?.risk_score || "—"}<span className="text-sm font-medium opacity-50">/10</span>
+                </p>
+              </div>
+              <div className="mt-2">
+                <Badge className="bg-orange-600 text-white border-none text-[9px] tracking-wide uppercase">
+                  {riskProfile?.label || "Non évalué"}
                 </Badge>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* C.4 — Épargne mensuelle KPI */}
-        <Card className="border-none bg-gradient-to-br from-purple-500/10 to-pink-500/10 dark:from-purple-500/20 dark:to-pink-500/20">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Épargne mensuelle</p>
-              <PiggyBank className="h-4 w-4 text-purple-600" />
+        {/* C.4 — Épargne mensuelle */}
+        <Card className="group relative overflow-hidden border-none shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-pink-500/10 dark:from-purple-500/20 dark:to-pink-500/20" />
+          <CardContent className="p-6 relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="h-10 w-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                <PiggyBank className="h-5 w-5" />
+              </div>
+              <Badge variant="secondary" className="bg-purple-500/10 text-purple-600 border-none text-[10px]">ÉPARGNE</Badge>
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">
+            <div>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Capacité Mensuelle</p>
+              <p className="text-3xl font-black mt-1 tracking-tight text-purple-700 dark:text-purple-300">
                 {monthlySavings > 0 ? formatCurrency(monthlySavings) : "—"}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {savingsRate > 0 ? (
-                  <>
-                    {savingsRate}% du revenu
-                    {savingsRate >= 20 ? (
-                      <span className="text-green-600"> — Excellent</span>
-                    ) : savingsRate >= 10 ? (
-                      <span className="text-yellow-600"> — Objectif: 20%</span>
-                    ) : (
-                      <span className="text-red-500"> — Objectif: 20%</span>
-                    )}
-                  </>
-                ) : "Renseignez votre épargne"}
-              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <div className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full bg-purple-500 rounded-full" style={{ width: `${Math.min(100, savingsRate * 2)}%` }} />
+                </div>
+                <span className="text-[10px] font-bold text-purple-600">{savingsRate}%</span>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -622,7 +649,15 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         ) : (
-          <QuickActionsCard />
+          <Card className="border-dashed flex items-center justify-center text-center p-6">
+            <div className="space-y-3">
+              <Shield className="h-10 w-10 text-muted-foreground/30 mx-auto" />
+              <p className="text-sm text-muted-foreground">Sélectionnez un portefeuille pour voir votre test de résilience.</p>
+              <Link href="/portfolio">
+                <Button variant="outline" size="sm">Gérer mon portefeuille</Button>
+              </Link>
+            </div>
+          </Card>
         )}
 
         {/* Col 2: AI Insights Panel */}

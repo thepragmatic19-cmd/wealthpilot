@@ -24,19 +24,29 @@ create policy "Users can view own subscription"
 create index idx_subscriptions_user_id on public.subscriptions(user_id);
 create index idx_subscriptions_stripe_customer_id on public.subscriptions(stripe_customer_id);
 
--- Modify handle_new_user trigger to also create a free subscription
+-- Modify handle_new_user trigger to also create a free subscription, client_info, and profile
 create or replace function public.handle_new_user()
-returns trigger as $$
+returns trigger
+language plpgsql
+security definer set search_path = ''
+as $$
 begin
-  insert into public.profiles (id, email, full_name)
-  values (new.id, new.email, new.raw_user_meta_data->>'full_name');
+  insert into public.profiles (id, email, full_name, avatar_url)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'name'),
+    new.raw_user_meta_data ->> 'avatar_url'
+  );
+
+  insert into public.client_info (user_id) values (new.id);
 
   insert into public.subscriptions (user_id, plan, status)
   values (new.id, 'free', 'active');
 
   return new;
 end;
-$$ language plpgsql security definer;
+$$;
 
 -- Backfill existing users who don't have a subscription
 insert into public.subscriptions (user_id, plan, status)

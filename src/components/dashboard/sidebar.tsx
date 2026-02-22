@@ -20,20 +20,42 @@ import {
   CreditCard,
   ChevronLeft,
   ChevronRight,
+  Target,
 } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 
-const navItems = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
-  { href: "/onboarding", icon: ClipboardList, label: "Onboarding" },
-  { href: "/portfolio", icon: PieChart, label: "Portefeuille" },
-  { href: "/transactions", icon: ArrowRightLeft, label: "Transactions" },
-  { href: "/fiscal", icon: Calculator, label: "Fiscal", proBadge: true },
-  { href: "/retirement", icon: Hourglass, label: "Retraite", proBadge: true },
-  { href: "/achievements", icon: Trophy, label: "Achievements" },
-  { href: "/chat", icon: MessageSquare, label: "Conseiller IA" },
-  { href: "/billing", icon: CreditCard, label: "Abonnement" },
-  { href: "/profile", icon: User, label: "Profil" },
+const navGroups = [
+  {
+    label: "Synthèse",
+    items: [
+      { href: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
+      { href: "/portfolio", icon: PieChart, label: "Portefeuille" },
+      { href: "/transactions", icon: ArrowRightLeft, label: "Transactions" },
+      { href: "/goals", icon: Target, label: "Objectifs" },
+    ]
+  },
+  {
+    label: "Planification",
+    items: [
+      { href: "/fiscal", icon: Calculator, label: "Fiscal", proBadge: true },
+      { href: "/retirement", icon: Hourglass, label: "Retraite", proBadge: true },
+    ]
+  },
+  {
+    label: "Conseil IA",
+    items: [
+      { href: "/chat", icon: MessageSquare, label: "Conseiller IA" },
+      { href: "/onboarding", icon: ClipboardList, label: "Évaluation" },
+    ]
+  },
+  {
+    label: "Compte",
+    items: [
+      { href: "/billing", icon: CreditCard, label: "Abonnement" },
+      { href: "/achievements", icon: Trophy, label: "Réalisations" },
+      { href: "/profile", icon: User, label: "Mon Profil" },
+    ]
+  }
 ];
 
 interface SidebarProps {
@@ -54,39 +76,60 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         collapsed ? "w-16" : "w-64"
       )}
     >
-      <div className="flex h-16 items-center border-b px-4">
-        <Link href="/dashboard" className="flex items-center gap-2 font-bold">
-          <TrendingUp className="h-6 w-6 shrink-0 text-primary" />
-          {!collapsed && <span className="text-lg">WealthPilot</span>}
+      <div className="flex h-16 items-center border-b px-6">
+        <Link href="/dashboard" className="flex items-center gap-3 font-bold">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+            <TrendingUp className="h-5 w-5 shrink-0" />
+          </div>
+          {!collapsed && (
+            <span className="text-xl tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+              WealthPilot
+            </span>
+          )}
         </Link>
       </div>
 
-      <ScrollArea className="flex-1 py-4">
-        <nav className="space-y-1 px-2">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Link key={item.href} href={item.href}>
-                <Button
-                  variant={isActive ? "secondary" : "ghost"}
-                  aria-label={item.label}
-                  aria-current={isActive ? "page" : undefined}
-                  className={cn(
-                    "w-full justify-start gap-3",
-                    collapsed && "justify-center px-2"
-                  )}
-                >
-                  <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                  {!collapsed && <span>{item.label}</span>}
-                  {!collapsed && item.proBadge && isFree && (
-                    <Badge variant="outline" className="ml-auto text-[10px] px-1 py-0">
-                      Pro
-                    </Badge>
-                  )}
-                </Button>
-              </Link>
-            );
-          })}
+      <ScrollArea className="flex-1 py-6">
+        <nav className="space-y-6 px-3">
+          {navGroups.map((group) => (
+            <div key={group.label} className="space-y-1">
+              {!collapsed && (
+                <h3 className="px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                  {group.label}
+                </h3>
+              )}
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link key={item.href} href={item.href}>
+                      <Button
+                        variant={isActive ? "secondary" : "ghost"}
+                        aria-label={item.label}
+                        aria-current={isActive ? "page" : undefined}
+                        className={cn(
+                          "w-full justify-start gap-3 h-10 transition-all duration-200",
+                          isActive && "bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary shadow-sm",
+                          collapsed && "justify-center px-0"
+                        )}
+                      >
+                        <item.icon className={cn(
+                          "h-4 w-4 shrink-0 transition-colors",
+                          isActive ? "text-primary" : "text-muted-foreground"
+                        )} aria-hidden="true" />
+                        {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+                        {!collapsed && (item as { proBadge?: boolean }).proBadge && isFree && (
+                          <Badge variant="outline" className="ml-auto text-[9px] px-1 py-0 border-primary/20 text-primary bg-primary/5">
+                            PRO
+                          </Badge>
+                        )}
+                      </Button>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
       </ScrollArea>
 

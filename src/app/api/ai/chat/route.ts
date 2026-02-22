@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Rate limiting: 10 requests per minute per user
-    const rateLimit = checkRateLimit(`chat:${user.id}`, 10);
+    const rateLimit = await checkRateLimit(`chat:${user.id}`, 10);
     if (!rateLimit.success) {
       return rateLimitResponse(rateLimit.resetInSeconds);
     }
@@ -170,27 +170,61 @@ export async function POST(request: NextRequest) {
       content: message,
     });
 
-    // Build system prompt with market data
+    // Build system prompt with full client context
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const allocations = ((selectedPortfolio as any)?.portfolio_allocations ?? []).map((a: any) => ({
+      asset_class: a.asset_class as string,
+      instrument_name: a.instrument_name as string,
+      instrument_ticker: a.instrument_ticker as string,
+      weight: a.weight as number,
+      suggested_account: a.suggested_account as string | null,
+    }));
+
     const systemPrompt = getChatSystemPrompt({
-      profile: `Nom: ${profile?.full_name || "Inconnu"}, Âge: ${clientInfo?.age || "N/A"}, Profession: ${clientInfo?.profession || "N/A"}, Situation: ${clientInfo?.family_situation || "N/A"}`,
-      riskScore: riskAssessment?.risk_score || 5,
-      riskProfile: riskAssessment?.risk_profile || "modéré",
-      portfolioType: selectedPortfolio
-        ? `${selectedPortfolio.name} (${selectedPortfolio.type}) - Rendement: ${selectedPortfolio.expected_return}%, Volatilité: ${selectedPortfolio.volatility}%`
-        : "Aucun sélectionné",
-      goals:
-        goals
-          ?.map(
-            (g: {
-              type: string;
-              label: string;
-              target_amount: number;
-              current_amount: number;
-            }) =>
-              `${g.type}: ${g.label} - Cible: ${g.target_amount}$, Actuel: ${g.current_amount}$`
-          )
-          .join("\n") || "Aucun objectif",
-      financialSummary: `Revenu: ${clientInfo?.annual_income || "N/A"}$, Actifs: ${clientInfo?.total_assets || "N/A"}$, Dettes: ${clientInfo?.total_debts || "N/A"}$, Épargne: ${clientInfo?.monthly_savings || "N/A"}$/mois, CELI: ${clientInfo?.has_celi ? `Oui (${clientInfo.celi_balance}$)` : "Non"}, REER: ${clientInfo?.has_reer ? `Oui (${clientInfo.reer_balance}$)` : "Non"}`,
+      clientName: profile?.full_name || "Client",
+      clientAge: clientInfo?.age ?? null,
+      clientProfession: clientInfo?.profession ?? null,
+      clientFamilySituation: clientInfo?.family_situation ?? null,
+      clientDependents: clientInfo?.dependents ?? null,
+      clientInvestmentExperience: clientInfo?.investment_experience ?? null,
+      clientTaxBracket: clientInfo?.tax_bracket ?? null,
+      annualIncome: clientInfo?.annual_income ?? null,
+      monthlyExpenses: clientInfo?.monthly_expenses ?? null,
+      totalAssets: clientInfo?.total_assets ?? null,
+      totalDebts: clientInfo?.total_debts ?? null,
+      monthlySavings: clientInfo?.monthly_savings ?? null,
+      celiBalance: clientInfo?.celi_balance ?? null,
+      reerBalance: clientInfo?.reer_balance ?? null,
+      reeeBalance: clientInfo?.reee_balance ?? null,
+      hasCeli: clientInfo?.has_celi ?? false,
+      hasReer: clientInfo?.has_reer ?? false,
+      hasReee: clientInfo?.has_reee ?? false,
+      riskScore: riskAssessment?.risk_score ?? 5,
+      riskProfile: riskAssessment?.risk_profile ?? "modéré",
+      riskAnalysis: riskAssessment?.ai_analysis ?? null,
+      riskKeyFactors: (riskAssessment?.key_factors as string[] | null) ?? null,
+      portfolio: selectedPortfolio
+        ? {
+            name: selectedPortfolio.name,
+            type: selectedPortfolio.type,
+            expectedReturn: selectedPortfolio.expected_return,
+            volatility: selectedPortfolio.volatility,
+            sharpeRatio: (selectedPortfolio as any).sharpe_ratio ?? null,
+            maxDrawdown: (selectedPortfolio as any).max_drawdown ?? null,
+            totalMer: (selectedPortfolio as any).total_mer ?? null,
+            taxStrategy: (selectedPortfolio as any).tax_strategy ?? null,
+            rationale: (selectedPortfolio as any).ai_rationale ?? null,
+            allocations,
+          }
+        : null,
+      goals: (goals ?? []).map((g: any) => ({
+        type: g.type as string,
+        label: g.label as string,
+        targetAmount: g.target_amount as number,
+        currentAmount: g.current_amount as number,
+        targetDate: g.target_date as string | null,
+        priority: g.priority as string,
+      })),
       marketData: marketData || undefined,
     });
 

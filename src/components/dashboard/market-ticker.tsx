@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
@@ -21,58 +21,86 @@ function formatPrice(price: number, symbol: string): string {
 }
 
 export function MarketTicker() {
-    const { data, isLoading } = useQuery({
-        queryKey: ["market-quotes"],
-        queryFn: async () => {
-            const res = await fetch("/api/market/quotes");
-            if (!res.ok) throw new Error("Failed to fetch");
-            return res.json() as Promise<{ quotes: Quote[]; cached: boolean; timestamp: string }>;
-        },
-        refetchInterval: 5 * 60 * 1000, // Refresh every 5 min
-        staleTime: 4 * 60 * 1000,
-    });
+  const { data, isLoading } = useQuery({
+    queryKey: ["market-quotes"],
+    queryFn: async () => {
+      const res = await fetch("/api/market/quotes");
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json() as Promise<{
+        quotes: Quote[];
+        cached: boolean;
+        timestamp: string;
+      }>;
+    },
+    refetchInterval: 5 * 60 * 1000, // Refresh every 5 min
+    staleTime: 4 * 60 * 1000,
+  });
 
-    if (isLoading) {
-        return (
-            <div className="flex gap-3 overflow-x-auto pb-1">
-                {[1, 2, 3, 4].map((i) => (
-                    <Skeleton key={i} className="h-16 w-40 shrink-0" />
-                ))}
-            </div>
-        );
-    }
-
-    const quotes = data?.quotes || [];
-
+  if (isLoading) {
     return (
-        <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
-            {quotes.map((q) => {
-                const isUp = q.change > 0;
-                const isFlat = q.change === 0;
-                return (
-                    <Card key={q.symbol} className="shrink-0 min-w-[140px] border-border/50">
-                        <CardContent className="p-3">
-                            <div className="flex items-center justify-between gap-2">
-                                <p className="text-xs font-medium text-muted-foreground truncate">{q.name}</p>
-                                {isFlat ? (
-                                    <Minus className="h-3 w-3 text-muted-foreground" />
-                                ) : isUp ? (
-                                    <TrendingUp className="h-3 w-3 text-green-500" />
-                                ) : (
-                                    <TrendingDown className="h-3 w-3 text-red-500" />
-                                )}
-                            </div>
-                            <p className="text-lg font-bold mt-0.5">
-                                {q.currency && <span className="text-xs font-normal text-muted-foreground mr-0.5">{q.currency}</span>}
-                                {formatPrice(q.price, q.symbol)}
-                            </p>
-                            <p className={`text-xs font-medium ${isUp ? "text-green-500" : isFlat ? "text-muted-foreground" : "text-red-500"}`}>
-                                {isUp ? "+" : ""}{q.change.toFixed(2)} ({isUp ? "+" : ""}{q.changePercent.toFixed(2)}%)
-                            </p>
-                        </CardContent>
-                    </Card>
-                );
-            })}
-        </div>
+      <div className="flex gap-4 overflow-hidden pb-2 -mx-2 px-2">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <Skeleton key={i} className="h-[72px] w-[180px] shrink-0 rounded-2xl" />
+        ))}
+      </div>
     );
+  }
+
+  const quotes = data?.quotes || [];
+
+  return (
+    <div className="group relative">
+      {/* Decorative gradient for edges */}
+      <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+      <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+      
+      <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 no-scrollbar scroll-smooth">
+        <div className="flex gap-4 min-w-full">
+          {quotes.map((q) => {
+            const isUp = q.change > 0;
+            const isFlat = q.change === 0;
+            return (
+              <div 
+                key={q.symbol} 
+                className="shrink-0 min-w-[180px] rounded-2xl border bg-card/40 backdrop-blur-sm p-3.5 shadow-sm hover:shadow-md hover:bg-card/60 transition-all duration-200 cursor-default"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <div className={cn(
+                      "h-1.5 w-1.5 rounded-full animate-pulse",
+                      isUp ? "bg-green-500" : isFlat ? "bg-muted-foreground" : "bg-red-500"
+                    )} />
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">
+                      {q.name}
+                    </p>
+                  </div>
+                  {isUp ? (
+                    <TrendingUp className="h-3.5 w-3.5 text-green-500" />
+                  ) : isFlat ? (
+                    <Minus className="h-3.5 w-3.5 text-muted-foreground" />
+                  ) : (
+                    <TrendingDown className="h-3.5 w-3.5 text-red-500" />
+                  )}
+                </div>
+                
+                <div className="flex items-baseline gap-1.5">
+                  <p className="text-lg font-black tracking-tight">
+                    {formatPrice(q.price, q.symbol)}
+                  </p>
+                  <span className="text-[10px] font-bold opacity-50">{q.currency}</span>
+                </div>
+                
+                <p className={cn(
+                  "text-[11px] font-bold mt-1",
+                  isUp ? "text-green-600 dark:text-green-400" : isFlat ? "text-muted-foreground" : "text-red-500"
+                )}>
+                  {isUp ? "▲" : isFlat ? "•" : "▼"} {Math.abs(q.changePercent).toFixed(2)}%
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }

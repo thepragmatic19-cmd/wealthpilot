@@ -20,7 +20,7 @@ export async function POST(_request: NextRequest) {
     }
 
     // Rate limiting: 5 requests per minute per user
-    const rateLimit = checkRateLimit(`portfolio:${user.id} `, 5);
+    const rateLimit = await checkRateLimit(`portfolio:${user.id}`, 5);
     if (!rateLimit.success) {
       return rateLimitResponse(rateLimit.resetInSeconds);
     }

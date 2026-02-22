@@ -21,6 +21,15 @@ export function AllocationChart({ allocations }: Props) {
     color: ASSET_CLASS_COLORS[name] || "#6b7280",
   }));
 
+  if (data.length === 0) {
+    return (
+      <div className="flex h-[300px] w-full flex-col items-center justify-center rounded-lg border border-dashed bg-muted/30">
+        <PieChart className="mb-2 h-10 w-10 text-muted-foreground/30" />
+        <p className="text-sm text-muted-foreground">Aucune donnée d&apos;allocation</p>
+      </div>
+    );
+  }
+
   return (
     <div className="h-[300px] w-full">
       <ResponsiveContainer width="100%" height="100%">

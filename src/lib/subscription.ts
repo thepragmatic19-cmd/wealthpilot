@@ -6,7 +6,9 @@ export type Feature =
   | "pdf_export"
   | "ai_insights"
   | "priority_ai"
-  | "unlimited_chat";
+  | "unlimited_chat"
+  | "rebalancing_alerts"
+  | "monthly_reports";
 
 interface PlanLimits {
   maxPortfolios: number;
@@ -17,8 +19,8 @@ interface PlanLimits {
 export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
   free: {
     maxPortfolios: 1,
-    chatPerDay: 5,
-    features: [],
+    chatPerDay: 20,
+    features: [], // Aucune fonctionnalité premium
   },
   pro: {
     maxPortfolios: 5,
@@ -26,8 +28,8 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     features: ["fiscal_page", "retirement_page", "pdf_export", "ai_insights"],
   },
   elite: {
-    maxPortfolios: -1, // unlimited
-    chatPerDay: -1, // unlimited
+    maxPortfolios: -1, // illimité
+    chatPerDay: -1,    // illimité
     features: [
       "fiscal_page",
       "retirement_page",
@@ -35,6 +37,8 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
       "ai_insights",
       "priority_ai",
       "unlimited_chat",
+      "rebalancing_alerts",
+      "monthly_reports",
     ],
   },
 };
@@ -53,7 +57,7 @@ export function getMaxPortfolios(plan: SubscriptionPlan): number {
 
 export function getPlanLabel(plan: SubscriptionPlan): string {
   const labels: Record<SubscriptionPlan, string> = {
-    free: "Gratuit",
+    free: "Pro (Lancement)",
     pro: "Pro",
     elite: "Élite",
   };

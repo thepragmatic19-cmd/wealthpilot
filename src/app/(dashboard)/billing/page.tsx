@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { useSubscription } from "@/hooks/use-subscription";
+import { useSubscription, LAUNCH_END_DATE } from "@/hooks/use-subscription";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,8 +14,63 @@ import {
   Check,
   ExternalLink,
   Loader2,
+  Timer,
 } from "lucide-react";
 import { getPlanLabel, PLAN_PRICES } from "@/lib/subscription";
+
+function useCountdown(target: Date) {
+  const calc = () => {
+    const diff = target.getTime() - Date.now();
+    if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0, expired: true };
+    return {
+      days: Math.floor(diff / 86400000),
+      hours: Math.floor((diff % 86400000) / 3600000),
+      minutes: Math.floor((diff % 3600000) / 60000),
+      seconds: Math.floor((diff % 60000) / 1000),
+      expired: false,
+    };
+  };
+  const [remaining, setRemaining] = useState(calc);
+  useEffect(() => {
+    const id = setInterval(() => setRemaining(calc()), 1000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return remaining;
+}
+
+function LaunchCountdown() {
+  const { days, hours, minutes, seconds, expired } = useCountdown(LAUNCH_END_DATE);
+  if (expired) return null;
+  return (
+    <div className="rounded-xl border border-amber-300/40 bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Timer className="h-4 w-4 text-amber-500 animate-pulse" />
+        <p className="text-sm font-bold text-amber-700 dark:text-amber-400">
+          L&apos;offre de lancement expire dans :
+        </p>
+      </div>
+      <div className="grid grid-cols-4 gap-2 text-center">
+        {[
+          { val: days, label: "Jours" },
+          { val: hours, label: "Heures" },
+          { val: minutes, label: "Minutes" },
+          { val: seconds, label: "Secondes" },
+        ].map(({ val, label }) => (
+          <div key={label} className="rounded-lg bg-background/80 border border-amber-200/50 py-2">
+            <p className="text-2xl font-black tabular-nums text-amber-600 dark:text-amber-400">
+              {String(val).padStart(2, "0")}
+            </p>
+            <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{label}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground mt-3 text-center">
+        Après cette date, les fonctionnalités Pro redeviendront payantes (19$/mois).
+      </p>
+    </div>
+  );
+}
 
 export default function BillingPage() {
   const { subscription, plan, isLoading, isFree } = useSubscription();
@@ -98,17 +153,35 @@ export default function BillingPage() {
       </div>
 
       {/* Current Plan */}
-      <Card>
+      <Card className="relative overflow-hidden border-primary/50">
+        <div className="absolute top-0 right-0">
+           <div className="bg-primary text-primary-foreground text-[10px] font-bold px-4 py-1 rotate-45 translate-x-[25px] translate-y-[10px] shadow-sm uppercase tracking-widest">
+              Launch
+           </div>
+        </div>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             Plan actuel
-            <Badge variant={isFree ? "secondary" : "default"}>
+            <Badge variant="default">
               {getPlanLabel(plan)}
             </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {subscription?.current_period_end && plan !== "free" && (
+          <div className="rounded-xl bg-primary/5 border border-primary/10 p-4">
+             <div className="flex items-start gap-3">
+                <Sparkles className="h-5 w-5 text-primary mt-0.5" />
+                <div>
+                   <p className="text-sm font-bold">Offre de lancement active</p>
+                   <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                      Pendant notre phase de lancement, tous les utilisateurs de WealthPilot bénéficient d&apos;un accès complet aux fonctionnalités <strong>Pro</strong> gratuitement. Profitez-en pour optimiser votre capital !
+                   </p>
+                </div>
+             </div>
+          </div>
+          <LaunchCountdown />
+
+          {subscription?.current_period_end && (
             <p className="text-sm text-muted-foreground">
               {subscription.cancel_at_period_end
                 ? "Votre abonnement se termine le "
@@ -122,7 +195,7 @@ export default function BillingPage() {
             </p>
           )}
 
-          {!isFree && (
+          {subscription?.stripe_customer_id && (
             <Button
               variant="outline"
               onClick={handlePortal}
@@ -133,7 +206,7 @@ export default function BillingPage() {
               ) : (
                 <ExternalLink className="h-4 w-4 mr-2" />
               )}
-              Gérer mon abonnement
+              Gérer mon abonnement Stripe
             </Button>
           )}
         </CardContent>
@@ -206,7 +279,9 @@ export default function BillingPage() {
                   "Tout du plan Pro",
                   "Portefeuilles illimités",
                   "Messages IA illimités",
-                  "IA prioritaire",
+                  "IA prioritaire (réponses plus rapides)",
+                  "🔔 Alertes de rééquilibrage automatiques",
+                  "📄 Rapports PDF mensuels automatisés",
                   "Support prioritaire",
                 ].map((f) => (
                   <li key={f} className="flex items-center gap-2">

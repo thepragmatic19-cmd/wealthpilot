@@ -84,9 +84,10 @@ export async function chatWithTools(options: {
     input_schema: Record<string, unknown>;
   }>;
   executeTool: (name: string, args: Record<string, unknown>) => string;
+  onToolCall?: (name: string) => void;
   maxTokens?: number;
 }): Promise<AIResponse> {
-  const { systemPrompt, messages, tools, executeTool, maxTokens = 2048 } =
+  const { systemPrompt, messages, tools, executeTool, onToolCall, maxTokens = 2048 } =
     options;
 
   // Convert tools to OpenAI function calling format

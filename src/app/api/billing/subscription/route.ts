@@ -13,7 +13,7 @@ export async function GET() {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const rateLimit = checkRateLimit(`billing:${user.id}`, 20);
+    const rateLimit = await checkRateLimit(`billing:${user.id}`, 20);
     if (!rateLimit.success) {
       return rateLimitResponse(rateLimit.resetInSeconds);
     }

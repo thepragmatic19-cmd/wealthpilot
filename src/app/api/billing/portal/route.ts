@@ -13,7 +13,7 @@ export async function POST() {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const rateLimit = checkRateLimit(`portal:${user.id}`, 5);
+    const rateLimit = await checkRateLimit(`portal:${user.id}`, 5);
     if (!rateLimit.success) {
       return rateLimitResponse(rateLimit.resetInSeconds);
     }

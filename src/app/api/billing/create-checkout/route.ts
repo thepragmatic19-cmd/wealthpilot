@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const rateLimit = checkRateLimit(`checkout:${user.id}`, 5);
+    const rateLimit = await checkRateLimit(`checkout:${user.id}`, 5);
     if (!rateLimit.success) {
       return rateLimitResponse(rateLimit.resetInSeconds);
     }

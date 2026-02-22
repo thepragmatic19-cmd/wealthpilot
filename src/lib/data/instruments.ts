@@ -1029,7 +1029,7 @@ export const INSTRUMENTS: Instrument[] = [
     mer: 0.11,
     currency: 'CAD',
     exchange: 'TSX',
-    expected_return: 3.8,
+    expected_return: 3.0, // Taux BdC ~3.0% (fév. 2026, après baisses 2024-2025)
     volatility: 0.2,
     preferred_account: 'REER',
     account_rationale: 'Intérêts pleinement imposables, au REER',
@@ -1043,7 +1043,7 @@ export const INSTRUMENTS: Instrument[] = [
     mer: 0.17,
     currency: 'CAD',
     exchange: 'TSX',
-    expected_return: 3.8,
+    expected_return: 3.0, // Taux BdC ~3.0% (fév. 2026)
     volatility: 0.2,
     preferred_account: 'REER',
     account_rationale: 'Alternative populaire pour le cash, au REER',
@@ -1057,7 +1057,7 @@ export const INSTRUMENTS: Instrument[] = [
     mer: 0.16,
     currency: 'CAD',
     exchange: 'TSX',
-    expected_return: 3.8,
+    expected_return: 3.0, // Taux BdC ~3.0% (fév. 2026)
     volatility: 0.2,
     preferred_account: 'REER',
     account_rationale: 'Épargne haut rendement CI',
@@ -1071,7 +1071,7 @@ export const INSTRUMENTS: Instrument[] = [
     mer: 0.14,
     currency: 'CAD',
     exchange: 'TSX',
-    expected_return: 3.6,
+    expected_return: 2.9, // Marché monétaire légèrement sous le taux directeur
     volatility: 0.1,
     preferred_account: 'REER',
     account_rationale: 'Marché monétaire BMO, très stable',
@@ -1108,10 +1108,10 @@ export function getInstrumentsSummaryForPrompt(): string {
   let summary = '';
   for (const [assetClass, instruments] of Object.entries(grouped)) {
     summary += `\n### ${assetClass}\n`;
-    summary += '| Ticker | Nom | MER | Devise | Compte préféré |\n';
-    summary += '|--------|-----|-----|--------|----------------|\n';
+    summary += '| Ticker | Nom | MER | Rend.att. | Volatilité | Devise | Compte préféré |\n';
+    summary += '|--------|-----|-----|-----------|------------|--------|----------------|\n';
     for (const inst of instruments) {
-      summary += `| ${inst.ticker} | ${inst.name} | ${inst.mer}% | ${inst.currency} | ${inst.preferred_account} |\n`;
+      summary += `| ${inst.ticker} | ${inst.name} | ${inst.mer}% | ${inst.expected_return}% | ${inst.volatility}% | ${inst.currency} | ${inst.preferred_account} |\n`;
     }
   }
   return summary;

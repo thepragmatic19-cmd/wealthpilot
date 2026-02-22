@@ -13,6 +13,8 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
+    DialogFooter,
+    DialogDescription,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
@@ -23,7 +25,9 @@ import {
     DollarSign,
     TrendingUp,
     Receipt,
+    Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { Transaction, TransactionType, Portfolio } from "@/types/database";
 
 const TYPE_LABELS: Record<TransactionType, string> = {
@@ -49,6 +53,7 @@ export default function TransactionsPage() {
     const [filter, setFilter] = useState<string>("all");
     const [search, setSearch] = useState("");
     const [showAddDialog, setShowAddDialog] = useState(false);
+    const [txToDelete, setTxToDelete] = useState<string | null>(null);
 
     // New transaction form state
     const [newTx, setNewTx] = useState({
@@ -60,6 +65,7 @@ export default function TransactionsPage() {
         amount: "",
         account: "",
         notes: "",
+        executed_at: new Date().toISOString().split("T")[0],
     });
 
     const loadData = useCallback(async () => {
@@ -113,9 +119,13 @@ export default function TransactionsPage() {
                 amount: parseFloat(newTx.amount) || 0,
                 account: newTx.account || null,
                 notes: newTx.notes || null,
+                executed_at: newTx.executed_at || new Date().toISOString(),
             });
 
-            if (!error) {
+            if (error) {
+                toast.error("Erreur lors de l'enregistrement de la transaction");
+            } else {
+                toast.success("Transaction enregistrée");
                 setShowAddDialog(false);
                 setNewTx({
                     type: "achat",
@@ -126,11 +136,30 @@ export default function TransactionsPage() {
                     amount: "",
                     account: "",
                     notes: "",
+                    executed_at: new Date().toISOString().split("T")[0],
                 });
                 loadData();
             }
         } catch (err) {
             console.error("Error adding transaction:", err);
+            toast.error("Erreur inattendue");
+        }
+    }
+
+    async function handleDeleteTransaction(id: string) {
+        try {
+            const supabase = createClient();
+            const { error } = await supabase.from("transactions").delete().eq("id", id);
+            if (error) {
+                toast.error("Erreur lors de la suppression");
+            } else {
+                toast.success("Transaction supprimée");
+                setTxToDelete(null);
+                loadData();
+            }
+        } catch (err) {
+            console.error("Error deleting transaction:", err);
+            toast.error("Erreur inattendue");
         }
     }
 
@@ -228,16 +257,28 @@ export default function TransactionsPage() {
                                         type="number"
                                         placeholder="0"
                                         value={newTx.quantity}
-                                        onChange={(e) => setNewTx({ ...newTx, quantity: e.target.value })}
+                                        onChange={(e) => {
+                                            const qty = e.target.value;
+                                            const computed = qty && newTx.price
+                                                ? String((parseFloat(qty) * parseFloat(newTx.price)).toFixed(2))
+                                                : newTx.amount;
+                                            setNewTx({ ...newTx, quantity: qty, amount: computed });
+                                        }}
                                     />
                                 </div>
                                 <div className="grid gap-2">
-                                    <Label>Prix</Label>
+                                    <Label>Prix unitaire ($)</Label>
                                     <Input
                                         type="number"
                                         placeholder="0.00"
                                         value={newTx.price}
-                                        onChange={(e) => setNewTx({ ...newTx, price: e.target.value })}
+                                        onChange={(e) => {
+                                            const price = e.target.value;
+                                            const computed = newTx.quantity && price
+                                                ? String((parseFloat(newTx.quantity) * parseFloat(price)).toFixed(2))
+                                                : newTx.amount;
+                                            setNewTx({ ...newTx, price, amount: computed });
+                                        }}
                                     />
                                 </div>
                                 <div className="grid gap-2">
@@ -249,6 +290,15 @@ export default function TransactionsPage() {
                                         onChange={(e) => setNewTx({ ...newTx, amount: e.target.value })}
                                     />
                                 </div>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="executed_at">Date d&apos;exécution</Label>
+                                <Input
+                                    id="executed_at"
+                                    type="date"
+                                    value={newTx.executed_at}
+                                    onChange={(e) => setNewTx({ ...newTx, executed_at: e.target.value })}
+                                />
                             </div>
                             <div className="grid gap-2">
                                 <Label>Compte</Label>
@@ -314,6 +364,29 @@ export default function TransactionsPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={!!txToDelete} onOpenChange={(open) => !open && setTxToDelete(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Supprimer la transaction</DialogTitle>
+                        <DialogDescription>
+                            Cette action est irréversible. La transaction sera définitivement supprimée.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2">
+                        <Button variant="outline" onClick={() => setTxToDelete(null)}>
+                            Annuler
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => txToDelete && handleDeleteTransaction(txToDelete)}
+                        >
+                            Supprimer
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Filters */}
             <Card>
@@ -393,15 +466,25 @@ export default function TransactionsPage() {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <p className={`font-semibold ${tx.type === "vente" ? "text-red-500" : "text-green-500"}`}>
-                                            {tx.type === "vente" ? "-" : "+"}${Math.abs(tx.amount).toLocaleString("fr-CA", { minimumFractionDigits: 2 })}
-                                        </p>
-                                        {tx.quantity && tx.price && (
-                                            <p className="text-xs text-muted-foreground">
-                                                {tx.quantity} × ${tx.price}
+                                    <div className="flex items-center gap-3">
+                                        <div className="text-right">
+                                            <p className={`font-semibold ${tx.type === "vente" ? "text-red-500" : "text-green-500"}`}>
+                                                {tx.type === "vente" ? "-" : "+"}${Math.abs(tx.amount).toLocaleString("fr-CA", { minimumFractionDigits: 2 })}
                                             </p>
-                                        )}
+                                            {tx.quantity && tx.price && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    {tx.quantity} × ${tx.price}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                            onClick={() => setTxToDelete(tx.id)}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
                                     </div>
                                 </div>
                             ))}

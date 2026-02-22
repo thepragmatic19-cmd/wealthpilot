@@ -8,10 +8,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { formatPercent } from "@/lib/utils";
 import { FINANCIAL_TERMS } from "@/lib/financial-terms";
-import { ArrowRight, Loader2, PieChart, Sparkles, CheckCircle, Star, Info, RefreshCw } from "lucide-react";
+import { ArrowRight, Loader2, PieChart, Sparkles, CheckCircle, Star, Info, RefreshCw, Calculator, Shield, Check } from "lucide-react";
 import type { Portfolio, PortfolioAllocation } from "@/types/database";
 
 interface Props {
@@ -49,11 +56,95 @@ function MetricLabel({ label }: { label: string }) {
   );
 }
 
+interface UpsellModalProps {
+  open: boolean;
+  selectedPortfolioName: string;
+  onContinue: () => void;
+}
+
+function UpsellModal({ open, selectedPortfolioName, onContinue }: UpsellModalProps) {
+  const router = useRouter();
+  return (
+    <Dialog open={open}>
+      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
+        <DialogHeader className="text-center">
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/60 shadow-lg shadow-primary/20">
+            <CheckCircle className="h-7 w-7 text-white" />
+          </div>
+          <DialogTitle className="text-xl">
+            🎉 Portefeuille « {selectedPortfolioName} » activé !
+          </DialogTitle>
+          <DialogDescription className="text-sm mt-1">
+            Votre portefeuille IA est prêt. Voici ce que vous pouvez faire maintenant :
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 mt-2">
+          {/* Features unlocked with Pro (current launch access) */}
+          <div className="rounded-xl border bg-muted/30 p-4 space-y-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              ✅ Inclus dans votre accès actuel (offre de lancement)
+            </p>
+            <ul className="space-y-1.5 text-sm">
+              {[
+                { icon: PieChart, text: "3 portefeuilles personnalisés par ETFs réels" },
+                { icon: Calculator, text: "Planification fiscale CELI/REER/REEE" },
+                { icon: Shield, text: "Simulateur de retraite Monte Carlo" },
+              ].map(({ icon: Icon, text }) => (
+                <li key={text} className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                  <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span>{text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Elite upsell */}
+          <div className="rounded-xl border border-amber-300/40 bg-gradient-to-br from-amber-500/5 to-orange-500/5 p-4 space-y-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+              ⭐ Débloquez Élite — 39$/mois
+            </p>
+            <ul className="space-y-1.5 text-sm text-muted-foreground">
+              {[
+                "🔔 Alertes de rééquilibrage automatiques par email",
+                "📄 Rapports PDF mensuels générés par l'IA",
+                "Messages IA illimités + IA prioritaire",
+              ].map((f) => (
+                <li key={f} className="flex items-start gap-2">
+                  <Check className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="flex flex-col gap-2 pt-1">
+            <Button
+              className="w-full gap-2 shadow-lg shadow-primary/20"
+              onClick={() => router.push("/billing")}
+            >
+              <Sparkles className="h-4 w-4" />
+              Passer à Élite — 39$/mois
+            </Button>
+            <Button variant="ghost" className="w-full text-xs text-muted-foreground" onClick={onContinue}>
+              Continuer avec mon accès Pro gratuit
+              <ArrowRight className="h-3.5 w-3.5 ml-1" />
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function PortfolioPreviewStep({ userId }: Props) {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [portfolios, setPortfolios] = useState<PortfolioWithAllocations[]>([]);
   const [selecting, setSelecting] = useState(false);
+  const [showUpsell, setShowUpsell] = useState(false);
+  const [selectedPortfolioName, setSelectedPortfolioName] = useState("");
   const generatingRef = useRef(false);
   const router = useRouter();
 
@@ -175,8 +266,11 @@ export function PortfolioPreviewStep({ userId }: Props) {
         .update({ onboarding_step: "completed", onboarding_completed: true })
         .eq("id", userId);
 
-      toast.success("Portefeuille sélectionné! Bienvenue sur WealthPilot.");
-      router.push("/dashboard");
+      toast.success("Portefeuille sélectionné ! Bienvenue sur WealthPilot.");
+      // Trouver le nom du portefeuille sélectionné pour la modal
+      const selected = portfolios.find((p) => p.id === portfolioId || p.type === portfolioType);
+      setSelectedPortfolioName(selected?.name || "Suggéré");
+      setShowUpsell(true);
     } catch (err) {
       console.error("Selection error:", err);
       toast.error("Erreur lors de la sélection du portefeuille");
@@ -231,6 +325,12 @@ export function PortfolioPreviewStep({ userId }: Props) {
   );
 
   return (
+    <>
+    <UpsellModal
+      open={showUpsell}
+      selectedPortfolioName={selectedPortfolioName}
+      onContinue={() => router.push("/dashboard")}
+    />
     <Card>
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">Vos portefeuilles recommandés</CardTitle>
@@ -393,6 +493,7 @@ export function PortfolioPreviewStep({ userId }: Props) {
         </Tabs>
       </CardContent>
     </Card>
+    </>
   );
 }
 

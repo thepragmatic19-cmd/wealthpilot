@@ -234,7 +234,7 @@ function calculateTaxSavings(input: ToolInput): string {
 
     const totalSavings = federalSavings + provincialSavings;
     const effectiveRate = federalRate + provincialRate;
-    const reerMaxContribution = Math.min(annualIncome * 0.18, 31560);
+    const reerMaxContribution = Math.min(annualIncome * 0.18, 32490); // Plafond 2025
 
     return JSON.stringify({
         contribution: formatCAD(contribution),

@@ -126,7 +126,7 @@ export function computePortfolioMetrics(
   }
 
   const vol = Math.sqrt(Math.max(0, variance));
-  const riskFreeRate = 2.0;
+  const riskFreeRate = 3.0; // Taux directeur BdC ~3.0% (fév. 2026)
   const sharpe = vol > 0 ? (netReturn - riskFreeRate) / vol : 0;
   const maxDrawdown = vol * 2.5;
 

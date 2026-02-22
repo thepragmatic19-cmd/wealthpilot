@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import {
     Info,
     Crown,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 import { useSubscription } from "@/hooks/use-subscription";
 import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
@@ -33,8 +35,10 @@ const DEFAULT_PARAMS = {
     lifeExpectancy: 90,
     currentSavings: 50000,
     monthlyContribution: 1000,
+    monthlyExpenses: 3000,
     expectedReturn: 7,
     inflationRate: 2.5,
+    portfolioVolatility: 12, // % — chargé depuis le portefeuille sélectionné
     rrspBalance: 25000,
     tfsaBalance: 20000,
     governmentPension: 15000, // RRQ/SV annual
@@ -58,7 +62,7 @@ function runMonteCarlo(
     const years = params.retirementAge - params.currentAge;
     const yearlyContribution = params.monthlyContribution * 12;
     const realReturn = (params.expectedReturn - params.inflationRate) / 100;
-    const volatility = 0.15; // Assumed market volatility
+    const volatility = params.portfolioVolatility / 100; // Volatilité du portefeuille sélectionné
 
     // Run simulations
     const allPaths: number[][] = [];
@@ -101,11 +105,6 @@ function runMonteCarlo(
     return results;
 }
 
-function formatCurrency(n: number): string {
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M $`;
-    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K $`;
-    return `${n.toFixed(0)} $`;
-}
 
 export default function RetirementPage() {
     const [params, setParams] = useState(DEFAULT_PARAMS);
@@ -113,20 +112,40 @@ export default function RetirementPage() {
     const { canAccess, isLoading: subLoading } = useSubscription();
     const [showUpgrade, setShowUpgrade] = useState(false);
 
+    const updateParam = useCallback((key: keyof typeof DEFAULT_PARAMS, value: number) => {
+        setParams((prev) => ({ ...prev, [key]: value }));
+    }, []);
+
+    // Load selected portfolio volatility on mount
+    useEffect(() => {
+        async function loadPortfolioVolatility() {
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            const { data: portfolio } = await supabase
+                .from("portfolios")
+                .select("volatility")
+                .eq("user_id", user.id)
+                .eq("is_selected", true)
+                .maybeSingle();
+            if (portfolio?.volatility) {
+                updateParam("portfolioVolatility", portfolio.volatility);
+            }
+        }
+        loadPortfolioVolatility();
+    }, [updateParam]);
+
     const results = useMemo(() => {
         return runMonteCarlo(params);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [params, simKey]);
 
-    const updateParam = useCallback((key: keyof typeof DEFAULT_PARAMS, value: number) => {
-        setParams((prev) => ({ ...prev, [key]: value }));
-    }, []);
-
     const finalMedian = results[results.length - 1]?.p50 || 0;
     const yearsInRetirement = params.lifeExpectancy - params.retirementAge;
     const annualWithdrawal = yearsInRetirement > 0 ? finalMedian / yearsInRetirement : 0;
     const monthlyIncome = annualWithdrawal / 12 + params.governmentPension / 12;
-    const fireNumber = params.monthlyContribution * 12 * 25; // 4% rule
+    // FIRE number = annual expenses × 25 (règle 4% : retrait annuel de 4% du capital)
+    const fireNumber = params.monthlyExpenses * 12 * 25;
 
     if (subLoading) {
         return (
@@ -218,6 +237,15 @@ export default function RetirementPage() {
                             />
                         </div>
                         <div className="space-y-2">
+                            <Label htmlFor="expenses">Dépenses mensuelles à la retraite ($)</Label>
+                            <Input
+                                id="expenses"
+                                type="number"
+                                value={params.monthlyExpenses}
+                                onChange={(e) => updateParam("monthlyExpenses", Number(e.target.value))}
+                            />
+                        </div>
+                        <div className="space-y-2">
                             <Label>Rendement espéré: {params.expectedReturn}%</Label>
                             <Slider
                                 value={[params.expectedReturn]}
@@ -231,6 +259,14 @@ export default function RetirementPage() {
                                 value={[params.inflationRate]}
                                 onValueChange={([v]: number[]) => updateParam("inflationRate", v)}
                                 min={0} max={6} step={0.5}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Volatilité du portefeuille: {params.portfolioVolatility}%</Label>
+                            <Slider
+                                value={[params.portfolioVolatility]}
+                                onValueChange={([v]: number[]) => updateParam("portfolioVolatility", v)}
+                                min={1} max={30} step={0.5}
                             />
                         </div>
                         <div className="space-y-2">
@@ -388,12 +424,12 @@ export default function RetirementPage() {
                                 <div className="text-xs text-muted-foreground space-y-1">
                                     <p>
                                         <strong>Méthodologie :</strong> Simulation Monte Carlo avec 500 trajectoires.
-                                        Rendements modélisés par une distribution log-normale (σ = 15%).
+                                        Rendements modélisés par une distribution log-normale (σ = {params.portfolioVolatility}%).
                                         Tous les montants sont ajustés pour l&apos;inflation.
                                     </p>
                                     <p>
                                         <strong>Revenu mensuel :</strong> Capital médian ÷ années en retraite + pension gouvernementale.
-                                        La <Badge variant="outline" className="text-[10px] px-1 py-0">règle 4%</Badge> est utilisée pour le nombre FIRE.
+                                        La <Badge variant="outline" className="text-[10px] px-1 py-0">règle 4%</Badge> calcule le nombre FIRE = dépenses annuelles à la retraite × 25 (capital nécessaire pour retirer 4%/an indéfiniment).
                                     </p>
                                 </div>
                             </div>

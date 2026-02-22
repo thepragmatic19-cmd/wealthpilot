@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     // Rate limit by IP
     const forwarded = request.headers.get("x-forwarded-for");
     const ip = forwarded?.split(",")[0]?.trim() || "unknown";
-    const limit = checkRateLimit(`register:${ip}`, 5, 60_000);
+    const limit = await checkRateLimit(`register:${ip}`, 5, 60_000);
     if (!limit.success) {
       return rateLimitResponse(limit.resetInSeconds);
     }

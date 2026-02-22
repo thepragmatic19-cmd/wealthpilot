@@ -31,6 +31,8 @@ import {
   RefreshCw,
   Save,
   KeyRound,
+  Pencil,
+  X,
 } from "lucide-react";
 import type { Profile, ClientInfo, RiskAssessment } from "@/types/database";
 
@@ -49,8 +51,20 @@ const passwordSchema = z
     path: ["confirm_password"],
   });
 
+const clientInfoSchema = z.object({
+  annual_income: z.coerce.number().min(0).optional(),
+  monthly_expenses: z.coerce.number().min(0).optional(),
+  monthly_savings: z.coerce.number().min(0).optional(),
+  total_assets: z.coerce.number().min(0).optional(),
+  total_debts: z.coerce.number().min(0).optional(),
+  celi_balance: z.coerce.number().min(0).optional(),
+  reer_balance: z.coerce.number().min(0).optional(),
+  reee_balance: z.coerce.number().min(0).optional(),
+});
+
 type ProfileFormInput = z.infer<typeof profileFormSchema>;
 type PasswordInput = z.infer<typeof passwordSchema>;
+type ClientInfoInput = z.infer<typeof clientInfoSchema>;
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -59,6 +73,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [editingFinancial, setEditingFinancial] = useState(false);
+  const [savingFinancial, setSavingFinancial] = useState(false);
   const router = useRouter();
 
   const profileForm = useForm<ProfileFormInput>({
@@ -69,6 +85,21 @@ export default function ProfilePage() {
   const passwordForm = useForm<PasswordInput>({
     resolver: zodResolver(passwordSchema),
     defaultValues: { password: "", confirm_password: "" },
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const clientInfoForm = useForm<ClientInfoInput>({
+    resolver: zodResolver(clientInfoSchema) as any,
+    defaultValues: {
+      annual_income: 0,
+      monthly_expenses: 0,
+      monthly_savings: 0,
+      total_assets: 0,
+      total_debts: 0,
+      celi_balance: 0,
+      reer_balance: 0,
+      reee_balance: 0,
+    },
   });
 
   useEffect(() => {
@@ -94,12 +125,25 @@ export default function ProfilePage() {
         profileForm.setValue("full_name", p.full_name || "");
         profileForm.setValue("email", p.email);
       }
-      if (ci) setClientInfo(ci as ClientInfo);
+      if (ci) {
+        const info = ci as ClientInfo;
+        setClientInfo(info);
+        clientInfoForm.reset({
+          annual_income: Number(info.annual_income) || 0,
+          monthly_expenses: Number(info.monthly_expenses) || 0,
+          monthly_savings: Number(info.monthly_savings) || 0,
+          total_assets: Number(info.total_assets) || 0,
+          total_debts: Number(info.total_debts) || 0,
+          celi_balance: Number(info.celi_balance) || 0,
+          reer_balance: Number(info.reer_balance) || 0,
+          reee_balance: Number(info.reee_balance) || 0,
+        });
+      }
       if (ra) setRiskAssessment(ra as RiskAssessment);
       setLoading(false);
     }
     load();
-  }, [profileForm]);
+  }, [profileForm, clientInfoForm]);
 
   async function onSaveProfile(data: ProfileFormInput) {
     setSaving(true);
@@ -115,6 +159,44 @@ export default function ProfilePage() {
       toast.success("Profil mis à jour");
     }
     setSaving(false);
+  }
+
+  async function onSaveClientInfo(data: ClientInfoInput) {
+    if (!clientInfo) return;
+    setSavingFinancial(true);
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("client_info")
+      .update({
+        annual_income: data.annual_income ?? null,
+        monthly_expenses: data.monthly_expenses ?? null,
+        monthly_savings: data.monthly_savings ?? null,
+        total_assets: data.total_assets ?? null,
+        total_debts: data.total_debts ?? null,
+        celi_balance: data.celi_balance ?? null,
+        reer_balance: data.reer_balance ?? null,
+        reee_balance: data.reee_balance ?? null,
+      })
+      .eq("id", clientInfo.id);
+
+    if (error) {
+      toast.error("Erreur lors de la sauvegarde");
+    } else {
+      setClientInfo({
+        ...clientInfo,
+        annual_income: data.annual_income ?? null,
+        monthly_expenses: data.monthly_expenses ?? null,
+        monthly_savings: data.monthly_savings ?? null,
+        total_assets: data.total_assets ?? null,
+        total_debts: data.total_debts ?? null,
+        celi_balance: data.celi_balance ?? null,
+        reer_balance: data.reer_balance ?? null,
+        reee_balance: data.reee_balance ?? null,
+      });
+      toast.success("Données financières mises à jour");
+      setEditingFinancial(false);
+    }
+    setSavingFinancial(false);
   }
 
   async function onChangePassword(data: PasswordInput) {
@@ -198,65 +280,207 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Financial Summary */}
+      {/* Financial Summary — editable */}
       {clientInfo && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5" />
-              Résumé financier
-            </CardTitle>
-            <CardDescription>Aperçu de votre situation (lecture seule).</CardDescription>
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Wallet className="h-5 w-5" />
+                  Données financières
+                </CardTitle>
+                <CardDescription>
+                  {editingFinancial ? "Modifiez vos informations financières." : "Cliquez sur Modifier pour mettre à jour vos données."}
+                </CardDescription>
+              </div>
+              {!editingFinancial && (
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setEditingFinancial(true)}>
+                  <Pencil className="h-3.5 w-3.5" />
+                  Modifier
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Revenu annuel</span>
-                  <span className="font-medium">{formatCurrency(Number(clientInfo.annual_income || 0))}</span>
+            {editingFinancial ? (
+              <Form {...clientInfoForm}>
+                <form onSubmit={clientInfoForm.handleSubmit(onSaveClientInfo)} className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={clientInfoForm.control}
+                      name="annual_income"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Revenu annuel ($)</FormLabel>
+                          <FormControl><Input type="number" min={0} {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={clientInfoForm.control}
+                      name="monthly_expenses"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Dépenses mensuelles ($)</FormLabel>
+                          <FormControl><Input type="number" min={0} {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={clientInfoForm.control}
+                      name="monthly_savings"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Épargne mensuelle ($)</FormLabel>
+                          <FormControl><Input type="number" min={0} {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={clientInfoForm.control}
+                      name="total_assets"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Actifs totaux ($)</FormLabel>
+                          <FormControl><Input type="number" min={0} {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={clientInfoForm.control}
+                      name="total_debts"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Dettes totales ($)</FormLabel>
+                          <FormControl><Input type="number" min={0} {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    {clientInfo.has_celi && (
+                      <FormField
+                        control={clientInfoForm.control}
+                        name="celi_balance"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Solde CELI ($)</FormLabel>
+                            <FormControl><Input type="number" min={0} {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                    {clientInfo.has_reer && (
+                      <FormField
+                        control={clientInfoForm.control}
+                        name="reer_balance"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Solde REER ($)</FormLabel>
+                            <FormControl><Input type="number" min={0} {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                    {clientInfo.has_reee && (
+                      <FormField
+                        control={clientInfoForm.control}
+                        name="reee_balance"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Solde REEE ($)</FormLabel>
+                            <FormControl><Input type="number" min={0} {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="submit" disabled={savingFinancial} className="gap-2">
+                      {savingFinancial ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      Enregistrer
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => {
+                        setEditingFinancial(false);
+                        clientInfoForm.reset({
+                          annual_income: Number(clientInfo.annual_income) || 0,
+                          monthly_expenses: Number(clientInfo.monthly_expenses) || 0,
+                          monthly_savings: Number(clientInfo.monthly_savings) || 0,
+                          total_assets: Number(clientInfo.total_assets) || 0,
+                          total_debts: Number(clientInfo.total_debts) || 0,
+                          celi_balance: Number(clientInfo.celi_balance) || 0,
+                          reer_balance: Number(clientInfo.reer_balance) || 0,
+                          reee_balance: Number(clientInfo.reee_balance) || 0,
+                        });
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                      Annuler
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Revenu annuel</span>
+                    <span className="font-medium">{formatCurrency(Number(clientInfo.annual_income || 0))}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Actifs totaux</span>
+                    <span className="font-medium">{formatCurrency(Number(clientInfo.total_assets || 0))}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Dettes totales</span>
+                    <span className="font-medium">{formatCurrency(Number(clientInfo.total_debts || 0))}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Épargne mensuelle</span>
+                    <span className="font-medium">{formatCurrency(Number(clientInfo.monthly_savings || 0))}/mois</span>
+                  </div>
                 </div>
-                <Separator />
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Actifs totaux</span>
-                  <span className="font-medium">{formatCurrency(Number(clientInfo.total_assets || 0))}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Dettes totales</span>
-                  <span className="font-medium">{formatCurrency(Number(clientInfo.total_debts || 0))}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Épargne mensuelle</span>
-                  <span className="font-medium">{formatCurrency(Number(clientInfo.monthly_savings || 0))}/mois</span>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Âge</span>
-                  <span className="font-medium">{clientInfo.age || "—"} ans</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Profession</span>
-                  <span className="font-medium">{clientInfo.profession || "—"}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Expérience</span>
-                  <span className="font-medium capitalize">{clientInfo.investment_experience || "—"}</span>
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Comptes</span>
-                  <div className="flex gap-1">
-                    {clientInfo.has_celi && <Badge variant="outline">CELI</Badge>}
-                    {clientInfo.has_reer && <Badge variant="outline">REER</Badge>}
-                    {clientInfo.has_reee && <Badge variant="outline">REEE</Badge>}
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Âge</span>
+                    <span className="font-medium">{clientInfo.age || "—"} ans</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Profession</span>
+                    <span className="font-medium">{clientInfo.profession || "—"}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Expérience</span>
+                    <span className="font-medium capitalize">{clientInfo.investment_experience || "—"}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Comptes</span>
+                    <div className="flex gap-1">
+                      {clientInfo.has_celi && <Badge variant="outline">CELI {clientInfo.celi_balance ? `· ${formatCurrency(Number(clientInfo.celi_balance))}` : ""}</Badge>}
+                      {clientInfo.has_reer && <Badge variant="outline">REER {clientInfo.reer_balance ? `· ${formatCurrency(Number(clientInfo.reer_balance))}` : ""}</Badge>}
+                      {clientInfo.has_reee && <Badge variant="outline">REEE</Badge>}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       )}
