@@ -23,6 +23,14 @@ import {
 import { toast } from "sonner";
 import { formatCurrency, RISK_PROFILES } from "@/lib/utils";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   User,
   Wallet,
   Shield,
@@ -33,6 +41,8 @@ import {
   KeyRound,
   Pencil,
   X,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import type { Profile, ClientInfo, RiskAssessment } from "@/types/database";
 
@@ -52,6 +62,7 @@ const passwordSchema = z
   });
 
 const clientInfoSchema = z.object({
+  age: z.coerce.number().int().min(0).max(120).optional(),
   annual_income: z.coerce.number().min(0).optional(),
   monthly_expenses: z.coerce.number().min(0).optional(),
   monthly_savings: z.coerce.number().min(0).optional(),
@@ -75,6 +86,9 @@ export default function ProfilePage() {
   const [changingPassword, setChangingPassword] = useState(false);
   const [editingFinancial, setEditingFinancial] = useState(false);
   const [savingFinancial, setSavingFinancial] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
   const router = useRouter();
 
   const profileForm = useForm<ProfileFormInput>({
@@ -91,6 +105,7 @@ export default function ProfilePage() {
   const clientInfoForm = useForm<ClientInfoInput>({
     resolver: zodResolver(clientInfoSchema) as any,
     defaultValues: {
+      age: 0,
       annual_income: 0,
       monthly_expenses: 0,
       monthly_savings: 0,
@@ -129,6 +144,7 @@ export default function ProfilePage() {
         const info = ci as ClientInfo;
         setClientInfo(info);
         clientInfoForm.reset({
+          age: Number(info.age) || 0,
           annual_income: Number(info.annual_income) || 0,
           monthly_expenses: Number(info.monthly_expenses) || 0,
           monthly_savings: Number(info.monthly_savings) || 0,
@@ -168,6 +184,7 @@ export default function ProfilePage() {
     const { error } = await supabase
       .from("client_info")
       .update({
+        age: data.age ?? null,
         annual_income: data.annual_income ?? null,
         monthly_expenses: data.monthly_expenses ?? null,
         monthly_savings: data.monthly_savings ?? null,
@@ -184,6 +201,7 @@ export default function ProfilePage() {
     } else {
       setClientInfo({
         ...clientInfo,
+        age: data.age ?? null,
         annual_income: data.annual_income ?? null,
         monthly_expenses: data.monthly_expenses ?? null,
         monthly_savings: data.monthly_savings ?? null,
@@ -197,6 +215,24 @@ export default function ProfilePage() {
       setEditingFinancial(false);
     }
     setSavingFinancial(false);
+  }
+
+  async function handleDeleteAccount() {
+    setDeletingAccount(true);
+    try {
+      const res = await fetch("/api/auth/delete-account", { method: "DELETE" });
+      if (!res.ok) {
+        const body = await res.json();
+        toast.error(body.error || "Erreur lors de la suppression");
+        setDeletingAccount(false);
+        return;
+      }
+      toast.success("Compte supprimé");
+      router.push("/login");
+    } catch {
+      toast.error("Erreur inattendue");
+      setDeletingAccount(false);
+    }
   }
 
   async function onChangePassword(data: PasswordInput) {
@@ -309,6 +345,17 @@ export default function ProfilePage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <FormField
                       control={clientInfoForm.control}
+                      name="age"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Âge</FormLabel>
+                          <FormControl><Input type="number" min={0} max={120} {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={clientInfoForm.control}
                       name="annual_income"
                       render={({ field }) => (
                         <FormItem>
@@ -414,6 +461,7 @@ export default function ProfilePage() {
                       onClick={() => {
                         setEditingFinancial(false);
                         clientInfoForm.reset({
+                          age: Number(clientInfo.age) || 0,
                           annual_income: Number(clientInfo.annual_income) || 0,
                           monthly_expenses: Number(clientInfo.monthly_expenses) || 0,
                           monthly_savings: Number(clientInfo.monthly_savings) || 0,
@@ -571,6 +619,78 @@ export default function ProfilePage() {
           </Form>
         </CardContent>
       </Card>
+
+      {/* Danger Zone */}
+      <Card className="border-destructive/40">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <AlertTriangle className="h-5 w-5" />
+            Zone de danger
+          </CardTitle>
+          <CardDescription>
+            Ces actions sont irréversibles. Procédez avec prudence.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+            <div>
+              <p className="font-medium text-sm">Supprimer mon compte</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Supprime définitivement votre compte et toutes vos données.
+              </p>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="gap-2 shrink-0"
+              onClick={() => { setDeleteConfirm(""); setShowDeleteDialog(true); }}
+            >
+              <Trash2 className="h-4 w-4" />
+              Supprimer
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Delete Account Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Supprimer le compte
+            </DialogTitle>
+            <DialogDescription>
+              Cette action est <strong>irréversible</strong>. Toutes vos données (profil, portefeuille, transactions, objectifs, historique de chat) seront définitivement supprimées.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Tapez <strong>SUPPRIMER</strong> pour confirmer :
+            </p>
+            <Input
+              value={deleteConfirm}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              placeholder="SUPPRIMER"
+              className="border-destructive/50 focus-visible:ring-destructive"
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+              Annuler
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteConfirm !== "SUPPRIMER" || deletingAccount}
+              onClick={handleDeleteAccount}
+              className="gap-2"
+            >
+              {deletingAccount ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Supprimer définitivement
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

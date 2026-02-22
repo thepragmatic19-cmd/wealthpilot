@@ -62,7 +62,7 @@ function buildSuggestions(ctx: ClientContext): string[] {
       (g) =>
         g.target_date &&
         new Date(g.target_date) <
-          new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000)
+        new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000)
     );
     if (urgentGoal) {
       suggestions.push(`Stratégie pour atteindre : ${urgentGoal.label}`);
@@ -319,7 +319,7 @@ export function ChatInterface() {
   const atLimit = isFree && todayMessageCount >= limits.chatPerDay;
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col gap-3">
+    <div className="flex flex-col gap-3" style={{ height: 'calc(100dvh - 8rem)' }}>
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
@@ -350,7 +350,7 @@ export function ChatInterface() {
 
       {/* ── Messages ── */}
       <div className="flex-1 overflow-hidden rounded-2xl border border-border/40 bg-card/20 backdrop-blur-sm flex flex-col min-h-0">
-        <div ref={messagesRef} className="flex-1 overflow-y-auto px-5 scroll-smooth">
+        <div ref={messagesRef} className="flex-1 overflow-y-auto scroll-touch px-4 sm:px-5 scroll-smooth">
           <div className="py-6 space-y-0.5">
 
             {/* Empty state */}
@@ -398,7 +398,7 @@ export function ChatInterface() {
               const isNewDay =
                 !prevMsg ||
                 new Date(msg.created_at).toDateString() !==
-                  new Date(prevMsg.created_at).toDateString();
+                new Date(prevMsg.created_at).toDateString();
               const isUser = msg.role === "user";
 
               return (
@@ -502,7 +502,7 @@ export function ChatInterface() {
                 <button
                   key={i}
                   onClick={() => sendMessage(s)}
-                  className="flex-shrink-0 text-[10px] font-semibold text-primary/70 hover:text-primary bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-full border border-primary/10 hover:border-primary/25 transition-all whitespace-nowrap"
+                  className="flex-shrink-0 text-[10px] font-semibold text-primary/70 hover:text-primary bg-primary/5 hover:bg-primary/10 px-3 py-2 rounded-full border border-primary/10 hover:border-primary/25 transition-all whitespace-nowrap active:scale-95"
                 >
                   {s}
                 </button>
@@ -522,6 +522,7 @@ export function ChatInterface() {
                   ? "Limite de messages atteinte..."
                   : "Posez votre question..."
               }
+              inputMode="text"
               className="min-h-[44px] max-h-[140px] flex-1 resize-none bg-background/60 rounded-xl border-border/50 focus-visible:ring-1 focus-visible:ring-primary/30 text-sm py-3 px-4 shadow-none leading-relaxed"
               rows={1}
               disabled={streaming || atLimit}
@@ -530,7 +531,7 @@ export function ChatInterface() {
               onClick={() => sendMessage()}
               disabled={!input.trim() || streaming}
               size="icon"
-              className="h-11 w-11 rounded-xl shrink-0 shadow-md shadow-primary/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:scale-100"
+              className="h-11 w-11 sm:h-11 sm:w-11 rounded-xl shrink-0 shadow-md shadow-primary/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:scale-100"
             >
               {streaming ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

@@ -38,7 +38,7 @@ import {
     CircleDollarSign,
     CheckCircle2,
 } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import type { Goal, GoalType, GoalPriority } from "@/types/database";
 
 const GOAL_TYPE_CONFIG: Record<GoalType, { label: string; icon: React.ElementType; color: string }> = {
@@ -60,6 +60,16 @@ const PRIORITY_LABELS: Record<GoalPriority, { label: string; variant: "default" 
 function daysUntil(dateStr: string | null): number | null {
     if (!dateStr) return null;
     return Math.ceil((new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+function getTrajectory(goal: Goal, monthlySavings: number): { status: 'on_track' | 'tight' | 'off_track' | 'overdue'; required: number } | null {
+    if (!goal.target_date || goal.current_amount >= goal.target_amount) return null;
+    const months = (new Date(goal.target_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.4);
+    if (months <= 0) return { status: 'overdue', required: 0 };
+    const required = (goal.target_amount - goal.current_amount) / months;
+    if (required <= monthlySavings * 0.6) return { status: 'on_track', required };
+    if (required <= monthlySavings) return { status: 'tight', required };
+    return { status: 'off_track', required };
 }
 
 interface GoalForm {
@@ -84,6 +94,7 @@ const EMPTY_FORM: GoalForm = {
 
 export default function GoalsPage() {
     const [goals, setGoals] = useState<Goal[]>([]);
+    const [monthlySavings, setMonthlySavings] = useState(0);
     const [loading, setLoading] = useState(true);
     const [showDialog, setShowDialog] = useState(false);
     const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
@@ -97,11 +108,11 @@ export default function GoalsPage() {
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        const { data } = await supabase
-            .from("goals")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false });
+        const [{ data }, { data: ciData }] = await Promise.all([
+            supabase.from("goals").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+            supabase.from("client_info").select("monthly_savings").eq("user_id", user.id).maybeSingle(),
+        ]);
+        if (ciData?.monthly_savings) setMonthlySavings(Number(ciData.monthly_savings));
         if (data) setGoals(data as Goal[]);
         setLoading(false);
     }, []);
@@ -212,6 +223,11 @@ export default function GoalsPage() {
         );
     }
 
+    const sortedGoals = [...goals].sort((a, b) => {
+        const order: Record<GoalPriority, number> = { haute: 0, moyenne: 1, basse: 2 };
+        return order[a.priority] - order[b.priority];
+    });
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -246,7 +262,7 @@ export default function GoalsPage() {
                 </Card>
             ) : (
                 <div className="grid gap-4 sm:grid-cols-2">
-                    {goals.map((goal) => {
+                    {sortedGoals.map((goal) => {
                         const progress = goal.target_amount > 0 ? Math.min((goal.current_amount / goal.target_amount) * 100, 100) : 0;
                         const cfg = GOAL_TYPE_CONFIG[goal.type] || GOAL_TYPE_CONFIG.autre;
                         const days = daysUntil(goal.target_date);
@@ -301,6 +317,31 @@ export default function GoalsPage() {
                                             )}
                                         </div>
                                     </div>
+                                    {(() => {
+                                        const traj = getTrajectory(goal, monthlySavings);
+                                        if (!traj) return null;
+                                        return (
+                                            <div className={cn(
+                                                "rounded-lg px-3 py-2 text-xs flex items-center justify-between",
+                                                traj.status === 'on_track' && "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400",
+                                                traj.status === 'tight' && "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400",
+                                                traj.status === 'off_track' && "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400",
+                                                traj.status === 'overdue' && "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400",
+                                            )}>
+                                                <span>
+                                                    {traj.status === 'on_track' && '✓ Sur la bonne voie'}
+                                                    {traj.status === 'tight' && '⚠ Attention — objectif serré'}
+                                                    {traj.status === 'off_track' && '✗ Hors trajectoire'}
+                                                    {traj.status === 'overdue' && '✗ Date dépassée'}
+                                                </span>
+                                                {traj.status !== 'overdue' && (
+                                                    <span className="font-semibold">
+                                                        {formatCurrency(traj.required)}/mois requis
+                                                    </span>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
                                     {/* Quick progress update */}
                                     {!completed && (
                                         <div className="flex gap-2 pt-1">

@@ -26,8 +26,10 @@ import {
     TrendingUp,
     Receipt,
     Trash2,
+    BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import type { Transaction, TransactionType, Portfolio } from "@/types/database";
 
 const TYPE_LABELS: Record<TransactionType, string> = {
@@ -45,6 +47,60 @@ const TYPE_COLORS: Record<TransactionType, string> = {
     rééquilibrage: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
     cotisation: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
 };
+
+interface Position {
+    ticker: string;
+    name: string;
+    sharesHeld: number;
+    avgCost: number;
+    totalCostBasis: number;
+    realizedGainLoss: number;
+}
+
+function computePositions(transactions: Transaction[]): Position[] {
+    const positions: Record<string, Position> = {};
+
+    // Process in chronological order for correct average cost
+    const sorted = [...transactions].sort(
+        (a, b) => new Date(a.executed_at).getTime() - new Date(b.executed_at).getTime()
+    );
+
+    for (const tx of sorted) {
+        const ticker = tx.instrument_ticker;
+        if (!ticker || ticker === "-") continue;
+
+        if (!positions[ticker]) {
+            positions[ticker] = {
+                ticker,
+                name: tx.instrument_name,
+                sharesHeld: 0,
+                avgCost: 0,
+                totalCostBasis: 0,
+                realizedGainLoss: 0,
+            };
+        }
+
+        const pos = positions[ticker];
+
+        if (tx.type === "achat" && tx.quantity && tx.price) {
+            const newCostBasis = pos.totalCostBasis + tx.quantity * tx.price;
+            const newShares = pos.sharesHeld + tx.quantity;
+            pos.avgCost = newCostBasis / newShares;
+            pos.sharesHeld = newShares;
+            pos.totalCostBasis = newCostBasis;
+        } else if (tx.type === "vente" && tx.quantity && tx.price) {
+            const saleProceeds = tx.quantity * tx.price;
+            const costOfSold = pos.avgCost * tx.quantity;
+            pos.realizedGainLoss += saleProceeds - costOfSold;
+            pos.sharesHeld = Math.max(0, pos.sharesHeld - tx.quantity);
+            pos.totalCostBasis = Math.max(0, pos.totalCostBasis - costOfSold);
+        }
+    }
+
+    return Object.values(positions).filter(
+        (p) => p.sharesHeld > 0.0001 || p.realizedGainLoss !== 0
+    );
+}
 
 export default function TransactionsPage() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -174,6 +230,9 @@ export default function TransactionsPage() {
         }
         return true;
     });
+
+    const positions = computePositions(transactions);
+    const totalRealizedGain = positions.reduce((sum, p) => sum + p.realizedGainLoss, 0);
 
     // Summary stats
     const totalInvested = transactions
@@ -364,6 +423,74 @@ export default function TransactionsPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Positions (Cost Basis) */}
+            {positions.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <BarChart3 className="h-5 w-5" />
+                            Mes positions
+                            {totalRealizedGain !== 0 && (
+                                <span className={cn(
+                                    "ml-auto text-sm font-semibold",
+                                    totalRealizedGain >= 0 ? "text-green-600 dark:text-green-400" : "text-red-500"
+                                )}>
+                                    G/P réalisé: {totalRealizedGain >= 0 ? "+" : ""}${totalRealizedGain.toLocaleString("fr-CA", { minimumFractionDigits: 2 })}
+                                </span>
+                            )}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b text-muted-foreground">
+                                        <th className="pb-2 text-left font-medium">Titre</th>
+                                        <th className="pb-2 text-right font-medium">Parts</th>
+                                        <th className="pb-2 text-right font-medium">Coût moyen</th>
+                                        <th className="pb-2 text-right font-medium">Coût total</th>
+                                        <th className="pb-2 text-right font-medium">G/P réalisé</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {positions.map((pos) => (
+                                        <tr key={pos.ticker} className="hover:bg-muted/30 transition-colors">
+                                            <td className="py-3">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="font-medium">{pos.name}</div>
+                                                    <Badge variant="outline" className="text-[10px]">{pos.ticker}</Badge>
+                                                </div>
+                                            </td>
+                                            <td className="py-3 text-right font-mono text-xs">
+                                                {pos.sharesHeld > 0 ? pos.sharesHeld.toFixed(4) : "—"}
+                                            </td>
+                                            <td className="py-3 text-right font-mono text-xs">
+                                                {pos.avgCost > 0 ? `$${pos.avgCost.toLocaleString("fr-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
+                                            </td>
+                                            <td className="py-3 text-right font-mono text-xs">
+                                                {pos.totalCostBasis > 0 ? `$${pos.totalCostBasis.toLocaleString("fr-CA", { minimumFractionDigits: 2 })}` : "—"}
+                                            </td>
+                                            <td className={cn(
+                                                "py-3 text-right font-semibold text-xs",
+                                                pos.realizedGainLoss > 0 ? "text-green-600 dark:text-green-400" :
+                                                pos.realizedGainLoss < 0 ? "text-red-500" : "text-muted-foreground"
+                                            )}>
+                                                {pos.realizedGainLoss === 0 ? "—" : (
+                                                    `${pos.realizedGainLoss >= 0 ? "+" : ""}$${pos.realizedGainLoss.toLocaleString("fr-CA", { minimumFractionDigits: 2 })}`
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <p className="mt-3 text-xs text-muted-foreground">
+                            Méthode du coût moyen pondéré. G/P réalisé calculé sur les ventes seulement.
+                        </p>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Delete Confirmation Dialog */}
             <Dialog open={!!txToDelete} onOpenChange={(open) => !open && setTxToDelete(null)}>

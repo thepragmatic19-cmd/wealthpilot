@@ -20,7 +20,25 @@ import { useSubscription } from "@/hooks/use-subscription";
 import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
 import { Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import Link from "next/link";
+
+const PROVINCES: Record<string, { label: string; brackets: Array<{ max: number; rate: number }> }> = {
+    QC: { label: "Québec", brackets: [{ max: 51780, rate: 0.14 }, { max: 103545, rate: 0.19 }, { max: 126000, rate: 0.24 }, { max: Infinity, rate: 0.2575 }] },
+    ON: { label: "Ontario", brackets: [{ max: 51446, rate: 0.0505 }, { max: 102894, rate: 0.0915 }, { max: 150000, rate: 0.1116 }, { max: 220000, rate: 0.1216 }, { max: Infinity, rate: 0.1316 }] },
+    BC: { label: "Colombie-Britannique", brackets: [{ max: 45654, rate: 0.0506 }, { max: 91310, rate: 0.077 }, { max: 104835, rate: 0.105 }, { max: 127299, rate: 0.1229 }, { max: 172602, rate: 0.147 }, { max: 240716, rate: 0.168 }, { max: Infinity, rate: 0.205 }] },
+    AB: { label: "Alberta", brackets: [{ max: 148269, rate: 0.10 }, { max: 177922, rate: 0.12 }, { max: 237230, rate: 0.13 }, { max: 355845, rate: 0.14 }, { max: Infinity, rate: 0.15 }] },
+};
+
+function getProvincialRate(income: number, province: string): number {
+    const prov = PROVINCES[province];
+    if (!prov) return 0;
+    for (const b of prov.brackets) {
+        if (income <= b.max) return b.rate;
+    }
+    return prov.brackets[prov.brackets.length - 1].rate;
+}
 
 // 2026 limits for Canada
 const CELI_ANNUAL_LIMIT = 7000;
@@ -42,6 +60,7 @@ interface FiscalData {
 export default function FiscalPage() {
     const [data, setData] = useState<FiscalData>({ clientInfo: null, portfolio: null, transactions: [] });
     const [loading, setLoading] = useState(true);
+    const [province, setProvince] = useState("QC");
     const { canAccess, isLoading: subLoading } = useSubscription();
     const [showUpgrade, setShowUpgrade] = useState(false);
 
@@ -128,8 +147,13 @@ export default function FiscalPage() {
     const celiUsagePercent = Math.min(100, (celiBalance / CELI_CUMULATIVE_LIMIT) * 100);
 
     // Estimated tax savings from REER contributions
-    const estimatedTaxBracket = annualIncome > 235675 ? 0.33 : annualIncome > 165430 ? 0.29 : annualIncome > 111733 ? 0.26 : annualIncome > 55867 ? 0.205 : 0.15;
-    const estimatedTaxSavings = reerRoom * estimatedTaxBracket;
+    // Federal marginal rate
+    const federalRate = annualIncome > 235675 ? 0.33 : annualIncome > 165430 ? 0.29 : annualIncome > 111733 ? 0.26 : annualIncome > 55867 ? 0.205 : 0.15;
+    // Provincial marginal rate
+    const provincialRate = getProvincialRate(annualIncome, province);
+    // Combined rate
+    const combinedRate = federalRate + provincialRate;
+    const estimatedTaxSavings = reerRoom * combinedRate;
 
     // REEE SCEE projection
     const sceeAccumulated = reeeBalance * SCEE_RATE; // rough estimate of grants received
@@ -254,7 +278,7 @@ export default function FiscalPage() {
                                 ${reerRoom.toLocaleString("fr-CA")}
                             </p>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                                18% du revenu, max {REER_MAX.toLocaleString("fr-CA")}$ (2025)
+                                18% du revenu, max {REER_MAX.toLocaleString("fr-CA")}$ ({new Date().getFullYear()})
                             </p>
                         </div>
                     </CardContent>
@@ -316,13 +340,25 @@ export default function FiscalPage() {
                     <CardContent className="space-y-4">
                         {annualIncome > 0 ? (
                             <>
+                                {/* Province selector */}
+                                <div className="flex items-center gap-2">
+                                    <Label className="text-xs text-muted-foreground shrink-0">Province :</Label>
+                                    <Select value={province} onValueChange={setProvince}>
+                                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            {Object.entries(PROVINCES).map(([k, v]) => (
+                                                <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                                 <div className="rounded-lg bg-muted p-4">
-                                    <p className="text-sm text-muted-foreground">Si vous cotisez le maximum REER restant</p>
+                                    <p className="text-sm text-muted-foreground">Économies si vous cotisez le maximum REER</p>
                                     <p className="text-3xl font-bold mt-1">
                                         ${estimatedTaxSavings.toLocaleString("fr-CA", { maximumFractionDigits: 0 })}
                                     </p>
                                     <p className="text-xs text-muted-foreground mt-1">
-                                        Taux marginal estimé: {(estimatedTaxBracket * 100).toFixed(1)}% (fédéral)
+                                        Taux combiné : {(combinedRate * 100).toFixed(1)}%
                                     </p>
                                 </div>
                                 <div className="space-y-2 text-sm">
@@ -331,8 +367,16 @@ export default function FiscalPage() {
                                         <span>${annualIncome.toLocaleString("fr-CA")}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Cotisation max REER</span>
-                                        <span>${reerRoom.toLocaleString("fr-CA")}</span>
+                                        <span className="text-muted-foreground">Taux fédéral marginal</span>
+                                        <span>{(federalRate * 100).toFixed(1)}%</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Taux provincial ({province})</span>
+                                        <span>{(provincialRate * 100).toFixed(1)}%</span>
+                                    </div>
+                                    <div className="flex justify-between font-semibold border-t pt-2">
+                                        <span className="text-muted-foreground">Taux combiné</span>
+                                        <span>{(combinedRate * 100).toFixed(1)}%</span>
                                     </div>
                                     <div className="flex justify-between font-medium text-green-600 dark:text-green-400">
                                         <span>Réduction d&apos;impôt estimée</span>

@@ -62,7 +62,7 @@ function MetricLabel({ label, className }: { label: string; className?: string }
 
 function QuickActionsCard() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
       {[
         { href: "/chat", icon: MessageSquare, label: "Chat IA", color: "text-blue-500", bg: "bg-blue-500/10" },
         { href: "/transactions", icon: Calculator, label: "Transaction", color: "text-emerald-500", bg: "bg-emerald-500/10" },
@@ -337,24 +337,24 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 pb-10">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight">
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
             Bonjour, {data.profile?.full_name?.split(" ")[0] || "investisseur"} 👋
           </h1>
-          <p className="text-muted-foreground mt-1">Votre cockpit financier est à jour.</p>
+          <p className="text-muted-foreground mt-1 text-sm md:text-base">Votre cockpit financier est à jour.</p>
         </div>
-        
+
         {/* Wealth Score indicator */}
         <div className="flex items-center gap-4 p-3 rounded-2xl border bg-card/50 backdrop-blur-sm shadow-sm">
           <div className="relative h-12 w-12">
-             <svg className="h-full w-full" viewBox="0 0 36 36">
-                <path className="stroke-muted fill-none" strokeWidth="3" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                <path className="stroke-primary fill-none transition-all duration-1000" strokeDasharray={`${Math.min(100, savingsRate * 2)}, 100`} strokeLinecap="round" strokeWidth="3" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-             </svg>
-             <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold">
-               {savingsRate}%
-             </div>
+            <svg className="h-full w-full" viewBox="0 0 36 36">
+              <path className="stroke-muted fill-none" strokeWidth="3" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              <path className="stroke-primary fill-none transition-all duration-1000" strokeDasharray={`${Math.min(100, savingsRate * 2)}, 100`} strokeLinecap="round" strokeWidth="3" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold">
+              {savingsRate}%
+            </div>
           </div>
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Taux d&apos;épargne</p>
@@ -369,7 +369,7 @@ export default function DashboardPage() {
       <MarketTicker />
 
       {/* Summary Cards */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
         {/* C.1 — Net Worth */}
         <Card className="group relative overflow-hidden border-none shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20 opacity-100 group-hover:opacity-80 transition-opacity" />
@@ -388,7 +388,7 @@ export default function DashboardPage() {
             <div>
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Actifs Totaux</p>
               <p className="text-3xl font-black mt-1 tracking-tight">{formatCurrency(totalInvested)}</p>
-              
+
               {totalRegistered > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-4">
                   {celiBalance > 0 && (
@@ -574,13 +574,12 @@ export default function DashboardPage() {
                         {daysRemaining !== null && (
                           <Badge
                             variant="outline"
-                            className={`text-[10px] px-1.5 py-0 ${
-                              daysRemaining < 0
+                            className={`text-[10px] px-1.5 py-0 ${daysRemaining < 0
                                 ? "border-red-200 bg-red-50/50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
                                 : daysRemaining < 365
                                   ? "border-orange-200 bg-orange-50/50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400"
                                   : "border-green-200 bg-green-50/50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
-                            }`}
+                              }`}
                           >
                             {daysRemaining < 0
                               ? "Dépassé"
