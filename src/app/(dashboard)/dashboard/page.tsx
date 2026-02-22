@@ -538,12 +538,19 @@ export default function DashboardPage() {
 
         {/* Goals with days-remaining badges */}
         <Card className="flex flex-col">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              Objectifs de vie
-            </CardTitle>
-            <CardDescription>Suivi de votre progression</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-primary" />
+                Objectifs de vie
+              </CardTitle>
+              <CardDescription>Suivi de votre progression</CardDescription>
+            </div>
+            <Link href="/goals">
+              <Button variant="outline" size="sm" className="gap-1">
+                Gérer <ArrowRight className="h-3 w-3" />
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent className="space-y-6 flex-1">
             {data.goals.length === 0 ? (

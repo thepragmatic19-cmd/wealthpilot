@@ -15,17 +15,19 @@ import {
   Hourglass,
   Trophy,
   CreditCard,
+  Target,
 } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
-  { href: "/onboarding", icon: ClipboardList, label: "Onboarding" },
   { href: "/portfolio", icon: PieChart, label: "Portefeuille" },
   { href: "/transactions", icon: ArrowRightLeft, label: "Transactions" },
+  { href: "/goals", icon: Target, label: "Objectifs" },
   { href: "/fiscal", icon: Calculator, label: "Fiscal" },
   { href: "/retirement", icon: Hourglass, label: "Retraite" },
-  { href: "/achievements", icon: Trophy, label: "Achievements" },
   { href: "/chat", icon: MessageSquare, label: "Conseiller IA" },
+  { href: "/onboarding", icon: ClipboardList, label: "Évaluation" },
+  { href: "/achievements", icon: Trophy, label: "Réalisations" },
   { href: "/billing", icon: CreditCard, label: "Abonnement" },
   { href: "/profile", icon: User, label: "Profil" },
 ];
