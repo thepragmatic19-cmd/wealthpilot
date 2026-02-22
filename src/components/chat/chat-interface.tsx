@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +14,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Send, Loader2, Bot, User, Lock, Trash2, Sparkles, PlusCircle } from "lucide-react";
+import {
+  Send,
+  Loader2,
+  Trash2,
+  Sparkles,
+  TrendingUp,
+  Target,
+  PiggyBank,
+  BarChart3,
+  Lock,
+} from "lucide-react";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -28,6 +37,8 @@ const DEFAULT_SUGGESTIONS = [
   "Risques de mon portefeuille actuel",
   "Atteindre mes objectifs de retraite",
 ];
+
+const SUGGESTION_ICONS = [TrendingUp, PiggyBank, BarChart3, Target];
 
 interface ClientContext {
   hasPortfolio: boolean;
@@ -48,7 +59,12 @@ function buildSuggestions(ctx: ClientContext): string[] {
   }
 
   if (ctx.hasGoals && ctx.goals.length > 0) {
-    const urgentGoal = ctx.goals.find(g => g.target_date && new Date(g.target_date) < new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000));
+    const urgentGoal = ctx.goals.find(
+      (g) =>
+        g.target_date &&
+        new Date(g.target_date) <
+          new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000)
+    );
     if (urgentGoal) {
       suggestions.push(`Stratégie pour atteindre : ${urgentGoal.label}`);
     } else {
@@ -69,14 +85,13 @@ function buildSuggestions(ctx: ClientContext): string[] {
   }
 
   suggestions.push("Simuler ma retraite à 60 ans");
-
   return suggestions.slice(0, 4);
 }
 
 function MessageDate({ date }: { date: string }) {
   return (
-    <div className="flex justify-center my-6">
-      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40 bg-muted/30 px-3 py-1 rounded-full border border-border/50">
+    <div className="flex justify-center my-5">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/30 px-3">
         {new Date(date).toLocaleDateString("fr-CA", { dateStyle: "long" })}
       </span>
     </div>
@@ -100,12 +115,19 @@ export function ChatInterface() {
   useEffect(() => {
     async function loadHistory() {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       setUserId(user.id);
 
-      const [{ data }, { data: portfolio }, { data: goals }, { data: clientInfo }] = await Promise.all([
+      const [
+        { data },
+        { data: portfolio },
+        { data: goals },
+        { data: clientInfo },
+      ] = await Promise.all([
         supabase
           .from("chat_messages")
           .select("*")
@@ -118,10 +140,7 @@ export function ChatInterface() {
           .eq("user_id", user.id)
           .eq("is_selected", true)
           .maybeSingle(),
-        supabase
-          .from("goals")
-          .select("label, target_date")
-          .eq("user_id", user.id),
+        supabase.from("goals").select("label, target_date").eq("user_id", user.id),
         supabase
           .from("client_info")
           .select("has_celi, has_reer")
@@ -139,20 +158,23 @@ export function ChatInterface() {
         setTodayMessageCount(todayCount);
       }
 
-      // Build contextual suggestions
-      setSuggestions(buildSuggestions({
-        hasPortfolio: !!portfolio,
-        hasGoals: (goals ?? []).length > 0,
-        hasCeli: clientInfo?.has_celi ?? false,
-        hasReer: clientInfo?.has_reer ?? false,
-        goals: (goals ?? []) as Array<{ label: string; target_date: string | null }>,
-      }));
+      setSuggestions(
+        buildSuggestions({
+          hasPortfolio: !!portfolio,
+          hasGoals: (goals ?? []).length > 0,
+          hasCeli: clientInfo?.has_celi ?? false,
+          hasReer: clientInfo?.has_reer ?? false,
+          goals: (goals ?? []) as Array<{
+            label: string;
+            target_date: string | null;
+          }>,
+        })
+      );
     }
     loadHistory();
   }, []);
 
   useEffect(() => {
-    // Check for query param
     const params = new URLSearchParams(window.location.search);
     const q = params.get("q");
     if (q) {
@@ -163,21 +185,22 @@ export function ChatInterface() {
 
   useEffect(() => {
     if (scrollRef.current) {
-      const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      const scrollContainer = scrollRef.current.querySelector(
+        "[data-radix-scroll-area-viewport]"
+      );
       if (scrollContainer) {
         scrollContainer.scrollTo({
           top: scrollContainer.scrollHeight,
-          behavior: "smooth"
+          behavior: "smooth",
         });
       }
     }
   }, [messages, streamingText]);
 
-  // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`;
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
     }
   }, [input]);
 
@@ -198,7 +221,6 @@ export function ChatInterface() {
     setStreaming(true);
     setStreamingText("");
 
-    // Optimistically add user message
     const userMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
       user_id: userId,
@@ -246,16 +268,13 @@ export function ChatInterface() {
           if (line.startsWith("data: ")) {
             const data = line.slice(6);
             if (data === "[DONE]") break;
-
             try {
               const parsed = JSON.parse(data);
               if (parsed.text) {
                 fullText += parsed.text;
                 setStreamingText(fullText);
               }
-              if (parsed.error) {
-                toast.error(parsed.error);
-              }
+              if (parsed.error) toast.error(parsed.error);
             } catch {
               // skip malformed chunks
             }
@@ -263,7 +282,6 @@ export function ChatInterface() {
         }
       }
 
-      // Add assistant message
       const assistantMsg: ChatMessage = {
         id: `temp-${Date.now()}-assistant`,
         user_id: userId,
@@ -288,219 +306,260 @@ export function ChatInterface() {
     }
   }
 
+  const atLimit = isFree && todayMessageCount >= limits.chatPerDay;
+
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col gap-4">
+    <div className="flex h-[calc(100vh-8rem)] flex-col gap-3">
+
+      {/* ── Header ── */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-primary" />
-           </div>
-           <div>
-              <h2 className="text-sm font-bold tracking-tight">Conseiller IA WealthPilot</h2>
-              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
-                <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                Disponible 24/7
-              </div>
-           </div>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg shadow-primary/25">
+              <Sparkles className="h-4 w-4 text-white" />
+            </div>
+            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-background" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold leading-none mb-0.5">Conseiller IA</h2>
+            <p className="text-[10px] text-muted-foreground font-medium">
+              Llama 3.3 · 70B · Disponible 24/7
+            </p>
+          </div>
         </div>
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => setShowClearDialog(true)}>
-          <Trash2 className="h-4 w-4" />
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+          onClick={() => setShowClearDialog(true)}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
         </Button>
       </div>
 
-      <div className="flex-1 overflow-hidden rounded-2xl border bg-card/30 backdrop-blur-sm shadow-inner flex flex-col">
-        {/* Messages */}
-        <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-          <div className="space-y-6 pb-4">
+      {/* ── Messages ── */}
+      <div className="flex-1 overflow-hidden rounded-2xl border border-border/40 bg-card/20 backdrop-blur-sm flex flex-col min-h-0">
+        <ScrollArea className="flex-1 px-5" ref={scrollRef}>
+          <div className="py-6 space-y-0.5">
+
+            {/* Empty state */}
             {messages.length === 0 && !streaming && (
-              <div className="flex flex-col items-center justify-center py-20 animate-in fade-in slide-in-from-bottom-2">
-                <div className="relative mb-6">
-                  <div className="absolute -inset-4 rounded-full bg-primary/20 blur-2xl animate-pulse" />
-                  <div className="relative h-16 w-16 rounded-2xl bg-primary flex items-center justify-center shadow-xl">
-                    <Bot className="h-10 w-10 text-white" />
+              <div className="flex flex-col items-center justify-center py-14 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="relative mb-7">
+                  <div className="absolute inset-0 rounded-full bg-primary/20 blur-3xl scale-[2] animate-pulse" />
+                  <div className="relative h-20 w-20 rounded-3xl bg-gradient-to-br from-primary via-primary to-primary/70 flex items-center justify-center shadow-2xl shadow-primary/30">
+                    <Sparkles className="h-9 w-9 text-white" />
                   </div>
                 </div>
-                <div className="text-center max-w-sm px-4">
-                  <h3 className="text-lg font-bold mb-2">Comment puis-je vous aider ?</h3>
-                  <p className="text-sm text-muted-foreground mb-8">
-                    Je suis votre expert financier personnel, prêt à analyser vos actifs et optimiser votre stratégie.
-                  </p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2 w-full max-w-lg px-4">
-                  {suggestions.map((s, i) => (
-                    <Button
-                      key={i}
-                      variant="outline"
-                      className="h-auto py-3.5 px-4 justify-start items-start text-left text-xs bg-background/50 border-border/50 hover:border-primary/50 transition-all group whitespace-normal break-words"
-                      onClick={() => sendMessage(s)}
-                    >
-                      <PlusCircle className="h-3.5 w-3.5 mr-2 text-primary opacity-50 group-hover:opacity-100 shrink-0 mt-0.5" />
-                      <span className="flex-1">{s}</span>
-                    </Button>
-                  ))}
+
+                <h3 className="text-lg font-bold mb-1.5 tracking-tight">
+                  Bonjour, je suis votre conseiller IA
+                </h3>
+                <p className="text-sm text-muted-foreground text-center max-w-[280px] mb-9 leading-relaxed">
+                  Posez-moi n&apos;importe quelle question sur votre situation financière
+                </p>
+
+                <div className="grid grid-cols-2 gap-2.5 w-full max-w-[420px] px-1">
+                  {suggestions.map((s, i) => {
+                    const Icon = SUGGESTION_ICONS[i] ?? Sparkles;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => sendMessage(s)}
+                        className="group flex flex-col items-start gap-2.5 p-4 rounded-2xl bg-background/70 border border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 text-left shadow-sm hover:shadow-md"
+                      >
+                        <div className="h-8 w-8 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center transition-colors">
+                          <Icon className="h-4 w-4 text-primary" />
+                        </div>
+                        <span className="text-xs font-medium leading-snug text-foreground/80 group-hover:text-foreground transition-colors">
+                          {s}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
+            {/* Message list */}
             {messages.map((msg, i) => {
               const prevMsg = messages[i - 1];
-              const isNewDay = !prevMsg || new Date(msg.created_at).toDateString() !== new Date(prevMsg.created_at).toDateString();
+              const isNewDay =
+                !prevMsg ||
+                new Date(msg.created_at).toDateString() !==
+                  new Date(prevMsg.created_at).toDateString();
+              const isUser = msg.role === "user";
 
               return (
-                <div key={msg.id} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div
+                  key={msg.id}
+                  className="animate-in fade-in slide-in-from-bottom-1 duration-200"
+                >
                   {isNewDay && <MessageDate date={msg.created_at} />}
-                  <div className={cn("flex gap-3 mb-1", msg.role === "user" ? "flex-row-reverse" : "flex-row")}>
-                    <Avatar className={cn("h-8 w-8 shrink-0 border shadow-sm mt-1", msg.role === "assistant" ? "bg-primary text-primary-foreground" : "bg-muted")}>
-                      <AvatarFallback className="text-[10px] font-bold">
-                        {msg.role === "assistant" ? "WP" : <User className="h-4 w-4" />}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className={cn(
-                      "group relative flex flex-col gap-1 max-w-[85%] sm:max-w-[75%]",
-                      msg.role === "user" ? "items-end" : "items-start"
-                    )}>
-                      <div className={cn(
-                        "rounded-2xl px-4 py-3 shadow-sm break-words overflow-hidden w-full",
-                        msg.role === "user" 
-                          ? "bg-primary text-primary-foreground rounded-tr-none" 
-                          : "bg-background border rounded-tl-none"
-                      )}>
-                        {msg.role === "assistant" ? (
-                          <ChatMarkdown content={msg.content} />
-                        ) : (
+
+                  <div
+                    className={cn(
+                      "flex gap-3 py-1.5",
+                      isUser ? "flex-row-reverse" : "flex-row"
+                    )}
+                  >
+                    {/* AI avatar */}
+                    {!isUser && (
+                      <div className="h-7 w-7 shrink-0 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-sm mt-1.5">
+                        <Sparkles className="h-3.5 w-3.5 text-white" />
+                      </div>
+                    )}
+
+                    <div
+                      className={cn(
+                        "flex flex-col gap-1",
+                        isUser
+                          ? "items-end max-w-[72%]"
+                          : "items-start max-w-[88%]"
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "break-words",
+                          isUser
+                            ? "bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-4 py-2.5 shadow-sm"
+                            : "rounded-2xl rounded-tl-sm"
+                        )}
+                      >
+                        {isUser ? (
                           <p className="text-sm leading-relaxed whitespace-pre-wrap">
                             {msg.content}
                           </p>
+                        ) : (
+                          <ChatMarkdown content={msg.content} />
                         )}
                       </div>
-                      <div className={cn(
-                        "text-[9px] font-medium opacity-40 px-1",
-                        msg.role === "user" ? "text-right" : "text-left"
-                      )}>
-                        {new Date(msg.created_at).toLocaleTimeString("fr-CA", { hour: '2-digit', minute: '2-digit' })}
-                      </div>
+                      <span
+                        className={cn(
+                          "text-[9px] font-medium text-muted-foreground/35 px-1",
+                          isUser ? "text-right" : "text-left"
+                        )}
+                      >
+                        {new Date(msg.created_at).toLocaleTimeString("fr-CA", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
                     </div>
                   </div>
                 </div>
               );
             })}
 
-            {/* Streaming message */}
-            {streaming && streamingText && (
-              <div className="flex gap-3 animate-in fade-in slide-in-from-left-2 duration-200">
-                <Avatar className="h-8 w-8 shrink-0 bg-primary text-primary-foreground border shadow-sm mt-1">
-                  <AvatarFallback className="text-[10px] font-bold">WP</AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col gap-1 max-w-[85%] sm:max-w-[75%] items-start">
-                  <div className="rounded-2xl rounded-tl-none bg-background border px-4 py-3 shadow-sm break-words overflow-hidden w-full">
-                    <ChatMarkdown content={streamingText} />
-                    <span className="inline-block h-4 w-1 animate-pulse bg-primary ml-1 align-middle" />
-                  </div>
+            {/* Streaming */}
+            {streaming && (
+              <div className="flex gap-3 py-1.5 animate-in fade-in duration-200">
+                <div className="h-7 w-7 shrink-0 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-sm mt-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-white animate-pulse" />
                 </div>
-              </div>
-            )}
-
-            {streaming && !streamingText && (
-              <div className="flex gap-3 animate-pulse">
-                <Avatar className="h-8 w-8 shrink-0 bg-primary/20 border-dashed">
-                  <AvatarFallback className="text-[10px] font-bold opacity-30">WP</AvatarFallback>
-                </Avatar>
-                <div className="flex items-center gap-2 rounded-2xl bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Le pilote analyse vos données...
+                <div className="flex flex-col gap-1 items-start max-w-[88%]">
+                  {streamingText ? (
+                    <div className="break-words">
+                      <ChatMarkdown content={streamingText} />
+                      <span className="inline-block h-3.5 w-0.5 bg-primary/70 animate-pulse ml-0.5 align-middle rounded-full" />
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 py-3">
+                      {[0, 150, 300].map((delay) => (
+                        <span
+                          key={delay}
+                          className="h-2 w-2 rounded-full bg-primary/50 animate-bounce"
+                          style={{ animationDelay: `${delay}ms` }}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
           </div>
         </ScrollArea>
 
-        {/* Input Area */}
-        <div className="p-4 bg-background/50 border-t backdrop-blur-md">
-          <div className="relative group">
-            <Textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                isFree && todayMessageCount >= limits.chatPerDay
-                  ? "Limite de messages atteinte..."
-                  : "Comment puis-je optimiser mon capital ?"
-              }
-              className="min-h-[52px] max-h-[160px] w-full resize-none bg-background/80 pr-12 pl-4 py-3.5 rounded-2xl border-border/60 focus-visible:ring-primary/20 shadow-sm transition-all group-hover:border-primary/30"
-              rows={1}
-              disabled={streaming || (isFree && todayMessageCount >= limits.chatPerDay)}
-            />
-            <Button
-              onClick={() => sendMessage()}
-              disabled={!input.trim() || streaming}
-              size="icon"
-              className="absolute right-2 bottom-2 h-8 w-8 rounded-xl shadow-lg transition-transform hover:scale-105 active:scale-95"
-            >
-              {streaming ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-3.5 w-3.5" />
-              )}
-            </Button>
-          </div>
-          
-      {/* Message counter for non-elite users */}
-      {!isElite && limits.chatPerDay > 0 && (
-        <div className="mt-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-1 w-16 rounded-full bg-muted overflow-hidden">
-              <div 
-                className={cn(
-                  "h-full transition-all duration-700",
-                  todayMessageCount >= limits.chatPerDay ? "bg-destructive" : "bg-primary"
-                )} 
-                style={{ width: `${Math.min(100, (todayMessageCount / limits.chatPerDay) * 100)}%` }} 
-              />
-            </div>
-            <span className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-tighter">
-              {todayMessageCount}/{limits.chatPerDay} Messages
-            </span>
-          </div>
+        {/* ── Input area ── */}
+        <div className="shrink-0 p-3 border-t border-border/30 bg-background/30 backdrop-blur-md">
 
+          {/* Quick suggestions */}
           {messages.length > 0 && !streaming && (
-            <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
-              {suggestions.slice(0, 2).map((s, i) => (
+            <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar">
+              {(isElite ? suggestions : suggestions.slice(0, 2)).map((s, i) => (
                 <button
                   key={i}
-                  className="whitespace-normal text-[9px] font-bold text-primary hover:text-primary-foreground hover:bg-primary transition-all bg-primary/5 px-2.5 py-1.5 rounded-xl border border-primary/10 shadow-sm max-w-[140px] text-left leading-tight"
                   onClick={() => sendMessage(s)}
+                  className="flex-shrink-0 text-[10px] font-semibold text-primary/70 hover:text-primary bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-full border border-primary/10 hover:border-primary/25 transition-all whitespace-nowrap"
                 >
                   {s}
                 </button>
               ))}
             </div>
           )}
-        </div>
-      )}
 
-      {isElite && messages.length > 0 && !streaming && (
-        <div className="mt-3 flex justify-end gap-1.5 overflow-x-auto no-scrollbar pb-1">
-          {suggestions.slice(0, 3).map((s, i) => (
-            <button
-              key={i}
-              className="whitespace-normal text-[9px] font-bold text-primary hover:text-primary-foreground hover:bg-primary transition-all bg-primary/5 px-2.5 py-1.5 rounded-xl border border-primary/10 shadow-sm max-w-[140px] text-right leading-tight"
-              onClick={() => sendMessage(s)}
+          {/* Textarea + send */}
+          <div className="flex gap-2 items-end">
+            <Textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                atLimit
+                  ? "Limite de messages atteinte..."
+                  : "Posez votre question..."
+              }
+              className="min-h-[44px] max-h-[140px] flex-1 resize-none bg-background/60 rounded-xl border-border/50 focus-visible:ring-1 focus-visible:ring-primary/30 text-sm py-3 px-4 shadow-none leading-relaxed"
+              rows={1}
+              disabled={streaming || atLimit}
+            />
+            <Button
+              onClick={() => sendMessage()}
+              disabled={!input.trim() || streaming}
+              size="icon"
+              className="h-11 w-11 rounded-xl shrink-0 shadow-md shadow-primary/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:scale-100"
             >
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
+              {streaming ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+
+          {/* Message counter */}
+          {!isElite && limits.chatPerDay > 0 && (
+            <div className="mt-2 flex items-center gap-2">
+              <div className="h-0.5 w-14 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all duration-700",
+                    todayMessageCount >= limits.chatPerDay
+                      ? "bg-destructive"
+                      : "bg-primary"
+                  )}
+                  style={{
+                    width: `${Math.min(100, (todayMessageCount / limits.chatPerDay) * 100)}%`,
+                  }}
+                />
+              </div>
+              <span className="text-[9px] font-medium text-muted-foreground/50">
+                {todayMessageCount}/{limits.chatPerDay} messages aujourd&apos;hui
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Security Disclaimer */}
-      <div className="flex items-center justify-center gap-2 text-[10px] font-medium text-muted-foreground opacity-60">
-        <Lock className="h-3 w-3" />
-        Vos données sont chiffrées et privées. WealthPilot est un outil d&apos;aide à la décision.
+      {/* ── Footer disclaimer ── */}
+      <div className="flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground/35 font-medium">
+        <Lock className="h-2.5 w-2.5" />
+        Données chiffrées · Outil d&apos;aide à la décision uniquement
       </div>
 
+      {/* ── Dialogs ── */}
       <UpgradePrompt
         open={showUpgrade}
         onOpenChange={setShowUpgrade}
@@ -512,7 +571,8 @@ export function ChatInterface() {
           <DialogHeader>
             <DialogTitle>Effacer l&apos;historique</DialogTitle>
             <DialogDescription>
-              Cette action supprimera définitivement tous vos messages. Cette opération est irréversible.
+              Cette action supprimera définitivement tous vos messages. Cette
+              opération est irréversible.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
