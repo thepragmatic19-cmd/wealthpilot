@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   LayoutDashboard,
   PieChart,
@@ -89,7 +88,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </Link>
       </div>
 
-      <ScrollArea className="flex-1 py-6">
+      <div className="flex-1 overflow-y-auto py-6">
         <nav className="space-y-6 px-3">
           {navGroups.map((group) => (
             <div key={group.label} className="space-y-1">
@@ -131,7 +130,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             </div>
           ))}
         </nav>
-      </ScrollArea>
+      </div>
 
       <div className="border-t p-2">
         <Button variant="ghost" className="w-full" onClick={onToggle} aria-label={collapsed ? "Ouvrir le menu" : "Réduire le menu"}>
