@@ -54,7 +54,7 @@ export function HowItWorks() {
               className="relative text-center"
             >
               {index < steps.length - 1 && (
-                <div className="absolute left-1/2 top-12 hidden h-0.5 w-full bg-border md:block" />
+                <div className="absolute left-0 right-0 top-12 hidden h-0.5 bg-border md:block" />
               )}
               <div className="relative mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-background shadow-lg ring-1 ring-border">
                 <step.icon className="h-10 w-10 text-primary" />

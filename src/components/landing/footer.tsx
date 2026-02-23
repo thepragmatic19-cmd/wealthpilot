@@ -37,7 +37,7 @@ export function Footer() {
   return (
     <footer className="border-t py-12 px-4">
       <div className="mx-auto max-w-7xl">
-        <div className="grid gap-8 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-4">
           <div className="md:col-span-1">
             <Link href="/" className="flex items-center gap-2 font-bold text-lg">
               <TrendingUp className="h-5 w-5 text-primary" />
@@ -100,7 +100,8 @@ export function Footer() {
                   placeholder="votre@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="text-sm"
+                  className="text-base"
+                  autoComplete="email"
                   required
                 />
                 <Button type="submit" size="sm">
