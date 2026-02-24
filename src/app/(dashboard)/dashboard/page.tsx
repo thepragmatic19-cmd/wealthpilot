@@ -75,7 +75,7 @@ function MetricLabel({ label, className }: { label: string; className?: string }
 
 function QuickActionsCard() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       {[
         { href: "/chat", icon: MessageSquare, label: "Chat IA", color: "text-blue-500", bg: "bg-blue-500/10" },
         { href: "/transactions", icon: Calculator, label: "Transaction", color: "text-emerald-500", bg: "bg-emerald-500/10" },
@@ -83,13 +83,13 @@ function QuickActionsCard() {
         { href: "/fiscal", icon: Shield, label: "Planification", color: "text-purple-500", bg: "bg-purple-500/10" },
       ].map((action, i) => (
         <Link key={i} href={action.href}>
-          <div className="group flex items-center gap-4 p-4 rounded-2xl border bg-card/50 backdrop-blur-sm hover:border-primary/30 hover:bg-card transition-all cursor-pointer shadow-sm">
-            <div className={`h-10 w-10 rounded-xl ${action.bg} flex items-center justify-center ${action.color} group-hover:scale-110 transition-transform`}>
-              <action.icon className="h-5 w-5" />
+          <div className="group flex items-center gap-3 p-3 sm:p-4 rounded-2xl border bg-card/50 backdrop-blur-sm hover:border-primary/30 hover:bg-card transition-all cursor-pointer shadow-sm">
+            <div className={`h-9 w-9 shrink-0 rounded-xl ${action.bg} flex items-center justify-center ${action.color} group-hover:scale-110 transition-transform`}>
+              <action.icon className="h-4 w-4" />
             </div>
-            <div>
-              <p className="text-sm font-bold">{action.label}</p>
-              <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">Accès rapide</p>
+            <div className="min-w-0">
+              <p className="text-sm font-bold truncate">{action.label}</p>
+              <p className="hidden sm:block text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">Accès rapide</p>
             </div>
           </div>
         </Link>
@@ -352,7 +352,7 @@ export default function DashboardPage() {
     <div className="space-y-8 pb-10">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
             Bonjour, {data.profile?.full_name?.split(" ")[0] || "investisseur"} 👋
           </h1>
           <p className="text-muted-foreground mt-1">Votre cockpit financier est à jour.</p>
@@ -382,7 +382,7 @@ export default function DashboardPage() {
       <MarketTicker />
 
       {/* Summary Cards */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* C.1 — Net Worth */}
         <Card className="group relative overflow-hidden border-none shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20 opacity-100 group-hover:opacity-80 transition-opacity" />
@@ -400,7 +400,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Actifs Totaux</p>
-              <p className="text-3xl font-black mt-1 tracking-tight">{formatCurrency(totalInvested)}</p>
+              <p className="text-2xl sm:text-3xl font-black mt-1 tracking-tight">{formatCurrency(totalInvested)}</p>
 
               {totalRegistered > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-4">
@@ -432,7 +432,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Cible 1 an</p>
-              <p className="text-3xl font-black mt-1 tracking-tight text-blue-700 dark:text-blue-300">
+              <p className="text-2xl sm:text-3xl font-black mt-1 tracking-tight text-blue-700 dark:text-blue-300">
                 {projectedValue > 0 ? formatCurrency(projectedValue) : "—"}
               </p>
               <p className="text-[10px] text-muted-foreground mt-2 font-medium">
@@ -455,7 +455,7 @@ export default function DashboardPage() {
             <div>
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Score de Risque</p>
               <div className="flex items-baseline gap-2">
-                <p className="text-3xl font-black mt-1 tracking-tight text-orange-700 dark:text-orange-300">
+                <p className="text-2xl sm:text-3xl font-black mt-1 tracking-tight text-orange-700 dark:text-orange-300">
                   {data.riskAssessment?.risk_score || "—"}<span className="text-sm font-medium opacity-50">/10</span>
                 </p>
               </div>
@@ -480,7 +480,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Capacité Mensuelle</p>
-              <p className="text-3xl font-black mt-1 tracking-tight text-purple-700 dark:text-purple-300">
+              <p className="text-2xl sm:text-3xl font-black mt-1 tracking-tight text-purple-700 dark:text-purple-300">
                 {monthlySavings > 0 ? formatCurrency(monthlySavings) : "—"}
               </p>
               <div className="mt-2 flex items-center gap-2">
@@ -497,7 +497,7 @@ export default function DashboardPage() {
       {/* Quick Actions — always visible after KPI cards */}
       <QuickActionsCard />
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3">
         {/* Portfolio allocation + metrics row */}
         {data.selectedPortfolio && (
           <Card className="lg:col-span-2">
@@ -629,7 +629,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Strategic Insights Row — 3-column layout */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3">
         {/* Col 1: Stress Test (if portfolio) or Quick Actions fallback */}
         {data.selectedPortfolio?.stress_test ? (
           <Card className="border-yellow-200/50 bg-yellow-50/10 dark:bg-yellow-950/10">

@@ -242,7 +242,8 @@ export default function GoalsPage() {
                 </div>
                 <Button onClick={openAdd} className="gap-2">
                     <Plus className="h-4 w-4" />
-                    Nouvel objectif
+                    <span className="hidden sm:inline">Nouvel objectif</span>
+                    <span className="sm:hidden">Nouveau</span>
                 </Button>
             </div>
 
@@ -322,7 +323,7 @@ export default function GoalsPage() {
                                         if (!traj) return null;
                                         return (
                                             <div className={cn(
-                                                "rounded-lg px-3 py-2 text-xs flex items-center justify-between",
+                                                "rounded-lg px-3 py-2 text-xs flex flex-wrap items-center justify-between gap-1",
                                                 traj.status === 'on_track' && "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400",
                                                 traj.status === 'tight' && "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400",
                                                 traj.status === 'off_track' && "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400",
@@ -347,18 +348,19 @@ export default function GoalsPage() {
                                         <div className="flex gap-2 pt-1">
                                             <Input
                                                 type="number"
-                                                placeholder={`Nouveau montant actuel…`}
-                                                className="h-10 text-sm"
+                                                placeholder="Montant actuel…"
+                                                className="h-10 text-sm min-w-0"
                                                 value={progressInputs[goal.id] || ""}
                                                 onChange={(e) => setProgressInputs((prev) => ({ ...prev, [goal.id]: e.target.value }))}
                                             />
                                             <Button
                                                 size="sm"
                                                 variant="outline"
-                                                className="h-10 shrink-0"
+                                                className="h-10 shrink-0 text-xs sm:text-sm"
                                                 onClick={() => handleUpdateProgress(goal)}
                                             >
-                                                Mettre à jour
+                                                <span className="hidden sm:inline">Mettre à jour</span>
+                                                <span className="sm:hidden">Màj</span>
                                             </Button>
                                         </div>
                                     )}

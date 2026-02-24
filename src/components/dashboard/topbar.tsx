@@ -52,7 +52,7 @@ export function Topbar({ profile }: TopbarProps) {
   }
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-background px-4 md:px-6">
+    <header className="flex h-16 items-center justify-between border-b bg-background px-3 md:px-6">
       {/* Mobile menu */}
       {mounted ? (
         <Sheet>
@@ -73,7 +73,7 @@ export function Topbar({ profile }: TopbarProps) {
 
       <div className="hidden md:block" />
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1 sm:gap-3">
         <Button
           variant="ghost"
           size="icon"

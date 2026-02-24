@@ -252,16 +252,16 @@ export default function PortfolioPage() {
       {/* Portfolio tabs */}
       <Tabs defaultValue={selected?.type || "suggéré"}>
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="conservateur" className="text-xs sm:text-sm">
-            <Shield className="mr-1 sm:mr-2 h-4 w-4" />
-            Conservateur
+          <TabsTrigger value="conservateur" className="text-xs sm:text-sm gap-1">
+            <Shield className="hidden sm:block h-4 w-4" />
+            <span className="truncate">Conservateur</span>
           </TabsTrigger>
           <TabsTrigger value="suggéré" className="gap-1 text-xs sm:text-sm">
             Suggéré <Star className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500" />
           </TabsTrigger>
-          <TabsTrigger value="ambitieux" className="text-xs sm:text-sm">
-            <TrendingUp className="mr-1 sm:mr-2 h-4 w-4" />
-            Ambitieux
+          <TabsTrigger value="ambitieux" className="text-xs sm:text-sm gap-1">
+            <TrendingUp className="hidden sm:block h-4 w-4" />
+            <span className="truncate">Ambitieux</span>
           </TabsTrigger>
         </TabsList>
 
@@ -344,7 +344,7 @@ export default function PortfolioPage() {
               </Card>
 
               {/* Allocation chart + table */}
-              <div className="grid gap-6 lg:grid-cols-2">
+              <div className="grid gap-4 lg:grid-cols-2">
                 <Card>
                   <CardHeader>
                     <CardTitle>Allocation d&apos;actifs</CardTitle>
@@ -365,17 +365,17 @@ export default function PortfolioPage() {
                           key={i}
                           className="flex items-center justify-between rounded-lg border p-3"
                         >
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2 min-w-0">
                             <div
-                              className="h-3 w-3 rounded-full"
+                              className="h-3 w-3 shrink-0 rounded-full"
                               style={{
                                 backgroundColor:
                                   ASSET_CLASS_COLORS[alloc.asset_class] || "#6b7280",
                               }}
                             />
-                            <div>
+                            <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
-                                <p className="text-sm font-medium">{alloc.instrument_name}</p>
+                                <p className="text-sm font-medium truncate">{alloc.instrument_name}</p>
                                 {alloc.currency === 'USD' && (
                                   <Badge variant="outline" className="text-[10px] px-1 py-0">USD</Badge>
                                 )}

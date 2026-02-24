@@ -249,7 +249,7 @@ export default function TransactionsPage() {
         return (
             <div className="space-y-4">
                 <div className="h-8 w-48 animate-pulse rounded bg-muted" />
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     {[1, 2, 3].map((i) => (
                         <div key={i} className="h-28 animate-pulse rounded-lg bg-muted" />
                     ))}
@@ -388,9 +388,9 @@ export default function TransactionsPage() {
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <Card>
-                    <CardContent className="flex items-center gap-4 p-6">
+                    <CardContent className="flex items-center gap-3 p-4 sm:p-6">
                         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
                             <ArrowUpRight className="h-6 w-6 text-green-600 dark:text-green-400" />
                         </div>
@@ -401,7 +401,7 @@ export default function TransactionsPage() {
                     </CardContent>
                 </Card>
                 <Card>
-                    <CardContent className="flex items-center gap-4 p-6">
+                    <CardContent className="flex items-center gap-3 p-4 sm:p-6">
                         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
                             <ArrowDownRight className="h-6 w-6 text-red-600 dark:text-red-400" />
                         </div>
@@ -412,7 +412,7 @@ export default function TransactionsPage() {
                     </CardContent>
                 </Card>
                 <Card>
-                    <CardContent className="flex items-center gap-4 p-6">
+                    <CardContent className="flex items-center gap-3 p-4 sm:p-6">
                         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
                             <DollarSign className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                         </div>
@@ -448,8 +448,8 @@ export default function TransactionsPage() {
                                     <tr className="border-b text-muted-foreground">
                                         <th className="pb-2 text-left font-medium">Titre</th>
                                         <th className="pb-2 text-right font-medium">Parts</th>
-                                        <th className="pb-2 text-right font-medium">Coût moyen</th>
-                                        <th className="pb-2 text-right font-medium">Coût total</th>
+                                        <th className="pb-2 text-right font-medium hidden sm:table-cell">Coût moyen</th>
+                                        <th className="pb-2 text-right font-medium hidden sm:table-cell">Coût total</th>
                                         <th className="pb-2 text-right font-medium">G/P réalisé</th>
                                     </tr>
                                 </thead>
@@ -465,10 +465,10 @@ export default function TransactionsPage() {
                                             <td className="py-3 text-right font-mono text-xs">
                                                 {pos.sharesHeld > 0 ? pos.sharesHeld.toFixed(4) : "—"}
                                             </td>
-                                            <td className="py-3 text-right font-mono text-xs">
+                                            <td className="py-3 text-right font-mono text-xs hidden sm:table-cell">
                                                 {pos.avgCost > 0 ? `$${pos.avgCost.toLocaleString("fr-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
                                             </td>
-                                            <td className="py-3 text-right font-mono text-xs">
+                                            <td className="py-3 text-right font-mono text-xs hidden sm:table-cell">
                                                 {pos.totalCostBasis > 0 ? `$${pos.totalCostBasis.toLocaleString("fr-CA", { minimumFractionDigits: 2 })}` : "—"}
                                             </td>
                                             <td className={cn(
@@ -561,9 +561,9 @@ export default function TransactionsPage() {
                             {filteredTransactions.map((tx) => (
                                 <div
                                     key={tx.id}
-                                    className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50"
+                                    className="flex items-center justify-between rounded-lg border p-3 sm:p-4 transition-colors hover:bg-muted/50"
                                 >
-                                    <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-2 sm:gap-4 min-w-0">
                                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
                                             {tx.type === "achat" || tx.type === "cotisation" ? (
                                                 <ArrowUpRight className="h-5 w-5 text-green-500" />
@@ -573,9 +573,9 @@ export default function TransactionsPage() {
                                                 <DollarSign className="h-5 w-5 text-blue-500" />
                                             )}
                                         </div>
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <p className="font-medium">{tx.instrument_name}</p>
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-1.5 sm:gap-2">
+                                                <p className="font-medium truncate text-sm sm:text-base">{tx.instrument_name}</p>
                                                 <Badge variant="outline" className="text-[10px]">
                                                     {tx.instrument_ticker}
                                                 </Badge>
