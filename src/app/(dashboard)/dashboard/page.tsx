@@ -9,6 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import dynamic from "next/dynamic";
+const NetWorthChart = dynamic(
+  () => import("@/components/dashboard/net-worth-chart").then((m) => ({ default: m.NetWorthChart })),
+  { ssr: false, loading: () => <Skeleton className="h-[260px] w-full" /> }
+);
 const AllocationChart = dynamic(
   () => import("@/components/portfolio/allocation-chart").then((m) => ({ default: m.AllocationChart })),
   { ssr: false, loading: () => <Skeleton className="h-[200px] w-full" /> }
@@ -166,6 +170,13 @@ function generateRecommendations(data: DashboardData): Recommendation[] {
   return recs;
 }
 
+interface NetWorthSnapshot {
+  snapshot_date: string;
+  total_assets: number | null;
+  total_debts: number | null;
+  net_worth: number | null;
+}
+
 interface DashboardData {
   profile: Profile | null;
   clientInfo: ClientInfo | null;
@@ -173,6 +184,7 @@ interface DashboardData {
   riskAssessment: RiskAssessment | null;
   selectedPortfolio: (Portfolio & { allocations: PortfolioAllocation[] }) | null;
   chatMessages: ChatMessage[];
+  snapshots: NetWorthSnapshot[];
 }
 
 export default function DashboardPage() {
@@ -183,6 +195,7 @@ export default function DashboardPage() {
     riskAssessment: null,
     selectedPortfolio: null,
     chatMessages: [],
+    snapshots: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -226,6 +239,22 @@ export default function DashboardPage() {
             .limit(20),
         ]);
 
+        // Fire-and-forget today's net worth snapshot
+        if (clientInfo) {
+          fetch("/api/net-worth/snapshot", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              total_assets: clientInfo.total_assets,
+              total_debts: clientInfo.total_debts,
+            }),
+          }).catch(() => {});
+        }
+
+        // Fetch net worth history
+        const snapshotsRes = await fetch("/api/net-worth/snapshot");
+        const snapshotsData = snapshotsRes.ok ? await snapshotsRes.json() : { snapshots: [] };
+
         setData({
           profile: profile as Profile | null,
           clientInfo: clientInfo as ClientInfo | null,
@@ -238,6 +267,7 @@ export default function DashboardPage() {
             } as Portfolio & { allocations: PortfolioAllocation[] }
             : null,
           chatMessages: (chatMsgs as ChatMessage[]) || [],
+          snapshots: snapshotsData.snapshots || [],
         });
       } catch (err) {
         console.error("Dashboard load error:", err);
@@ -496,6 +526,9 @@ export default function DashboardPage() {
 
       {/* Quick Actions — always visible after KPI cards */}
       <QuickActionsCard />
+
+      {/* Net Worth Chart */}
+      <NetWorthChart snapshots={data.snapshots} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Portfolio allocation + metrics row */}

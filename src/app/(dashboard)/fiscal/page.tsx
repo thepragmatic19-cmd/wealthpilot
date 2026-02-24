@@ -14,6 +14,7 @@ import {
     Info,
     ArrowUp,
     ArrowDown,
+    Sliders,
 } from "lucide-react";
 import type { ClientInfo, Portfolio, PortfolioAllocation, Transaction } from "@/types/database";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -61,6 +62,7 @@ export default function FiscalPage() {
     const [data, setData] = useState<FiscalData>({ clientInfo: null, portfolio: null, transactions: [] });
     const [loading, setLoading] = useState(true);
     const [province, setProvince] = useState("QC");
+    const [contributionAmount, setContributionAmount] = useState(5000);
     const { canAccess, isLoading: subLoading } = useSubscription();
     const [showUpgrade, setShowUpgrade] = useState(false);
 
@@ -103,7 +105,7 @@ export default function FiscalPage() {
         return (
             <div className="space-y-4">
                 <div className="h-8 w-48 animate-pulse rounded bg-muted" />
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {[1, 2, 3, 4].map((i) => (
                         <div key={i} className="h-48 animate-pulse rounded-lg bg-muted" />
                     ))}
@@ -213,7 +215,7 @@ export default function FiscalPage() {
             </div>
 
             {/* Account Overview */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {/* CELI Card */}
                 <Card className="border-green-200 dark:border-green-900/50">
                     <CardHeader className="pb-2">
@@ -327,8 +329,106 @@ export default function FiscalPage() {
                 </Card>
             </div>
 
+            {/* Contribution Optimizer */}
+            {annualIncome > 0 && (
+                <Card className="border-indigo-200 dark:border-indigo-900/50">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <Sliders className="h-5 w-5 text-indigo-500" />
+                            Optimiseur de contribution
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                        {/* Slider */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-sm text-muted-foreground">Montant disponible pour investir</Label>
+                                <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
+                                    {contributionAmount.toLocaleString("fr-CA")} $
+                                </span>
+                            </div>
+                            <input
+                                type="range"
+                                min={0}
+                                max={50000}
+                                step={500}
+                                value={contributionAmount}
+                                onChange={(e) => setContributionAmount(Number(e.target.value))}
+                                className="w-full accent-indigo-500"
+                            />
+                            <div className="flex justify-between text-[10px] text-muted-foreground">
+                                <span>0 $</span>
+                                <span>50 000 $</span>
+                            </div>
+                        </div>
+
+                        {/* Recommendation badge */}
+                        {(() => {
+                            const marginalRate = (federalRate + provincialRate) * 100;
+                            const toReer = Math.min(contributionAmount, reerRoom);
+                            const toCeli = Math.min(contributionAmount - toReer, celiRoom);
+                            const reerTaxSaving = Math.round(toReer * (federalRate + provincialRate));
+                            const celiGrowthEstimate = Math.round(toCeli * (Math.pow(1.07, 10) - 1));
+                            let recLabel = "";
+                            let recColor = "";
+                            if (marginalRate >= 40) {
+                                recLabel = "Prioriser le REER — économie fiscale maximale";
+                                recColor = "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800";
+                            } else if (marginalRate < 30) {
+                                recLabel = "Prioriser le CELI — croissance non imposée avantageuse";
+                                recColor = "bg-green-500/10 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800";
+                            } else {
+                                recLabel = "Split optimal : REER d'abord, puis CELI";
+                                recColor = "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800";
+                            }
+                            return (
+                                <>
+                                    <div className={`rounded-lg border px-3 py-2 text-sm font-medium ${recColor}`}>
+                                        {recLabel}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {/* CELI column */}
+                                        <div className="rounded-lg bg-green-50 dark:bg-green-900/20 p-3 space-y-1.5">
+                                            <p className="text-xs font-bold text-green-700 dark:text-green-400 uppercase tracking-wide">CELI</p>
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-muted-foreground">Room disponible</span>
+                                                <span className="font-medium">{celiRoom.toLocaleString("fr-CA")} $</span>
+                                            </div>
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-muted-foreground">Montant suggéré</span>
+                                                <span className="font-semibold text-green-700 dark:text-green-400">{toCeli.toLocaleString("fr-CA")} $</span>
+                                            </div>
+                                            <div className="flex justify-between text-xs border-t pt-1.5">
+                                                <span className="text-muted-foreground">Croissance estimée × 10 ans</span>
+                                                <span className="font-bold text-green-600">+{celiGrowthEstimate.toLocaleString("fr-CA")} $</span>
+                                            </div>
+                                        </div>
+                                        {/* REER column */}
+                                        <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3 space-y-1.5">
+                                            <p className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wide">REER</p>
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-muted-foreground">Room disponible</span>
+                                                <span className="font-medium">{reerRoom.toLocaleString("fr-CA")} $</span>
+                                            </div>
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-muted-foreground">Montant suggéré</span>
+                                                <span className="font-semibold text-blue-700 dark:text-blue-400">{toReer.toLocaleString("fr-CA")} $</span>
+                                            </div>
+                                            <div className="flex justify-between text-xs border-t pt-1.5">
+                                                <span className="text-muted-foreground">Économie fiscale immédiate</span>
+                                                <span className="font-bold text-blue-600">-{reerTaxSaving.toLocaleString("fr-CA")} $</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            );
+                        })()}
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Tax Optimization & Rebalancing */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {/* Tax Savings */}
                 <Card>
                     <CardHeader>
@@ -354,7 +454,7 @@ export default function FiscalPage() {
                                 </div>
                                 <div className="rounded-lg bg-muted p-4">
                                     <p className="text-sm text-muted-foreground">Économies si vous cotisez le maximum REER</p>
-                                    <p className="text-3xl font-bold mt-1">
+                                    <p className="text-2xl sm:text-3xl font-bold mt-1">
                                         ${estimatedTaxSavings.toLocaleString("fr-CA", { maximumFractionDigits: 0 })}
                                     </p>
                                     <p className="text-xs text-muted-foreground mt-1">

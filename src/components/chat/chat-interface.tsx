@@ -87,6 +87,23 @@ function buildSuggestions(ctx: ClientContext): string[] {
   return suggestions.slice(0, 4);
 }
 
+function getContextualSuggestions(content: string): string[] {
+  const lower = content.toLowerCase();
+  if (lower.includes("celi") || lower.includes("reer")) {
+    return ["Comment maximiser mes cotisations CELI ?", "Quelle est ma déduction REER optimale ?"];
+  }
+  if (lower.includes("portefeuille") || lower.includes("allocation") || lower.includes("etf")) {
+    return ["Dois-je rééquilibrer mon portefeuille ?", "Quel ETF est le plus adapté à ma situation ?"];
+  }
+  if (lower.includes("objectif") || lower.includes("retraite")) {
+    return ["À quelle date puis-je prendre ma retraite ?", "Combien faut-il épargner chaque mois ?"];
+  }
+  if (lower.includes("impôt") || lower.includes("fiscalité") || lower.includes("fiscal") || lower.includes("taxe")) {
+    return ["Comment réduire mon impôt cette année ?", "Quelle province a le meilleur taux marginal ?"];
+  }
+  return ["Analyse complète de ma situation", "Quels sont mes prochains pas prioritaires ?"];
+}
+
 function MessageDate({ date }: { date: string }) {
   return (
     <div className="flex justify-center my-5">
@@ -97,9 +114,13 @@ function MessageDate({ date }: { date: string }) {
   );
 }
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  initialMessage?: string;
+}
+
+export function ChatInterface({ initialMessage }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialMessage ?? "");
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [userId, setUserId] = useState("");
@@ -107,6 +128,12 @@ export function ChatInterface() {
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [todayMessageCount, setTodayMessageCount] = useState(0);
   const [suggestions, setSuggestions] = useState<string[]>(DEFAULT_SUGGESTIONS);
+  const [followUpSuggestions, setFollowUpSuggestions] = useState<string[]>([]);
+  // Feature 1: pagination
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // Feature 2: feedback
+  const [messageFeedback, setMessageFeedback] = useState<Record<string, 'up' | 'down'>>({});
   const messagesRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -123,16 +150,16 @@ export function ChatInterface() {
       setUserId(user.id);
 
       const [
-        { data },
+        { data, count },
         { data: portfolio },
         { data: goals },
         { data: clientInfo },
       ] = await Promise.all([
         supabase
           .from("chat_messages")
-          .select("*")
+          .select("*", { count: "exact" })
           .eq("user_id", user.id)
-          .order("created_at", { ascending: true })
+          .order("created_at", { ascending: false })
           .limit(50),
         supabase
           .from("portfolios")
@@ -149,10 +176,12 @@ export function ChatInterface() {
       ]);
 
       if (data) {
-        setMessages(data as ChatMessage[]);
+        const msgs = ((data || []) as ChatMessage[]).reverse();
+        setMessages(msgs);
+        setHasMore((count ?? 0) > 50);
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
-        const todayCount = (data as ChatMessage[]).filter(
+        const todayCount = msgs.filter(
           (m) => m.role === "user" && new Date(m.created_at) >= todayStart
         ).length;
         setTodayMessageCount(todayCount);
@@ -201,6 +230,37 @@ export function ChatInterface() {
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
     }
   }, [input]);
+
+  async function loadMoreMessages() {
+    if (!userId || loadingMore || messages.length === 0) return;
+    setLoadingMore(true);
+    const supabase = createClient();
+    const oldest = messages[0];
+    const { data } = await supabase
+      .from("chat_messages")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .lt("created_at", oldest.created_at)
+      .limit(30);
+    if (data && data.length > 0) {
+      const older = (data as ChatMessage[]).reverse();
+      setMessages((prev) => [...older, ...prev]);
+      setHasMore(data.length === 30);
+    } else {
+      setHasMore(false);
+    }
+    setLoadingMore(false);
+  }
+
+  async function submitFeedback(msgId: string, feedback: 'up' | 'down') {
+    setMessageFeedback((prev) => ({ ...prev, [msgId]: feedback }));
+    // Store in Supabase (best-effort, no error shown to user)
+    const supabase = createClient();
+    await supabase.from("chat_messages").update({
+      metadata: { feedback }
+    }).eq("id", msgId);
+  }
 
   async function clearHistory() {
     const supabase = createClient();
@@ -302,6 +362,7 @@ export function ChatInterface() {
       };
       setMessages((prev) => [...prev, assistantMsg]);
       setStreamingText("");
+      setFollowUpSuggestions(getContextualSuggestions(fullText));
     } catch {
       toast.error("Erreur lors de l'envoi du message");
     } finally {
@@ -319,7 +380,7 @@ export function ChatInterface() {
   const atLimit = isFree && todayMessageCount >= limits.chatPerDay;
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col gap-3">
+    <div className="flex h-[calc(100vh-5.5rem)] sm:h-[calc(100vh-7rem)] md:h-[calc(100vh-8rem)] flex-col gap-3">
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
@@ -350,8 +411,26 @@ export function ChatInterface() {
 
       {/* ── Messages ── */}
       <div className="flex-1 overflow-hidden rounded-2xl border border-border/40 bg-card/20 backdrop-blur-sm flex flex-col min-h-0">
-        <div ref={messagesRef} className="flex-1 overflow-y-auto px-5 scroll-smooth">
+        <div ref={messagesRef} className="flex-1 overflow-y-auto px-3 sm:px-5 scroll-smooth">
           <div className="py-6 space-y-0.5">
+
+            {/* Load more button */}
+            {hasMore && (
+              <div className="flex justify-center mb-4">
+                <button
+                  onClick={loadMoreMessages}
+                  disabled={loadingMore}
+                  className="text-xs text-primary/60 hover:text-primary flex items-center gap-1.5 transition-colors"
+                >
+                  {loadingMore ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <span>↑</span>
+                  )}
+                  Charger les messages précédents
+                </button>
+              </div>
+            )}
 
             {/* Empty state */}
             {messages.length === 0 && !streaming && (
@@ -377,9 +456,9 @@ export function ChatInterface() {
                       <button
                         key={i}
                         onClick={() => sendMessage(s)}
-                        className="group flex flex-col items-start gap-2.5 p-4 rounded-2xl bg-background/70 border border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 text-left shadow-sm hover:shadow-md"
+                        className="group flex flex-col items-start gap-2 p-3 sm:gap-2.5 sm:p-4 rounded-2xl bg-background/70 border border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 text-left shadow-sm hover:shadow-md"
                       >
-                        <div className="h-8 w-8 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center transition-colors">
+                        <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center transition-colors">
                           <Icon className="h-4 w-4 text-primary" />
                         </div>
                         <span className="text-xs font-medium leading-snug text-foreground/80 group-hover:text-foreground transition-colors">
@@ -404,7 +483,7 @@ export function ChatInterface() {
               return (
                 <div
                   key={msg.id}
-                  className="animate-in fade-in slide-in-from-bottom-1 duration-200"
+                  className="animate-in fade-in slide-in-from-bottom-1 duration-200 group"
                 >
                   {isNewDay && <MessageDate date={msg.created_at} />}
 
@@ -445,6 +524,35 @@ export function ChatInterface() {
                           <ChatMarkdown content={msg.content} />
                         )}
                       </div>
+                      {!isUser && i === messages.length - 1 && !streaming && followUpSuggestions.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {followUpSuggestions.map((s, si) => (
+                            <button
+                              key={si}
+                              onClick={() => sendMessage(s)}
+                              className="text-[10px] font-semibold text-primary/70 hover:text-primary bg-primary/5 hover:bg-primary/10 px-2.5 py-1 rounded-full border border-primary/10 hover:border-primary/25 transition-all whitespace-nowrap"
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {!isUser && !streaming && (
+                        <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => submitFeedback(msg.id, 'up')}
+                            className={`p-1 rounded transition-colors ${messageFeedback[msg.id] === 'up' ? 'text-green-500' : 'text-muted-foreground/40 hover:text-green-500'}`}
+                          >
+                            <span className="text-xs">👍</span>
+                          </button>
+                          <button
+                            onClick={() => submitFeedback(msg.id, 'down')}
+                            className={`p-1 rounded transition-colors ${messageFeedback[msg.id] === 'down' ? 'text-red-400' : 'text-muted-foreground/40 hover:text-red-400'}`}
+                          >
+                            <span className="text-xs">👎</span>
+                          </button>
+                        </div>
+                      )}
                       <span
                         className={cn(
                           "text-[9px] font-medium text-muted-foreground/35 px-1",

@@ -16,6 +16,7 @@ import {
   Trophy,
   CreditCard,
   Target,
+  BookOpen,
 } from "lucide-react";
 
 const navItems = [
@@ -26,6 +27,7 @@ const navItems = [
   { href: "/fiscal", icon: Calculator, label: "Fiscal" },
   { href: "/retirement", icon: Hourglass, label: "Retraite" },
   { href: "/chat", icon: MessageSquare, label: "Conseiller IA" },
+  { href: "/education", icon: BookOpen, label: "Hub Éducatif" },
   { href: "/onboarding", icon: ClipboardList, label: "Évaluation" },
   { href: "/achievements", icon: Trophy, label: "Réalisations" },
   { href: "/billing", icon: CreditCard, label: "Abonnement" },

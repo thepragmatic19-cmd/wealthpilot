@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Target,
+  BookOpen,
 } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 
@@ -44,6 +45,7 @@ const navGroups = [
     label: "Conseil IA",
     items: [
       { href: "/chat", icon: MessageSquare, label: "Conseiller IA" },
+      { href: "/education", icon: BookOpen, label: "Hub Éducatif" },
       { href: "/onboarding", icon: ClipboardList, label: "Évaluation" },
     ]
   },
