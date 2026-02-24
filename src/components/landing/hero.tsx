@@ -1,12 +1,10 @@
-"use client";
-
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
 
 export function Hero() {
   return (
-    <section className="relative flex min-h-dvh items-center justify-center overflow-hidden px-4 pt-16">
+    <section className="relative flex min-h-dvh items-center justify-center overflow-hidden px-4 pt-24 pb-12 sm:pt-16 sm:pb-0">
       {/* Background gradient */}
       <div className="absolute inset-0 -z-10">
         <div className="absolute left-1/2 top-0 -translate-x-1/2 h-[600px] w-[600px] rounded-full bg-primary/5 blur-3xl" />
@@ -52,7 +50,7 @@ export function Hero() {
         </div>
 
         {/* Quick stats */}
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300 mx-auto mt-16 grid max-w-lg grid-cols-3 gap-8">
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300 mx-auto mt-10 sm:mt-16 grid max-w-lg grid-cols-3 gap-8">
           {[
             { value: "3", label: "Portefeuilles personnalisés" },
             { value: "90+", label: "ETFs canadiens analysés" },

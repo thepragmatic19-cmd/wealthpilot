@@ -1,21 +1,13 @@
-"use client";
-
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, Check, Shield } from "lucide-react";
 
 export function CTASection() {
   return (
-    <section className="bg-muted/50 py-24 px-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        className="mx-auto max-w-3xl text-center"
-      >
-        <h2 className="text-3xl font-bold sm:text-4xl">
+    <section className="bg-muted/50 py-14 px-4 sm:py-24">
+      <div className="mx-auto max-w-3xl text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <h2 className="text-2xl font-bold sm:text-4xl">
           Prêt à prendre le contrôle de vos finances?
         </h2>
         <p className="mt-4 text-lg text-muted-foreground">
@@ -51,7 +43,7 @@ export function CTASection() {
             <span>Garantie 30 jours satisfait ou remboursé</span>
           </div>
         </div>
-      </motion.div>
+      </div>
     </section>
   );
 }

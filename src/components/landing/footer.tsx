@@ -35,7 +35,7 @@ export function Footer() {
   }
 
   return (
-    <footer className="border-t py-12 px-4">
+    <footer className="border-t py-8 px-4 sm:py-12">
       <div className="mx-auto max-w-7xl">
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-4">
           <div className="md:col-span-1">
@@ -94,7 +94,7 @@ export function Footer() {
                 Merci pour votre inscription!
               </p>
             ) : (
-              <form onSubmit={handleSubscribe} className="mt-3 flex gap-2">
+              <form onSubmit={handleSubscribe} className="mt-3 flex flex-col gap-2 sm:flex-row">
                 <Input
                   type="email"
                   placeholder="votre@email.com"

@@ -1,6 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Brain,
@@ -50,47 +47,26 @@ const features = [
   },
 ];
 
-const containerVariants = {
-  hidden: {},
-  visible: {
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 },
-};
-
 export function Features() {
   return (
-    <section id="features" className="py-24 px-4">
+    <section id="features" className="py-14 px-4 sm:py-24">
       <div className="mx-auto max-w-7xl">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="text-center"
-        >
-          <h2 className="text-3xl font-bold sm:text-4xl">
+        <div className="text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <h2 className="text-2xl font-bold sm:text-4xl">
             Tout ce dont vous avez besoin
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
             Une suite complète d&apos;outils pour gérer votre patrimoine intelligemment
           </p>
-        </motion.div>
+        </div>
 
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
-        >
-          {features.map((feature) => (
-            <motion.div key={feature.title} variants={itemVariants}>
+        <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {features.map((feature, i) => (
+            <div
+              key={feature.title}
+              className="animate-in fade-in slide-in-from-bottom-4 duration-500"
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
               <Card className="h-full transition-shadow hover:shadow-lg">
                 <CardContent className="flex flex-col gap-4 p-6">
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
@@ -100,9 +76,9 @@ export function Features() {
                   <p className="text-muted-foreground">{feature.description}</p>
                 </CardContent>
               </Card>
-            </motion.div>
+            </div>
           ))}
-        </motion.div>
+        </div>
       </div>
     </section>
   );

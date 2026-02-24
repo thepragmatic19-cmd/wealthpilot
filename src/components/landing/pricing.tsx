@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -70,24 +69,18 @@ export function Pricing() {
   const [annual, setAnnual] = useState(false);
 
   return (
-    <section id="pricing" className="py-20 bg-muted/30">
+    <section id="pricing" className="py-14 sm:py-20 bg-muted/30">
       <div className="container mx-auto px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          viewport={{ once: true }}
-          className="text-center mb-12"
-        >
-          <h2 className="text-3xl font-bold sm:text-4xl">
+        <div className="text-center mb-8 sm:mb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <h2 className="text-2xl font-bold sm:text-4xl">
             Des plans adaptés à vos besoins
           </h2>
-          <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="mt-4 text-base text-muted-foreground max-w-2xl mx-auto sm:text-lg">
             Commencez gratuitement et évoluez selon vos besoins. Tous les prix sont en dollars canadiens.
           </p>
 
           {/* Monthly / Annual toggle */}
-          <div className="mt-8 flex items-center justify-center gap-3">
+          <div className="mt-6 sm:mt-8 flex items-center justify-center gap-3">
             <span className={`text-sm ${!annual ? "font-semibold" : "text-muted-foreground"}`}>
               Mensuel
             </span>
@@ -101,18 +94,16 @@ export function Pricing() {
               </Badge>
             )}
           </div>
-        </motion.div>
+        </div>
 
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-auto">
+        <div className="grid gap-5 sm:gap-8 sm:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-auto">
           {plans.map((plan, i) => {
             const price = annual ? plan.priceAnnualMonthly : plan.priceMonthly;
             return (
-              <motion.div
+              <div
                 key={plan.name}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
-                viewport={{ once: true }}
+                className={`animate-in fade-in slide-in-from-bottom-4 duration-500${plan.popular ? " order-first sm:order-none" : ""}`}
+                style={{ animationDelay: `${i * 100}ms` }}
               >
                 <Card
                   className={`relative h-full flex flex-col ${plan.popular
@@ -131,7 +122,7 @@ export function Pricing() {
                       {plan.description}
                     </p>
                     <div className="mt-4">
-                      <span className="text-4xl font-bold">{price}$</span>
+                      <span className="text-3xl font-bold sm:text-4xl">{price}$</span>
                       {price > 0 && (
                         <span className="text-muted-foreground">/mois</span>
                       )}
@@ -161,7 +152,7 @@ export function Pricing() {
                     </Link>
                   </CardContent>
                 </Card>
-              </motion.div>
+              </div>
             );
           })}
         </div>

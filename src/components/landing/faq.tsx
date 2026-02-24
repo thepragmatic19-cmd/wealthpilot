@@ -1,6 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
 import {
   Accordion,
   AccordionContent,
@@ -43,28 +40,18 @@ const faqs = [
 
 export function FAQ() {
   return (
-    <section id="faq" className="py-24 px-4">
+    <section id="faq" className="py-14 px-4 sm:py-24">
       <div className="mx-auto max-w-3xl">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="text-center mb-12"
-        >
-          <h2 className="text-3xl font-bold sm:text-4xl">
+        <div className="text-center mb-8 sm:mb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <h2 className="text-2xl font-bold sm:text-4xl">
             Questions fréquentes
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
             Tout ce que vous devez savoir sur WealthPilot
           </p>
-        </motion.div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.1 }}
-        >
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: "100ms" }}>
           <Accordion type="single" collapsible className="w-full">
             {faqs.map((faq, i) => (
               <AccordionItem key={i} value={`item-${i}`}>
@@ -77,7 +64,7 @@ export function FAQ() {
               </AccordionItem>
             ))}
           </Accordion>
-        </motion.div>
+        </div>
       </div>
     </section>
   );
