@@ -10,8 +10,7 @@ import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import type { RiskProfile } from "@/types/database";
 import type { EnrichedPortfolio } from "@/lib/portfolio/validator";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function POST(_request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -25,13 +24,24 @@ export async function POST(_request: NextRequest) {
       return rateLimitResponse(rateLimit.resetInSeconds);
     }
 
+    // Parse body for force flag
+    let forceRegenerate = false;
+    try {
+      const body = await request.json();
+      forceRegenerate = body?.force === true;
+    } catch {
+      // No body or invalid — that's fine
+    }
+
     // Check if portfolios already exist
     const { data: existingPortfolios } = await supabase
       .from("portfolios")
       .select("id")
       .eq("user_id", user.id);
 
-    if (existingPortfolios && existingPortfolios.length > 0) {
+    const existingIds = existingPortfolios?.map((p) => p.id) ?? [];
+
+    if (existingIds.length > 0 && !forceRegenerate) {
       return NextResponse.json({ message: "Portfolios already exist" });
     }
 
@@ -58,6 +68,7 @@ export async function POST(_request: NextRequest) {
     const riskProfile: RiskProfile = (assessment?.risk_profile as RiskProfile) || 'modéré';
 
     let enrichedPortfolios: EnrichedPortfolio[];
+    let fallbackUsed = false;
 
     try {
       // Build dynamic prompts with user data
@@ -95,7 +106,8 @@ export async function POST(_request: NextRequest) {
       const aiResponse = await generateAIResponse({
         systemPrompt,
         userMessage,
-        maxTokens: 4096,
+        maxTokens: 8000,
+        temperature: 0.3,
       });
 
       const text = aiResponse.text;
@@ -117,10 +129,12 @@ export async function POST(_request: NextRequest) {
         console.error("AI portfolio validation failed:", validation.errors);
         console.warn("Falling back to deterministic portfolios");
         enrichedPortfolios = generateFallbackPortfolios(riskProfile);
+        fallbackUsed = true;
       }
     } catch (aiError: unknown) {
       console.error("AI Error in Portfolio (using fallback):", aiError instanceof Error ? aiError.message : aiError);
       enrichedPortfolios = generateFallbackPortfolios(riskProfile);
+      fallbackUsed = true;
     }
 
     const finalPortfolios = [];
@@ -245,7 +259,12 @@ export async function POST(_request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ portfolios: finalPortfolios });
+    // Now that new portfolios are saved successfully, delete the old ones
+    if (existingIds.length > 0) {
+      await supabase.from("portfolios").delete().in("id", existingIds);
+    }
+
+    return NextResponse.json({ portfolios: finalPortfolios, fallbackUsed });
   } catch (error: unknown) {
     console.error("Portfolio API error:", error);
     return NextResponse.json(

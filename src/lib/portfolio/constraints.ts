@@ -112,20 +112,35 @@ export function getConstraintsForProfile(profile: RiskProfile): PortfolioConstra
   return PROFILE_CONSTRAINTS[profile];
 }
 
+const ASSET_CLASS_ROLES: Partial<Record<string, string>> = {
+  'Actions canadiennes': 'Crédit impôt dividendes, home bias contrôlé (max 35% poche actions)',
+  'Actions américaines': 'Moteur de croissance principal — S&P 500 / NASDAQ, qualité élevée',
+  'Actions internationales': 'Diversification géographique — Europe, Asie-Pacifique',
+  'Actions marchés émergents': 'Prime de risque EM, croissance long terme, volatilité élevée',
+  'Obligations canadiennes': 'Amortisseur principal — corrélation négative vs actions (−0,10)',
+  'Obligations mondiales': 'Diversification obligataire globale, exposition USD/EUR hedgée',
+  'Immobilier (REITs)': 'Revenu régulier, hedge partiel inflation, corrélation modérée vs actions',
+  'Or / Commodités': 'Stabilisateur de volatilité, hedge géopolitique (corrélation 0,00–0,10 vs actions)',
+  'Liquidités': 'Fonds d\'urgence, réserve de sécurité, objectifs < 1 an',
+};
+
 export function getConstraintsSummaryForPrompt(profile: RiskProfile): string {
   const c = PROFILE_CONSTRAINTS[profile];
 
-  let summary = `## Contraintes pour le profil "${profile}"\n`;
-  summary += `- Équité maximum: ${c.equity_max}%\n`;
-  summary += `- Revenu fixe minimum: ${c.fixed_income_min}%\n`;
-  summary += `- Nombre de positions: ${c.holdings_min}-${c.holdings_max}\n`;
-  summary += `- Poids maximum par position: ${c.position_max}%\n\n`;
-  summary += `### Plages par classe d'actif\n`;
-  summary += '| Classe | Min | Max |\n';
-  summary += '|--------|-----|-----|\n';
+  let summary = `## Contraintes Institutionnelles — Profil "${profile}"\n`;
+  summary += `> Ces contraintes reflètent les standards de gestion discrétionnaire pour ce profil de risque (CFA Institute GIPS).\n\n`;
+  summary += `- **Exposition actions maximum** : ${c.equity_max}% — au-delà, la volatilité excède le profil déclaré\n`;
+  summary += `- **Revenu fixe minimum** : ${c.fixed_income_min}% — amortisseur obligatoire pour respecter le drawdown cible\n`;
+  summary += `- **Nombre de positions** : ${c.holdings_min} à ${c.holdings_max} — diversification optimale sans dilution excessive\n`;
+  summary += `- **Concentration maximale par position** : ${c.position_max}% — règle de prudence institutionnelle\n\n`;
+
+  summary += `### Plages d'allocation par classe d'actif\n`;
+  summary += '| Classe d\'actif | Min | Max | Rôle dans le portefeuille |\n';
+  summary += '|----------------|-----|-----|----------------------------|\n';
 
   for (const [assetClass, range] of Object.entries(c.asset_class_ranges)) {
-    summary += `| ${assetClass} | ${range.min}% | ${range.max}% |\n`;
+    const role = ASSET_CLASS_ROLES[assetClass] ?? '';
+    summary += `| ${assetClass} | ${range.min}% | ${range.max}% | ${role} |\n`;
   }
 
   return summary;
