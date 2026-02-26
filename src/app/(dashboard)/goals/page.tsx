@@ -39,6 +39,7 @@ import {
     CheckCircle2,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { Goal, GoalType, GoalPriority } from "@/types/database";
 
 const GOAL_TYPE_CONFIG: Record<GoalType, { label: string; icon: React.ElementType; color: string }> = {
@@ -249,16 +250,13 @@ export default function GoalsPage() {
 
             {goals.length === 0 ? (
                 <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                        <Target className="h-12 w-12 text-muted-foreground/30 mb-4" />
-                        <p className="font-medium text-muted-foreground">Aucun objectif défini</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                            Créez votre premier objectif financier pour commencer à suivre vos progrès
-                        </p>
-                        <Button onClick={openAdd} className="mt-4 gap-2" variant="outline">
-                            <Plus className="h-4 w-4" />
-                            Créer un objectif
-                        </Button>
+                    <CardContent>
+                        <EmptyState
+                            icon={Target}
+                            title="Aucun objectif défini"
+                            description="Ajoutez votre premier objectif pour suivre votre progression."
+                            action={{ label: "Ajouter un objectif", onClick: openAdd }}
+                        />
                     </CardContent>
                 </Card>
             ) : (

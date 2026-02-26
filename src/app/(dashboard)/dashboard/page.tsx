@@ -31,6 +31,7 @@ const MarketTicker = dynamic(
 );
 import { computeWeightedMer } from "@/lib/portfolio/helpers";
 import { formatCurrency, RISK_PROFILES, GOAL_ICONS } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FINANCIAL_TERMS } from "@/lib/financial-terms";
 import {
@@ -600,7 +601,12 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-6 flex-1">
             {data.goals.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Aucun objectif défini.</p>
+              <EmptyState
+                icon={Target}
+                title="Aucun objectif"
+                description="Définissez vos objectifs pour visualiser votre progression."
+                action={{ label: "Créer un objectif", href: "/goals" }}
+              />
             ) : (
               data.goals.map((goal) => {
                 const progress = goal.target_amount > 0

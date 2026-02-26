@@ -377,7 +377,7 @@ export default function PortfolioPage() {
           className="gap-2 shrink-0"
         >
           {regenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Régénérer
+          {regenerating ? "Génération en cours..." : "Régénérer"}
         </Button>
       </div>
 
@@ -471,7 +471,7 @@ export default function PortfolioPage() {
                         ) : (
                           <FileBarChart2 className="h-3.5 w-3.5" />
                         )}
-                        Rapport Q
+                        {generatingReport ? "Génération du rapport..." : "Rapport Q"}
                       </Button>
                       <Button
                         variant="outline"
@@ -668,7 +668,64 @@ export default function PortfolioPage() {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      <div className="overflow-x-auto">
+                      {/* Mobile cards */}
+                      <div className="sm:hidden space-y-3">
+                        {rows.map((row) => (
+                          <div
+                            key={row.ticker}
+                            className={`rounded-lg border p-4 ${
+                              row.action === "ACHETER"
+                                ? "bg-green-50/50 dark:bg-green-950/20 border-green-200/50 dark:border-green-900/50"
+                                : row.action === "VENDRE"
+                                ? "bg-red-50/50 dark:bg-red-950/20 border-red-200/50 dark:border-red-900/50"
+                                : ""
+                            }`}
+                          >
+                            <div className="flex items-start justify-between mb-3">
+                              <div>
+                                <p className="font-medium text-sm">{row.name}</p>
+                                <p className="text-xs text-muted-foreground">{row.ticker}</p>
+                              </div>
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] ${
+                                  row.action === "ACHETER"
+                                    ? "border-green-300 text-green-700 dark:text-green-400"
+                                    : row.action === "VENDRE"
+                                    ? "border-red-300 text-red-600 dark:text-red-400"
+                                    : "text-muted-foreground"
+                                }`}
+                              >
+                                {row.action}
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <span className="text-muted-foreground">Cible</span>
+                                <p className="font-medium tabular-nums">
+                                  {row.targetPct}% · {row.targetValue.toLocaleString("fr-CA", { maximumFractionDigits: 0 })} $
+                                </p>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Actuel</span>
+                                <p className="font-medium tabular-nums">
+                                  {row.currentValue.toLocaleString("fr-CA", { maximumFractionDigits: 0 })} $
+                                </p>
+                              </div>
+                            </div>
+                            {row.action !== "ÉQUILIBRÉ" && (
+                              <p className={`mt-2 text-sm font-semibold tabular-nums ${
+                                row.action === "ACHETER" ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                              }`}>
+                                {row.action === "ACHETER" ? "+" : "-"}{Math.abs(row.delta).toLocaleString("fr-CA", { maximumFractionDigits: 0 })} $
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Desktop table */}
+                      <div className="hidden sm:block overflow-x-auto">
                         <table className="w-full text-xs">
                           <thead>
                             <tr className="border-b text-muted-foreground">
@@ -744,7 +801,7 @@ export default function PortfolioPage() {
                         ) : (
                           <CheckCircle className="h-3.5 w-3.5" />
                         )}
-                        Enregistrer les transactions
+                        {savingRebalance === portfolio.id ? "Enregistrement..." : "Sauvegarder le rééquilibrage"}
                       </Button>
                     </CardContent>
                   </Card>

@@ -154,7 +154,9 @@ export function PortfolioPreviewStep({ userId }: Props) {
   const [portfolios, setPortfolios] = useState<PortfolioWithAllocations[]>([]);
   const [selecting, setSelecting] = useState(false);
   const [showUpsell, setShowUpsell] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
   const [selectedPortfolioName, setSelectedPortfolioName] = useState("");
+  const [selectedPortfolioSharpe, setSelectedPortfolioSharpe] = useState<number | null>(null);
   const [fallbackUsed, setFallbackUsed] = useState(false);
   const generatingRef = useRef(false);
   const stepTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -301,7 +303,12 @@ export function PortfolioPreviewStep({ userId }: Props) {
       // Trouver le nom du portefeuille sélectionné pour la modal
       const selected = portfolios.find((p) => p.id === portfolioId || p.type === portfolioType);
       setSelectedPortfolioName(selected?.name || "Suggéré");
-      setShowUpsell(true);
+      setSelectedPortfolioSharpe(selected?.sharpe_ratio ?? null);
+      setShowCelebration(true);
+      setTimeout(() => {
+        setShowCelebration(false);
+        setShowUpsell(true);
+      }, 1800);
     } catch (err) {
       console.error("Selection error:", err);
       toast.error("Erreur lors de la sélection du portefeuille");
@@ -393,6 +400,51 @@ export function PortfolioPreviewStep({ userId }: Props) {
 
   return (
     <>
+    {showCelebration && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm overflow-hidden">
+        <style>{`
+          @keyframes confetti-fall {
+            0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+          }
+        `}</style>
+        {[
+          { left: "8%",  color: "#f59e0b", delay: "0s",    dur: "1.2s" },
+          { left: "18%", color: "#10b981", delay: "0.1s",  dur: "1.5s" },
+          { left: "28%", color: "#3b82f6", delay: "0.05s", dur: "1.3s" },
+          { left: "38%", color: "#8b5cf6", delay: "0.2s",  dur: "1.4s" },
+          { left: "48%", color: "#ef4444", delay: "0s",    dur: "1.2s" },
+          { left: "58%", color: "#f59e0b", delay: "0.15s", dur: "1.6s" },
+          { left: "68%", color: "#10b981", delay: "0.05s", dur: "1.3s" },
+          { left: "78%", color: "#3b82f6", delay: "0.1s",  dur: "1.5s" },
+          { left: "88%", color: "#8b5cf6", delay: "0.2s",  dur: "1.4s" },
+        ].map((p, i) => (
+          <div
+            key={i}
+            className="absolute top-0 w-3 h-3 rounded-sm pointer-events-none"
+            style={{
+              left: p.left,
+              backgroundColor: p.color,
+              animationName: "confetti-fall",
+              animationDuration: p.dur,
+              animationDelay: p.delay,
+              animationTimingFunction: "ease-in",
+              animationFillMode: "both",
+            }}
+          />
+        ))}
+        <div className="animate-in zoom-in-95 duration-300 bg-card rounded-2xl p-8 max-w-sm w-full mx-4 text-center shadow-2xl border relative z-10">
+          <div className="text-5xl mb-4">🎉</div>
+          <h2 className="text-xl font-bold mb-1">Votre portefeuille est prêt !</h2>
+          <p className="text-muted-foreground text-sm mb-3">{selectedPortfolioName}</p>
+          {selectedPortfolioSharpe != null && (
+            <p className="text-sm font-medium">
+              Ratio de Sharpe : <span className="text-primary font-bold">{selectedPortfolioSharpe.toFixed(2)}</span>
+            </p>
+          )}
+        </div>
+      </div>
+    )}
     <UpsellModal
       open={showUpsell}
       selectedPortfolioName={selectedPortfolioName}

@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import {
     ArrowUpRight,
     ArrowDownRight,
+    ArrowLeftRight,
     Plus,
     Search,
     DollarSign,
@@ -30,6 +31,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { Transaction, TransactionType, Portfolio } from "@/types/database";
 
 const TYPE_LABELS: Record<TransactionType, string> = {
@@ -555,13 +557,12 @@ export default function TransactionsPage() {
                 </CardHeader>
                 <CardContent>
                     {filteredTransactions.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <TrendingUp className="h-12 w-12 text-muted-foreground/30 mb-4" />
-                            <p className="text-muted-foreground">Aucune transaction trouvée</p>
-                            <p className="text-sm text-muted-foreground mt-1">
-                                Ajoutez votre première transaction pour commencer le suivi
-                            </p>
-                        </div>
+                        <EmptyState
+                            icon={ArrowLeftRight}
+                            title="Aucune transaction"
+                            description="Vos transactions apparaîtront ici une fois enregistrées."
+                            action={{ label: "Ajouter une transaction", onClick: () => setShowAddDialog(true) }}
+                        />
                     ) : (
                         <div className="space-y-2">
                             {visibleTransactions.map((tx) => (
