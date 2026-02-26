@@ -25,13 +25,14 @@ export async function generateAIResponse(options: {
   systemPrompt: string;
   userMessage: string;
   maxTokens?: number;
+  temperature?: number;
 }): Promise<AIResponse> {
-  const { systemPrompt, userMessage, maxTokens = 2048 } = options;
+  const { systemPrompt, userMessage, maxTokens = 2048, temperature = 0.7 } = options;
 
   const response = await groq.chat.completions.create({
     model: AI_MODEL,
     max_tokens: maxTokens,
-    temperature: 0.7,
+    temperature,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userMessage },
@@ -49,8 +50,9 @@ export async function generateChatResponse(options: {
   systemPrompt: string;
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   maxTokens?: number;
+  temperature?: number;
 }): Promise<AIResponse> {
-  const { systemPrompt, messages, maxTokens = 2048 } = options;
+  const { systemPrompt, messages, maxTokens = 2048, temperature = 0.7 } = options;
 
   const groqMessages: Array<{
     role: "system" | "user" | "assistant";
@@ -63,7 +65,7 @@ export async function generateChatResponse(options: {
   const response = await groq.chat.completions.create({
     model: AI_MODEL,
     max_tokens: maxTokens,
-    temperature: 0.7,
+    temperature,
     messages: groqMessages,
   });
 
@@ -86,8 +88,9 @@ export async function chatWithTools(options: {
   executeTool: (name: string, args: Record<string, unknown>) => string;
   onToolCall?: (name: string) => void;
   maxTokens?: number;
+  temperature?: number;
 }): Promise<AIResponse> {
-  const { systemPrompt, messages, tools, executeTool, onToolCall, maxTokens = 2048 } =
+  const { systemPrompt, messages, tools, executeTool, onToolCall, maxTokens = 2048, temperature = 0.7 } =
     options;
 
   // Convert tools to OpenAI function calling format
@@ -109,7 +112,7 @@ export async function chatWithTools(options: {
   let response = await groq.chat.completions.create({
     model: AI_MODEL,
     max_tokens: maxTokens,
-    temperature: 0.7,
+    temperature,
     messages: groqMessages,
     tools: groqTools,
     tool_choice: "auto",
@@ -148,7 +151,7 @@ export async function chatWithTools(options: {
     response = await groq.chat.completions.create({
       model: AI_MODEL,
       max_tokens: maxTokens,
-      temperature: 0.7,
+      temperature,
       messages: groqMessages,
       tools: groqTools,
       tool_choice: "auto",

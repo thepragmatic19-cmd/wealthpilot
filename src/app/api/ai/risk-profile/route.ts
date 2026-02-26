@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
         systemPrompt: RISK_PROFILE_SYSTEM_PROMPT,
         userMessage: JSON.stringify({ assessment, followUpAnswers }),
         maxTokens: 2048,
+        temperature: 0.2,
       });
 
       const text = aiResponse.text;

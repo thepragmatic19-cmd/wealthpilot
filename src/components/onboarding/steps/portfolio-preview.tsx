@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,15 @@ interface Props {
 interface PortfolioWithAllocations extends Portfolio {
   allocations: PortfolioAllocation[];
 }
+
+const GENERATION_STEPS = [
+  { label: "Analyse de votre profil de risque...", delay: 0 },
+  { label: "Optimisation de la frontière efficiente...", delay: 2000 },
+  { label: "Calcul du ratio de Sharpe...", delay: 4500 },
+  { label: "Personnalisation selon vos objectifs...", delay: 7000 },
+  { label: "Localisation des actifs (CELI/REER)...", delay: 9500 },
+  { label: "Finalisation des allocations...", delay: 12000 },
+];
 
 const ACCOUNT_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
   'CELI': { label: 'CELI', variant: 'default' },
@@ -141,12 +150,18 @@ function UpsellModal({ open, selectedPortfolioName, onContinue }: UpsellModalPro
 export function PortfolioPreviewStep({ userId }: Props) {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [visibleSteps, setVisibleSteps] = useState<number[]>([]);
   const [portfolios, setPortfolios] = useState<PortfolioWithAllocations[]>([]);
   const [selecting, setSelecting] = useState(false);
   const [showUpsell, setShowUpsell] = useState(false);
   const [selectedPortfolioName, setSelectedPortfolioName] = useState("");
+  const [fallbackUsed, setFallbackUsed] = useState(false);
   const generatingRef = useRef(false);
+  const stepTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const router = useRouter();
+
+  // Memoize GENERATION_STEPS to keep reference stable
+  const generationSteps = useMemo(() => GENERATION_STEPS, []);
 
   const loadOrGenerate = useCallback(async () => {
     const supabase = createClient();
@@ -190,6 +205,7 @@ export function PortfolioPreviewStep({ userId }: Props) {
 
       if (data.portfolios && data.portfolios.length > 0) {
         setPortfolios(data.portfolios);
+        if (data.fallbackUsed) setFallbackUsed(true);
         setLoading(false);
         setGenerating(false);
         generatingRef.current = false;
@@ -221,6 +237,21 @@ export function PortfolioPreviewStep({ userId }: Props) {
   useEffect(() => {
     if (userId) loadOrGenerate();
   }, [userId, loadOrGenerate]);
+
+  // Animate generation steps
+  useEffect(() => {
+    if (generating) {
+      setVisibleSteps([]);
+      const timers = generationSteps.map((step, i) =>
+        setTimeout(() => setVisibleSteps((prev) => [...prev, i]), step.delay)
+      );
+      stepTimersRef.current = timers;
+    } else {
+      stepTimersRef.current.forEach(clearTimeout);
+      stepTimersRef.current = [];
+    }
+    return () => stepTimersRef.current.forEach(clearTimeout);
+  }, [generating, generationSteps]);
 
   async function selectPortfolio(portfolioId: string, portfolioType: string) {
     setSelecting(true);
@@ -279,20 +310,56 @@ export function PortfolioPreviewStep({ userId }: Props) {
     }
   }
 
-  if (loading || generating) {
+  if (loading && !generating) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
-          <div className="relative">
-            <PieChart className="h-12 w-12 text-primary animate-pulse" />
-            <Sparkles className="absolute -right-2 -top-2 h-5 w-5 text-yellow-500 animate-bounce" />
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground text-sm">Chargement de vos portefeuilles...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (generating) {
+    return (
+      <Card>
+        <CardContent className="py-12 px-8">
+          <div className="flex flex-col items-center mb-8">
+            <div className="relative mb-4">
+              <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20">
+                <PieChart className="h-7 w-7 text-primary animate-pulse" />
+              </div>
+              <Sparkles className="absolute -right-1 -top-1 h-5 w-5 text-yellow-500 animate-bounce" />
+            </div>
+            <h3 className="text-base font-semibold">Génération de vos portefeuilles</h3>
+            <p className="text-xs text-muted-foreground mt-1">Notre IA analyse votre profil complet...</p>
           </div>
-          <p className="text-muted-foreground text-center">
-            {generating
-              ? "Notre IA génère 3 portefeuilles personnalisés avec des ETFs réels..."
-              : "Chargement de vos portefeuilles..."}
-          </p>
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+
+          <div className="space-y-3 font-mono text-sm max-w-sm mx-auto">
+            {generationSteps.map((step, i) => {
+              const isVisible = visibleSteps.includes(i);
+              const isActive = isVisible && i === visibleSteps[visibleSteps.length - 1];
+              const isDone = isVisible && !isActive;
+              return (
+                <div
+                  key={i}
+                  className={`flex items-center gap-3 transition-all duration-500 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"}`}
+                >
+                  {isDone ? (
+                    <span className="h-5 w-5 flex-shrink-0 flex items-center justify-center rounded-full bg-green-500/15 text-green-500 text-xs font-bold">✓</span>
+                  ) : isActive ? (
+                    <Loader2 className="h-4 w-4 flex-shrink-0 animate-spin text-primary" />
+                  ) : (
+                    <span className="h-4 w-4 flex-shrink-0" />
+                  )}
+                  <span className={isDone ? "text-muted-foreground line-through" : isActive ? "text-foreground font-medium" : "text-muted-foreground/50"}>
+                    {step.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </CardContent>
       </Card>
     );
@@ -331,6 +398,14 @@ export function PortfolioPreviewStep({ userId }: Props) {
       selectedPortfolioName={selectedPortfolioName}
       onContinue={() => router.push("/dashboard")}
     />
+    {fallbackUsed && (
+      <div className="flex items-start gap-2 rounded-lg border border-yellow-300/50 bg-yellow-50/50 dark:bg-yellow-900/10 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-300">
+        <span className="shrink-0 mt-0.5">⚠️</span>
+        <span>
+          L&apos;IA n&apos;a pas pu générer des portefeuilles personnalisés. Des portefeuilles types basés sur votre profil de risque ont été utilisés. Vous pouvez régénérer depuis la page Portefeuille.
+        </span>
+      </div>
+    )}
     <Card>
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">Vos portefeuilles recommandés</CardTitle>

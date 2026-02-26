@@ -5,35 +5,46 @@ import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { canAccess } from "@/lib/subscription";
 import type { SubscriptionPlan } from "@/types/database";
 
-const INSIGHT_SYSTEM_PROMPT = `Tu es l'IA proactive de WealthPilot. Tu analyses la situation financière d'un client canadien et génères des insights personnalisés et actionnables.
+const INSIGHT_SYSTEM_PROMPT = `Tu es l'IA proactive de WealthPilot, conseiller financier canadien expert. Tu analyses la situation financière complète d'un client et génères des insights personnalisés, chiffrés et actionnables.
 
 ## Ton rôle
-Produire 2-3 insights courts et percutants qui aident le client à :
-1. Optimiser sa fiscalité (CELI, REER, REEE)
-2. Atteindre ses objectifs plus rapidement
-3. Améliorer la santé de son portefeuille
-4. Réagir aux conditions de marché actuelles
+Produire 3-4 insights percutants, triés du plus urgent au moins urgent, couvrant :
+1. Fiscalité (CELI, REER, REEE) — avec espace disponible et économies d'impôt exactes
+2. Santé financière (taux d'épargne, ratio dette/actif, fonds d'urgence)
+3. Portefeuille (rééquilibrage, dérive d'allocation, optimisation rendement/risque)
+4. Objectifs (retard, urgence, cap manquant)
+5. Marché (impact sur le portefeuille du client si données disponibles)
 
-## Règles
-- Chaque insight doit être CONCIS (2-3 phrases max)
-- Être SPÉCIFIQUE au client (utilise ses chiffres réels)
-- Toujours en français
-- Proposer une ACTION concrète
-- Ne PAS recommander de titres individuels
+## Règles strictes
+- CONCIS : 2 phrases max par insight (titre < 55 chars, contenu < 180 chars)
+- CHIFFRÉ : toujours utiliser les vrais chiffres du client (pas de X ou placeholder)
+- QUÉBÉCOIS : français canadien, termes locaux (CELI, REER, RAP, etc.)
+- ACTION : chaque insight = 1 action précise et immédiate
+- DIVERSITÉ : pas deux insights sur le même thème
+- Ne PAS recommander de titres ou actions individuels
 
-## Format JSON strict
+## Types disponibles
+- tax_optimization : CELI/REER/REEE sous-utilisés, déductions manquées
+- savings_rate : taux d'épargne insuffisant, budget à optimiser
+- debt_alert : ratio dette élevé, stratégie de remboursement
+- goal_progress : objectif en retard ou presque atteint
+- portfolio_alert : dérive d'allocation, volatilité excessive
+- rebalancing : rééquilibrage nécessaire
+- market_update : impact marché sur le portefeuille
+- general_tip : conseil actionnable si aucun autre thème urgent
+
+## Format JSON strict — réponds UNIQUEMENT avec ce JSON
 {
   "insights": [
     {
-      "type": "tax_optimization|portfolio_alert|goal_progress|rebalancing|market_update|general_tip",
-      "title": "Titre court et accrocheur (max 60 caractères)",
-      "content": "Explication avec chiffres concrets et action recommandée (max 200 caractères)",
-      "priority": "low|normal|high|urgent"
+      "type": "tax_optimization|savings_rate|debt_alert|goal_progress|portfolio_alert|rebalancing|market_update|general_tip",
+      "title": "Titre accrocheur max 55 chars",
+      "content": "2 phrases avec chiffres réels et action concrète. Max 180 chars.",
+      "priority": "low|normal|high|urgent",
+      "action_url": "/fiscal|/portfolio|/goals|/retirement|/chat"
     }
   ]
-}
-
-Réponds UNIQUEMENT avec le JSON.`;
+}`;
 
 export async function POST(request: NextRequest) {
     try {
@@ -140,36 +151,80 @@ export async function POST(request: NextRequest) {
             // Market data unavailable
         }
 
-        // Build user context for AI
+        // Build enriched user context
+        const income = Number(clientInfo?.annual_income || 0);
+        const monthlyIncome = income / 12;
+        const monthlySavings = Number(clientInfo?.monthly_savings || 0);
+        const monthlyExpenses = Number(clientInfo?.monthly_expenses || 0);
+        const totalAssets = Number(clientInfo?.total_assets || 0);
+        const totalDebts = Number(clientInfo?.total_debts || 0);
+        const celiBalance = Number(clientInfo?.celi_balance || 0);
+        const reerBalance = Number(clientInfo?.reer_balance || 0);
+        const age = Number(clientInfo?.age || 0);
+
+        const savingsRate = monthlyIncome > 0 ? Math.round((monthlySavings / monthlyIncome) * 100) : null;
+        const debtRatio = totalAssets > 0 ? Math.round((totalDebts / totalAssets) * 100) : null;
+        const netWorth = totalAssets - totalDebts;
+        const reerAnnualRoom = income > 0 ? Math.min(Math.round(income * 0.18), 31560) : null;
+        // CELI cumulative room: $6,500/yr × years since 18 (simplified estimate)
+        const celiCumulativeRoom = age >= 18 ? Math.min((age - 17) * 6500, 95000) : null;
+        const celiRoom = celiCumulativeRoom !== null ? Math.max(0, celiCumulativeRoom - celiBalance) : null;
+        const emergencyFundTarget = monthlyExpenses > 0 ? monthlyExpenses * 3 : null;
+
+        // Portfolio allocations summary
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const allocations = (selectedPortfolio as any)?.portfolio_allocations || [];
+        const allocSummary = allocations.length > 0
+            ? allocations
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                .sort((a: any, b: any) => b.weight - a.weight)
+                .slice(0, 4)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                .map((a: any) => `${a.asset_class} ${a.weight}%`)
+                .join(", ")
+            : null;
+
+        // Goals with urgency
+        const now = new Date();
+        const goalsWithUrgency = (goals || []).map((g: { label: string; type: string; target_amount: number; current_amount: number; target_date?: string }) => {
+            const progress = g.target_amount > 0 ? Math.round((g.current_amount / g.target_amount) * 100) : 0;
+            const gap = g.target_amount - g.current_amount;
+            let urgencyNote = "";
+            if (g.target_date) {
+                const daysLeft = Math.round((new Date(g.target_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                if (daysLeft < 180) urgencyNote = ` ⚠️ URGENT (${daysLeft}j restants)`;
+                else if (daysLeft < 365) urgencyNote = ` (${Math.round(daysLeft / 30)} mois restants)`;
+                else urgencyNote = ` (dans ${Math.round(daysLeft / 365)} ans)`;
+            }
+            return `- ${g.label}: ${g.current_amount.toLocaleString("fr-CA")}$ / ${g.target_amount.toLocaleString("fr-CA")}$ (${progress}%, manque ${gap.toLocaleString("fr-CA")}$)${urgencyNote}`;
+        });
+
         const userContext = `
-## Client
-- Âge: ${clientInfo?.age || "N/A"}
-- Revenu annuel: ${clientInfo?.annual_income || "N/A"}$
-- Épargne mensuelle: ${clientInfo?.monthly_savings || "N/A"}$
-- CELI: ${clientInfo?.has_celi ? `${clientInfo.celi_balance}$` : "Non ouvert"}
-- REER: ${clientInfo?.has_reer ? `${clientInfo.reer_balance}$` : "Non ouvert"}
-- REEE: ${clientInfo?.has_reee ? `${clientInfo.reee_balance}$` : "Non ouvert"}
+## Profil client
+- Âge: ${age || "N/A"} ans
+- Revenu annuel: ${income > 0 ? `${income.toLocaleString("fr-CA")}$` : "N/A"}
+- Revenu mensuel: ${monthlyIncome > 0 ? `${Math.round(monthlyIncome).toLocaleString("fr-CA")}$` : "N/A"}
+- Épargne mensuelle: ${monthlySavings > 0 ? `${monthlySavings.toLocaleString("fr-CA")}$` : "N/A"}${savingsRate !== null ? ` (taux: ${savingsRate}% — sain si > 20%)` : ""}
+- Dépenses mensuelles: ${monthlyExpenses > 0 ? `${monthlyExpenses.toLocaleString("fr-CA")}$` : "N/A"}
+- Actifs totaux: ${totalAssets > 0 ? `${totalAssets.toLocaleString("fr-CA")}$` : "N/A"}
+- Dettes totales: ${totalDebts > 0 ? `${totalDebts.toLocaleString("fr-CA")}$` : "0$"}
+- Valeur nette: ${netWorth > 0 ? `${netWorth.toLocaleString("fr-CA")}$` : "N/A"}${debtRatio !== null ? ` | Ratio dette/actif: ${debtRatio}% (risqué si > 35%)` : ""}
+- Fonds d'urgence cible: ${emergencyFundTarget ? `${emergencyFundTarget.toLocaleString("fr-CA")}$ (3 mois de dépenses)` : "N/A"}
 - Profil de risque: ${riskAssessment?.risk_profile || "Non évalué"} (${riskAssessment?.risk_score || "?"}/10)
 
-## Portefeuille
+## Comptes enregistrés
+- CELI: ${clientInfo?.has_celi ? `${celiBalance.toLocaleString("fr-CA")}$${celiRoom !== null ? ` | espace disponible estimé: ${celiRoom.toLocaleString("fr-CA")}$` : ""}` : "Non ouvert"}
+- REER: ${clientInfo?.has_reer ? `${reerBalance.toLocaleString("fr-CA")}$${reerAnnualRoom !== null ? ` | déduction max annuelle: ${reerAnnualRoom.toLocaleString("fr-CA")}$` : ""}` : "Non ouvert"}
+- REEE: ${clientInfo?.has_reee ? `${Number(clientInfo.reee_balance || 0).toLocaleString("fr-CA")}$` : "Non ouvert"}
+
+## Portefeuille sélectionné
 ${selectedPortfolio
-                ? `- Type: ${selectedPortfolio.type}
-- Rendement attendu: ${selectedPortfolio.expected_return}%
-- Volatilité: ${selectedPortfolio.volatility}%
-- Sharpe: ${selectedPortfolio.sharpe_ratio}`
+                ? `- Type: ${selectedPortfolio.type} | Rendement attendu: ${selectedPortfolio.expected_return}% | Volatilité: ${selectedPortfolio.volatility}% | Sharpe: ${selectedPortfolio.sharpe_ratio}${allocSummary ? `\n- Allocation: ${allocSummary}` : ""}`
                 : "Aucun portefeuille sélectionné"
             }
 
-## Objectifs
-${goals && goals.length > 0
-                ? goals
-                    .map(
-                        (g: { label: string; type: string; target_amount: number; current_amount: number }) =>
-                            `- ${g.label} (${g.type}): ${g.current_amount}$ / ${g.target_amount}$ (${Math.round((g.current_amount / g.target_amount) * 100)}%)`
-                    )
-                    .join("\n")
-                : "Aucun objectif défini"
-            }
+## Objectifs (triés par urgence)
+${goalsWithUrgency.length > 0 ? goalsWithUrgency.join("\n") : "Aucun objectif défini"}
 
 ## Marché aujourd'hui
 ${marketSummary || "Données non disponibles"}
@@ -177,7 +232,7 @@ ${marketSummary || "Données non disponibles"}
 ## Date
 ${new Date().toLocaleDateString("fr-CA", { dateStyle: "long" })}
 
-Génère 2-3 insights personnalisés pour ce client.`;
+Génère 3-4 insights personnalisés pour ce client, triés du plus urgent au moins urgent.`;
 
         let insights;
         try {
@@ -185,6 +240,7 @@ Génère 2-3 insights personnalisés pour ce client.`;
                 systemPrompt: INSIGHT_SYSTEM_PROMPT,
                 userMessage: userContext,
                 maxTokens: 1024,
+                temperature: 0.5,
             });
 
             const text = aiResponse.text;

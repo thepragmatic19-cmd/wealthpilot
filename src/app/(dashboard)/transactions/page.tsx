@@ -108,6 +108,7 @@ export default function TransactionsPage() {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<string>("all");
     const [search, setSearch] = useState("");
+    const [showCount, setShowCount] = useState(50);
     const [showAddDialog, setShowAddDialog] = useState(false);
     const [txToDelete, setTxToDelete] = useState<string | null>(null);
 
@@ -154,6 +155,10 @@ export default function TransactionsPage() {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    useEffect(() => {
+        setShowCount(50);
+    }, [filter, search]);
 
     async function handleAddTransaction() {
         try {
@@ -230,6 +235,7 @@ export default function TransactionsPage() {
         }
         return true;
     });
+    const visibleTransactions = filteredTransactions.slice(0, showCount);
 
     const positions = computePositions(transactions);
     const totalRealizedGain = positions.reduce((sum, p) => sum + p.realizedGainLoss, 0);
@@ -558,7 +564,7 @@ export default function TransactionsPage() {
                         </div>
                     ) : (
                         <div className="space-y-2">
-                            {filteredTransactions.map((tx) => (
+                            {visibleTransactions.map((tx) => (
                                 <div
                                     key={tx.id}
                                     className="flex items-center justify-between rounded-lg border p-3 sm:p-4 transition-colors hover:bg-muted/50"
@@ -615,6 +621,17 @@ export default function TransactionsPage() {
                                     </div>
                                 </div>
                             ))}
+                            {showCount < filteredTransactions.length && (
+                                <div className="flex justify-center pt-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setShowCount((c) => c + 50)}
+                                    >
+                                        Voir plus ({filteredTransactions.length - showCount} restants)
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </CardContent>

@@ -179,6 +179,16 @@ export default function ProfilePage() {
 
   async function onSaveClientInfo(data: ClientInfoInput) {
     if (!clientInfo) return;
+
+    // Cross-validation: registered accounts balances shouldn't exceed total assets by more than 10%
+    const celiBalance = data.celi_balance ?? 0;
+    const reerBalance = data.reer_balance ?? 0;
+    const reeeBalance = data.reee_balance ?? 0;
+    const totalAssets = data.total_assets ?? 0;
+    if (totalAssets > 0 && (celiBalance + reerBalance + reeeBalance) > totalAssets * 1.1) {
+      toast.warning("Vérification : vos soldes CELI/REER/REEE semblent supérieurs à vos actifs totaux. Veuillez vérifier vos données.");
+    }
+
     setSavingFinancial(true);
     const supabase = createClient();
     const { error } = await supabase
@@ -266,7 +276,7 @@ export default function ProfilePage() {
     : null;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-4 sm:space-y-6">
       <h1 className="text-2xl font-bold">Mon profil</h1>
 
       {/* Personal Info */}
@@ -518,9 +528,9 @@ export default function ProfilePage() {
                     <span className="font-medium capitalize">{clientInfo.investment_experience || "—"}</span>
                   </div>
                   <Separator />
-                  <div className="flex items-center justify-between text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-sm">
                     <span className="text-muted-foreground">Comptes</span>
-                    <div className="flex gap-1">
+                    <div className="flex flex-wrap gap-1">
                       {clientInfo.has_celi && <Badge variant="outline">CELI {clientInfo.celi_balance ? `· ${formatCurrency(Number(clientInfo.celi_balance))}` : ""}</Badge>}
                       {clientInfo.has_reer && <Badge variant="outline">REER {clientInfo.reer_balance ? `· ${formatCurrency(Number(clientInfo.reer_balance))}` : ""}</Badge>}
                       {clientInfo.has_reee && <Badge variant="outline">REEE</Badge>}
@@ -632,7 +642,7 @@ export default function ProfilePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+          <div className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-medium text-sm">Supprimer mon compte</p>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -642,7 +652,7 @@ export default function ProfilePage() {
             <Button
               variant="destructive"
               size="sm"
-              className="gap-2 shrink-0"
+              className="gap-2 sm:shrink-0"
               onClick={() => { setDeleteConfirm(""); setShowDeleteDialog(true); }}
             >
               <Trash2 className="h-4 w-4" />

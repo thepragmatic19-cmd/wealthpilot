@@ -18,6 +18,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Loader2, ShieldCheck } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Props {
   userId: string;
@@ -135,6 +136,9 @@ export function RiskQuestionnaireStep({ userId, onNext, onPrev }: Props) {
     resolver: zodResolver(riskQuestionnaireSchema),
   });
 
+  const watchAllFields = form.watch();
+  const answeredCount = Object.values(watchAllFields).filter(Boolean).length;
+
   useEffect(() => {
     async function loadData() {
       const supabase = createClient();
@@ -198,6 +202,20 @@ export function RiskQuestionnaireStep({ userId, onNext, onPrev }: Props) {
         </div>
       </CardHeader>
       <CardContent>
+        {/* Progress bar */}
+        <div className="mb-6">
+          <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+            <span>{answeredCount}/10 questions répondues</span>
+            <span>{Math.round((answeredCount / 10) * 100)}%</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all duration-300 rounded-full"
+              style={{ width: `${(answeredCount / 10) * 100}%` }}
+            />
+          </div>
+        </div>
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             {QUESTIONS.map((q, index) => (
@@ -217,15 +235,25 @@ export function RiskQuestionnaireStep({ userId, onNext, onPrev }: Props) {
                         className="space-y-2"
                       >
                         {q.options.map((option) => (
-                          <div
-                            key={option.value}
-                            className="flex items-center space-x-3 rounded-lg border p-3 hover:bg-muted/50 transition-colors"
-                          >
-                            <RadioGroupItem value={option.value} id={`${q.name}-${option.value}`} />
-                            <label htmlFor={`${q.name}-${option.value}`} className="flex-1 cursor-pointer text-sm">
+                          <FormItem key={option.value} className="flex items-start space-x-0 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value={option.value} className="sr-only" id={`${q.name}-${option.value}`} />
+                            </FormControl>
+                            <label
+                              htmlFor={`${q.name}-${option.value}`}
+                              className={cn(
+                                "flex w-full cursor-pointer items-center gap-3 rounded-xl border p-3.5 text-sm transition-all",
+                                "hover:border-primary/50 hover:bg-primary/5",
+                                field.value === option.value && "border-primary bg-primary/10 font-medium"
+                              )}
+                            >
+                              <span className={cn(
+                                "h-4 w-4 rounded-full border-2 flex-shrink-0 transition-colors",
+                                field.value === option.value ? "border-primary bg-primary" : "border-muted-foreground/40"
+                              )} />
                               {option.label}
                             </label>
-                          </div>
+                          </FormItem>
                         ))}
                       </RadioGroup>
                     </FormControl>

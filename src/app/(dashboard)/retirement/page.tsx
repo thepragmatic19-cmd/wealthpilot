@@ -185,13 +185,13 @@ export default function RetirementPage() {
                 </p>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-3">
+            <div className="grid gap-4 lg:grid-cols-3">
                 {/* Input Panel */}
                 <Card className="lg:col-span-1">
                     <CardHeader>
                         <CardTitle className="text-base">Paramètres</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-5">
+                    <CardContent className="space-y-4">
                         <div className="space-y-2">
                             <Label>Âge actuel: {params.currentAge} ans</Label>
                             <Slider
