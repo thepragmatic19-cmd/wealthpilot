@@ -1,11 +1,202 @@
-export const RISK_PROFILE_SYSTEM_PROMPT = `Tu es un conseiller financier certifié (CFA, CFP) spécialisé dans le marché canadien et français. Tu effectues une évaluation complète du profil de risque d'un client.
+// ─────────────────────────────────────────────────────────────────────────────
+// RÉFÉRENTIEL COMPLET — PRODUITS FINANCIERS ET RÉGLEMENTATION CANADIENNE
+// Injecté dans tous les prompts IA pour garantir une compréhension exhaustive
+// ─────────────────────────────────────────────────────────────────────────────
+export const CANADIAN_FINANCIAL_KNOWLEDGE = `
+## Référentiel des produits financiers canadiens
+
+### COMPTES ENREGISTRÉS — ÉPARGNE ET RETRAITE
+
+**CELI (Compte d'épargne libre d'impôt)** = TFSA
+- Droits de cotisation cumulatifs (2025) : ~95 000 $ pour quelqu'un ayant eu 18 ans avant 2009
+- Limite annuelle : 7 000 $/an (2024–2025)
+- Contributions NON déductibles ; retraits libres d'impôt à 100 %, en tout temps
+- Gains en capital, dividendes, intérêts : tous libres d'impôt à l'intérieur
+- Droits de cotisation récupérés le 1er janvier de l'année suivant un retrait
+- ⚠️ ETFs US-listed dans le CELI : retenue à la source américaine de 15 % NON récupérable (perte permanente)
+- Idéal pour : actifs à forte croissance à long terme, retraits anticipés sans conséquence fiscale
+
+**REER (Régime enregistré d'épargne-retraite)** = RRSP
+- Limite 2024 : 18 % du revenu gagné de l'année précédente, plafond à 31 560 $
+- Contributions déductibles du revenu imposable (réduction d'impôt immédiate)
+- Croissance à l'abri de l'impôt ; imposition complète au taux marginal au retrait
+- Date limite de cotisation pour l'année fiscale précédente : **1er mars**
+- Conversion obligatoire en FERR au plus tard le 31 décembre de l'année des **71 ans**
+- Droits inutilisés reportés indéfiniment
+- ⚠️ ETFs US-listed dans le REER : retenue 15 % RÉCUPÉRABLE (Convention fiscale Canada-USA, Art. XXI §3) → économie réelle vs CELI
+
+**FERR (Fonds enregistré de revenu de retraite)** = RRIF
+- Conversion obligatoire du REER à 71 ans ; le REER cesse d'exister
+- Retrait minimum annuel OBLIGATOIRE selon l'âge (ex. : ~5,28 % à 71 ans, ~6,82 % à 75 ans, ~11,92 % à 85 ans)
+- Option : utiliser l'âge du conjoint PLUS JEUNE pour réduire le retrait minimum obligatoire
+- Retraits entièrement imposables ; retenue à la source sur chaque retrait
+- Possibilité de fractionnement du revenu de pension à 65+ (jusqu'à 50 % transférable au conjoint)
+- Stratégie : planifier les retraits FERR pour ne pas dépasser le seuil de récupération de la PSV (~90 997 $ en 2024)
+
+**CELIAPP (Compte d'épargne libre d'impôt pour l'achat d'une première propriété)** = FHSA [NOUVEAU — introduit en avril 2023]
+- Le MEILLEUR véhicule d'épargne au Canada pour les acheteurs d'une première propriété
+- Double avantage unique : contributions DÉDUCTIBLES (comme REER) + retraits pour achat LIBRES D'IMPÔT (comme CELI)
+- Limite annuelle : **8 000 $/an**, plafond à vie : **40 000 $**
+- Droits inutilisés reportables d'une année à l'autre (max 8 000 $ de report)
+- Admissible : ne pas avoir possédé une habitation principale où on résidait au cours des 4 dernières années civiles
+- Durée maximale du compte : 15 ans (ou jusqu'à l'achat d'une propriété admissible)
+- Si l'achat n'a pas lieu : sommes transférables au REER/FERR sans impact sur les droits REER → zéro perte
+- Combinable avec le **RAP** pour maximiser la mise de fonds (CELIAPP + RAP = jusqu'à 75 000 $ par personne)
+- ⚠️ Souvent méconnu — toujours vérifier si le client y est admissible avant toute autre stratégie d'achat immobilier
+
+**REEE (Régime enregistré d'épargne-études)** = RESP
+- Plafond à vie par bénéficiaire : 50 000 $
+- **SCEE (Subvention canadienne pour l'épargne-études)** : 20 % sur les 2 500 $ premiers = 500 $/an, max à vie 7 200 $
+- **IQEE (Incitatif québécois à l'épargne-études)** [Québec uniquement] : 10 % sur les 2 500 $ premiers = 250 $/an, max à vie 3 600 $ (en plus de la SCEE fédérale)
+- SCEE supplémentaire pour familles à faible revenu : 10–20 % additionnels sur les 500 $ premiers
+- Revenus imposés au nom de l'étudiant au retrait (paiements d'aide aux études) → généralement peu ou pas d'impôt
+- Stratégie : si enfant < 10 ans → portefeuille croissance (XIC.TO, VFV.TO, XEF.TO) ; si enfant ≥ 14 ans → capital protection (CASH.TO, XSB.TO)
+
+**CRI (Compte de retraite immobilisé)** = LIRA [Locked-In Retirement Account]
+- Reçoit les sommes immobilisées d'un régime de retraite d'un ancien employeur (fonds "locked-in")
+- ⚠️ DIFFÉRENCE CLÉ avec le REER : les fonds sont BLOQUÉS — impossible de les retirer librement en espèces
+- Exceptions de déverrouillage (selon la province) : difficultés financières graves, espérance de vie réduite, solde minime, non-résident depuis 2+ ans, déverrouillage partiel à 55+ ans (Québec : 50 % du CRI déverrouillable une seule fois à 55+)
+- Croissance à l'abri de l'impôt comme un REER
+- Doit être converti en **FRV** (ou rente) au plus tard à 71 ans
+- Régi par la province d'emploi (Québec : Loi sur les régimes complémentaires de retraite / LRCR) ou fédéral (pour employeurs sous juridiction fédérale : banques, télécoms, etc.)
+- ⚠️ Souvent désigné "CRIF", "LIRA" ou "compte de pension immobilisé" selon l'institution — c'est le même produit
+
+**FRV (Fonds de revenu viager)** = LIF [Life Income Fund]
+- Successeur naturel du CRI pour générer des revenus à la retraite
+- Retrait MINIMUM annuel obligatoire (comme le FERR) ET retrait MAXIMUM annuel (unique au FRV/LIF, protège les fonds pour la durée de vie)
+- Maximum annuel calculé selon un facteur provincial (Québec : formule spécifique basée sur le rendement obligataire)
+- Entièrement imposable au retrait ; mêmes avantages de fractionnement qu'un FERR à 65+
+- Option en Québec : à 65+, convertir jusqu'à 40 % du FRV en FERR ordinaire pour plus de flexibilité
+
+**REER de conjoint** = Spousal RRSP
+- Le cotisant déduit les sommes (dans ses propres droits REER) ; le conjoint est le titulaire
+- Stratégie puissante de fractionnement du revenu à la retraite : si les conjoints ont des revenus très différents à la retraite, équilibrer leurs revenus réduit l'impôt total
+- ⚠️ Règle des 3 ans : si le conjoint retire des fonds dans les 2 années civiles SUIVANT la dernière cotisation au REER de conjoint → imposé au COTISANT (pas au bénéficiaire) → attendre 3 ans complets après la dernière cotisation pour retirer sans attribution
+
+**REEI (Régime enregistré d'épargne-invalidité)** = RDSP [Registered Disability Savings Plan]
+- Pour personnes admissibles au Crédit d'impôt pour personnes handicapées (CIPH) / Disability Tax Credit (DTC)
+- **SCEI (Subvention canadienne pour l'épargne-invalidité)** : jusqu'à 3 500 $/an (selon revenu familial), max à vie 70 000 $
+- **BCEI (Bon canadien pour l'épargne-invalidité)** : jusqu'à 1 000 $/an SANS cotisation nécessaire (familles à faible revenu), max à vie 20 000 $
+- Plafond de cotisation à vie : 200 000 $
+- Règle de récupération : si fermé dans les 10 ans suivant la dernière subvention → remboursement de certains montants reçus
+
+**RVER (Régime volontaire d'épargne-retraite)** [Québec uniquement] = VRSP [Voluntary Retirement Savings Plan]
+- Régime collectif simplifié pour les employés sans accès à un régime de retraite
+- Obligation pour les employeurs québécois de 5+ employés sans régime de retraite : offrir l'accès à un RVER
+- Cotisations de l'employé : déductibles comme un REER (utilisent les droits REER)
+- Géré par des assureurs autorisés (ex. : iA, SSQ, Desjardins, Industrielle Alliance)
+
+### PLANS D'ACCÈS AUX FONDS ENREGISTRÉS
+
+**RAP (Régime d'accession à la propriété)** = HBP [Home Buyers' Plan]
+- Retrait temporaire du REER pour achat d'une première propriété : max **35 000 $** par personne (70 000 $ pour un couple)
+- Remboursement sur 15 ans (1/15 par année minimum, sinon la portion non remboursée s'ajoute au revenu imposable)
+- Ne perd PAS les droits REER au remboursement
+- Combinable avec le CELIAPP pour un maximum total de **75 000 $** par personne (35 000 $ RAP + 40 000 $ CELIAPP)
+
+**REEP (Régime d'encouragement à l'éducation permanente)** = LLP [Lifelong Learning Plan]
+- Retrait du REER pour financer une formation à temps plein : max 10 000 $/an, 20 000 $ total
+- Remboursement sur 10 ans (1/10 par année minimum)
+
+### RÉGIMES DE RETRAITE PUBLICS
+
+**RRQ (Régie des rentes du Québec)** [Québec] / **RPC (Régime de pensions du Canada)** [autres provinces] = CPP
+- Basé sur les cotisations et les revenus de travail tout au long de la carrière
+- Début des prestations : flexible de **60 à 70 ans**
+  - Avant 65 ans : réduction permanente de **7,2 % par année** (0,6 %/mois)
+  - Après 65 ans : bonification permanente de **8,4 % par année** (0,7 %/mois)
+  - À 70 ans : prestation 42 % plus élevée qu'à 65 ans
+- Prestation maximale à 65 ans (2024) : ~1 364 $/mois (si cotisations maximales toute la carrière)
+- Prestation moyenne réelle : ~800–900 $/mois
+- Stratégie : si santé bonne et finances stables, retarder à 70 ans est souvent optimal
+
+**PSV (Pension de la sécurité de la vieillesse)** = OAS [Old Age Security]
+- Payable dès **65 ans** (résidence au Canada 40+ ans après 18 ans = prestation complète)
+- Montant maximum 2024 : ~707 $/mois (65–74 ans), ~778 $/mois (75 ans et plus, bonification automatique de 10 %)
+- **Récupération (clawback)** : si revenu net > ~90 997 $ (2024) → PSV réduite de **15 ¢ par dollar** au-dessus du seuil
+- PSV entièrement éliminée si revenu > ~148 000 $
+- Stratégie : minimiser les revenus imposables entre 65 et 75 ans (gestion des retraits FERR, REER de conjoint, fractionnement) pour conserver la PSV
+
+**SRG (Supplément de revenu garanti)** = GIS [Guaranteed Income Supplement]
+- Pour personnes à faible revenu âgées de 65+ recevant la PSV
+- Non imposable (avantage majeur)
+- Récupéré au taux de **50 ¢ par dollar** de revenu excédant le seuil → très punitif
+- ⚠️ Tout revenu imposable (retraits FERR, dividendes, revenus de location) RÉDUIT le SRG
+- Stratégie pour faibles revenus : privilégier le CELI (retraits non imposables) pour préserver le SRG ; minimiser les retraits FERR
+
+### FISCALITÉ CANADIENNE — POINTS CLÉS
+
+**Crédit d'impôt pour dividendes canadiens**
+- Dividendes déterminés (grandes sociétés publiques canadiennes, XEI.TO, CDZ.TO, ZDV.TO) : majoration 38 % + crédit fédéral 15,02 % → taux effectif ~25–35 % selon la province (vs. taux marginal plein sur intérêts)
+- ⚠️ Ce crédit est PERDU si les actions canadiennes sont détenues dans un REER/FERR → prioriser en non-enregistré ou CELI
+
+**Gains en capital — Changement MAJEUR 2024**
+- Jusqu'au 24 juin 2024 : taux d'inclusion = **1/2** (50 %) pour tous
+- Depuis le 25 juin 2024 : taux d'inclusion = **2/3** (66,67 %) pour :
+  - Les gains > 250 000 $ par année pour les PARTICULIERS
+  - Tous les gains pour les SOCIÉTÉS et les FIDUCIES
+- Exonération cumulative des gains en capital (ECGC) 2024 : ~1 016 602 $ pour actions admissibles de petites entreprises, fermes et pêches
+
+**Retenue à la source américaine sur les dividendes**
+| Compte | Retenue | Récupérable ? |
+|--------|---------|---------------|
+| REER / FERR | 15 % | OUI (traité USA-CAN Art. XXI §3) → effectivement 0 % |
+| CELI | 15 % | NON → perte permanente |
+| REEE | 15 % | NON → perte permanente |
+| Non-enregistré | 15 % | PARTIEL (crédit pour impôt étranger) |
+
+**Fractionnement du revenu de pension (65+)**
+- Jusqu'à 50 % des revenus de pension admissibles (FERR, rentes de régimes de retraite enregistrés, rentes viagères) peuvent être déclarés par le conjoint moins imposé
+- Règle : les deux conjoints doivent être résidents canadiens
+
+**Taux marginaux d'imposition combinés (fédéral + provincial) — Estimation 2024**
+| Revenu | Québec | Ontario | C.-B. |
+|--------|--------|---------|-------|
+| < 50 000 $ | ~26–37 % | ~20–29 % | ~20–28 % |
+| 50–100 k $ | ~37–47 % | ~29–43 % | ~28–40 % |
+| 100–150 k $ | ~47–53 % | ~43–46 % | ~40–47 % |
+| > 220 k $ | ~53,3 % | ~53,5 % | ~53,5 % |
+
+**Test de résistance hypothécaire (B-20)**
+- Qualification au taux LE PLUS ÉLEVÉ entre : (a) taux du contrat + 2 % ou (b) 5,25 %
+- S'applique à tous les prêts hypothécaires assurés et non assurés
+
+### ENVIRONNEMENT ÉCONOMIQUE CANADIEN (début 2026)
+
+- **Taux directeur BdC** : en phase de baisse depuis 2024 (était à 5 % en 2023, réduit progressivement)
+- **Inflation IPC** : cible BdC de 2 % ; inflation revenue dans la cible depuis mi-2024
+- **Marché immobilier** : pression à la hausse dans les grands centres (Toronto, Vancouver, Montréal)
+- **Marché actions** : TSX soutenu par les ressources et les banques ; S&P 500 en trend haussier
+- **Obligations** : rendement obligataire gouvernement canadien 10 ans ~3,X %
+- **Dollar canadien** : volatilité liée aux prix du pétrole et aux politiques commerciales américaines
+
+### TERMES SOUVENT CONFONDUS OU MAL COMPRIS
+
+| Terme utilisé | Produit réel | Notes |
+|---------------|-------------|-------|
+| CRIF, LIRA, compte de pension immobilisé | CRI (Compte de retraite immobilisé) | Fonds bloqués d'un ancien régime de retraite d'employeur |
+| FERR / RRIF | FERR (Fonds enregistré de revenu de retraite) | Conversion obligatoire du REER à 71 ans |
+| FRV / LIF | FRV (Fonds de revenu viager) | Conversion du CRI, avec retrait max annuel |
+| FHSA / compte acheteur | CELIAPP | Nouveau depuis 2023, double avantage REER+CELI |
+| RAP / HBP | RAP (Régime d'accession à la propriété) | Retrait temporaire REER pour première maison |
+| CPP / RPC | RRQ (Québec) ou RPC (autres provinces) | Régime de pensions public lié aux cotisations salariales |
+| OAS / PSV | PSV (Pension de la sécurité de la vieillesse) | Payable à 65+, clawback si revenu > ~91 k $ |
+| GIS / SRG | SRG (Supplément de revenu garanti) | Pour faibles revenus, non imposable, récupéré à 50 ¢/$ |
+| RDSP / REEI | REEI (Régime enregistré d'épargne-invalidité) | Pour personnes admissibles au crédit CIPH |
+| RVER / VRSP | RVER (Québec) | Régime collectif volontaire, droits REER |
+| Spousal RRSP | REER de conjoint | Stratégie de fractionnement, règle des 3 ans au retrait |
+`;
+
+export const RISK_PROFILE_SYSTEM_PROMPT = `Tu es un conseiller financier certifié (CFA, CFP) spécialisé dans le marché canadien et québécois. Tu effectues une évaluation complète du profil de risque d'un client.
+
+Tu connais parfaitement tous les produits financiers canadiens : CELI, REER, FERR, CELIAPP, REEE, CRI (aussi appelé CRIF ou LIRA), FRV (LIF), REER de conjoint, REEI, RVER, RAP, REEP, ainsi que les régimes publics (RRQ/RPC, PSV/OAS, SRG/GIS).
 
 ## Ta mission
 Analyser de manière holistique le profil du client en considérant:
-1. **Capacité financière** - Revenus, actifs, dettes, horizon temporel
+1. **Capacité financière** - Revenus, actifs, dettes, horizon temporel, comptes disponibles
 2. **Tolérance psychologique** - Réactions aux pertes, confort avec la volatilité
 3. **Objectifs d'investissement** - Nature et urgence des objectifs
-4. **Situation personnelle** - Âge, famille, emploi, stabilité
+4. **Situation personnelle** - Âge, famille, emploi, stabilité, province de résidence
 
 ## Principe de prudence
 Si la capacité financière et la tolérance psychologique divergent, tu dois retenir le profil LE PLUS CONSERVATEUR des deux.
@@ -45,6 +236,9 @@ Réponds UNIQUEMENT avec le JSON.`;
 
 export function buildPortfolioSystemPrompt(instrumentsSummary: string): string {
   return `Tu es un gestionnaire de portefeuille certifié CFA (Chartered Financial Analyst, Level III) et CIM (Conseiller en Gestion de Placements) chez WealthPilot. Tu construis des portefeuilles selon les standards du CFA Institute pour clientèle privée canadienne — rigueur institutionnelle, adaptation au client, optimisation fiscale.
+
+${CANADIAN_FINANCIAL_KNOWLEDGE}
+
 
 ## Étape 1 — Lecture de l'Énoncé de Politique de Placement (IPS)
 
@@ -105,18 +299,29 @@ L'asset location peut ajouter 0,3–0,8% de rendement annuel net supplémentaire
 - Priorité #2 : Obligations à revenu élevé, REITs (intérêts imposés au taux marginal plein en dehors du REER).
 - ⚠️ Éviter : Actions canadiennes dans le REER — on perd le crédit d'impôt pour dividendes canadiens, net très défavorable.
 
+**CELIAPP (contributions déductibles + retraits achat libres d'impôt)**
+- Uniquement pour les clients admissibles (acheteurs potentiels d'une première propriété)
+- Traiter comme un REER pour la localisation fiscale : prioriser les actifs à croissance modérée
+- Horizon typiquement 1–10 ans → éviter la trop haute volatilité
+
 **CELI (cotisations non déductibles, retraits libres d'impôt)**
 - Priorité #1 : Actifs à forte croissance à long terme (XIC.TO, XEF.TO, QQC.TO) — les gains en capital s'accumulent et sont retirés sans impôt.
 - Priorité #2 : Actions de qualité avec dividendes CAD (XEI.TO) si non-enregistré saturé.
 - ⚠️ Éviter absolument : ETFs US-listed dans le CELI — la retenue à la source américaine de 15% n'est PAS récupérable dans le CELI (contrairement au REER). C'est une perte permanente.
 
-**REEE (Subvention canadienne pour l'épargne-études : 20% sur 2 500 $/an = 500 $/an max, plafond vie 7 200 $)**
+**CRI / FRV (fonds immobilisés d'un ancien régime de retraite d'employeur)**
+- Traiter comme un REER/FERR pour la localisation fiscale
+- Même logique : prioriser ETFs US-listed pour éliminer la retenue à la source
+- ⚠️ Les retraits sont LIMITÉS (minimum ET maximum pour le FRV) — tenir compte dans la planification des flux de trésorerie à la retraite
+- Possibilité de déverrouillage partiel à 55+ ans (Québec : 50 % déverrouillable une fois) → planifier ce moment stratégiquement
+
+**REEE (Subvention canadienne pour l'épargne-études : 20% sur 2 500 $/an = 500 $/an max, plafond vie 7 200 $ ; Québec : +10% IQEE = +250 $/an)**
 - Enfant < 10 ans : profil croissance (XIC.TO + VFV.TO + XEF.TO) — horizon suffisamment long.
 - Enfant ≥ 14 ans : capital protection (CASH.TO, XSB.TO) — les fonds seront utilisés dans moins de 5 ans, la volatilité est inacceptable.
 
 **Non-Enregistré (revenus imposables annuellement)**
-- Priorité #1 : Actions canadiennes à dividendes (XEI.TO, CDZ.TO, ZDV.TO) → crédit d'impôt pour dividendes (taux effectif ~10–15% vs taux marginal plein sur les intérêts).
-- Priorité #2 : ETFs à faible rotation et distribution minimale (VFV.TO, VCN.TO) — minimise les gains en capital réalisés imposables.
+- Priorité #1 : Actions canadiennes à dividendes (XEI.TO, CDZ.TO, ZDV.TO) → crédit d'impôt pour dividendes déterminés (taux effectif ~10–15% vs taux marginal plein sur les intérêts).
+- Priorité #2 : ETFs à faible rotation et distribution minimale (VFV.TO, VCN.TO) — minimise les gains en capital réalisés imposables. Note : gains en capital > 250 k$/an maintenant imposés à 2/3 depuis juin 2024.
 - ⚠️ Éviter : Obligations en non-enregistré — les intérêts sont imposés à 100% au taux marginal. Le pire traitement fiscal possible.
 
 ## Étape 5 — Analyse Factorielle (Factor Investing)
@@ -335,16 +540,31 @@ export function buildPortfolioUserMessage(context: {
 
   message += `## Comptes enregistrés\n`;
   if (clientInfo.has_celi) {
-    message += `- CELI : ${formatMoney(clientInfo.celi_balance)} (abri fiscal sur gains en capital et dividendes — prioriser actifs de croissance)\n`;
+    message += `- CELI : ${formatMoney(clientInfo.celi_balance)} (abri fiscal sur gains en capital et dividendes — prioriser actifs de croissance ; ⚠️ pas d'ETFs US-listed, retenue 15 % non récupérable)\n`;
   }
   if (clientInfo.has_reer) {
-    message += `- REER : ${formatMoney(clientInfo.reer_balance)} (déductible, imposition au retrait — prioriser ETFs US-listed pour éliminer retenue à la source 15%)\n`;
+    message += `- REER : ${formatMoney(clientInfo.reer_balance)} (déductible, imposition au retrait — prioriser ETFs US-listed pour éliminer retenue à la source 15 % via traité USA-CAN)\n`;
   }
   if (clientInfo.has_reee) {
-    message += `- REEE : ${formatMoney(clientInfo.reee_balance)} (SCEE : 20% sur 2 500 $/an = 500 $/an max — prioriser croissance si horizon > 5 ans, capital protection si < 5 ans)\n`;
+    message += `- REEE : ${formatMoney(clientInfo.reee_balance)} (SCEE fédérale : 20 % sur 2 500 $/an = 500 $/an ; IQEE Québec : +10 % = +250 $/an)\n`;
   }
-  if (!clientInfo.has_celi && !clientInfo.has_reer && !clientInfo.has_reee) {
-    message += `- Aucun compte enregistré — recommander prioritairement l'ouverture d'un CELI (cotisation max ~95 000 $ cumulatif 2025 si 18 ans avant 2009)\n`;
+  // Extended account types (if available in client info)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ci = clientInfo as any;
+  if (ci.has_celiapp || ci.celiapp_balance > 0) {
+    message += `- CELIAPP : ${formatMoney(ci.celiapp_balance ?? 0)} (double avantage : contributions déductibles + retraits pour achat libres d'impôt ; max 8 000 $/an, 40 000 $ vie)\n`;
+  }
+  if (ci.has_cri || ci.cri_balance > 0) {
+    message += `- CRI/LIRA : ${formatMoney(ci.cri_balance ?? 0)} (fonds immobilisés d'un ancien régime de retraite ; même logique fiscale que REER ; déverrouillage partiel possible à 55+ en Québec)\n`;
+  }
+  if (ci.has_frv || ci.frv_balance > 0) {
+    message += `- FRV/LIF : ${formatMoney(ci.frv_balance ?? 0)} (successeur du CRI ; retrait min ET max annuel ; traiter comme FERR pour la localisation fiscale)\n`;
+  }
+  if (!clientInfo.has_celi && !clientInfo.has_reer && !clientInfo.has_reee && !ci.has_celiapp) {
+    message += `- Aucun compte enregistré — recommander prioritairement :\n`;
+    message += `  1. CELIAPP si acheteur potentiel d'une première propriété (max 8 000 $/an déductible ET retrait libre d'impôt)\n`;
+    message += `  2. CELI (cotisation max ~95 000 $ cumulatif 2025 si 18 ans avant 2009)\n`;
+    message += `  3. REER si tranche marginale élevée (> 40 %)\n`;
   }
   message += '\n';
 
@@ -658,6 +878,8 @@ ${financialSection}
 ${riskSection}
 ${portfolioSection}
 ${goalsSection}${marketSection}
+${CANADIAN_FINANCIAL_KNOWLEDGE}
+
 ## Tes outils de calcul
 Tu as accès à des outils de simulation financière (projections, économies d'impôt, rééquilibrage). Utilise-les dès qu'une question nécessite un chiffre précis — ne devine jamais. Présente les résultats avec une explication simple de ce que ça signifie concrètement pour le client.
 
