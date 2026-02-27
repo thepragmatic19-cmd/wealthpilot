@@ -31,6 +31,7 @@ const MarketTicker = dynamic(
 );
 import { computeWeightedMer } from "@/lib/portfolio/helpers";
 import { formatCurrency, RISK_PROFILES, GOAL_ICONS } from "@/lib/utils";
+import { useSimpleMode } from "@/contexts/simple-mode-context";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FINANCIAL_TERMS } from "@/lib/financial-terms";
@@ -47,6 +48,10 @@ import {
   Calculator,
   Wallet,
   PiggyBank,
+  CheckCircle2,
+  Circle,
+  Zap,
+  ChevronRight,
 } from "lucide-react";
 import type {
   Profile,
@@ -169,6 +174,101 @@ function generateRecommendations(data: DashboardData): Recommendation[] {
   }
 
   return recs;
+}
+
+// ─── Next Step Card (QW-A) ────────────────────────────────────────────────────
+
+interface NextStep {
+  label: string;
+  description: string;
+  href: string;
+  color: string;
+  bg: string;
+}
+
+function computeNextStep(data: DashboardData): NextStep {
+  const ci = data.clientInfo;
+
+  if (!data.riskAssessment) {
+    return { label: "Évaluez votre profil de risque", description: "Étape essentielle pour recevoir un portefeuille personnalisé.", href: "/onboarding", color: "text-orange-600", bg: "bg-orange-500/10" };
+  }
+  if (!data.selectedPortfolio) {
+    return { label: "Générez votre portefeuille", description: "Votre profil est prêt — obtenez votre allocation personnalisée.", href: "/portfolio", color: "text-blue-600", bg: "bg-blue-500/10" };
+  }
+  if (data.goals.length === 0) {
+    return { label: "Définissez votre premier objectif", description: "Retraite, maison, études — un objectif donne une direction à votre épargne.", href: "/goals", color: "text-purple-600", bg: "bg-purple-500/10" };
+  }
+  if (ci && !ci.has_celi && !ci.has_reer) {
+    return { label: "Ouvrez un CELI ou REER", description: "Investir dans des comptes enregistrés réduit vos impôts et accélère votre croissance.", href: "/fiscal", color: "text-emerald-600", bg: "bg-emerald-500/10" };
+  }
+  if (ci && Number(ci.monthly_savings || 0) === 0) {
+    return { label: "Renseignez votre épargne mensuelle", description: "Complétez votre profil pour des projections précises.", href: "/profile", color: "text-amber-600", bg: "bg-amber-500/10" };
+  }
+  if (data.chatMessages.filter((m) => m.role === "user").length === 0) {
+    return { label: "Posez votre première question à l'IA", description: "Votre conseiller IA est prêt à analyser votre situation personnalisée.", href: "/chat", color: "text-primary", bg: "bg-primary/10" };
+  }
+  return { label: "Consultez votre plan fiscal", description: "Optimisez la répartition de vos comptes CELI, REER et REEE.", href: "/fiscal", color: "text-teal-600", bg: "bg-teal-500/10" };
+}
+
+function NextStepCard({ data }: { data: DashboardData }) {
+  const step = computeNextStep(data);
+  return (
+    <Link href={step.href}>
+      <div className={`group flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed hover:border-solid ${step.bg} border-current/20 hover:border-current/40 transition-all cursor-pointer`}>
+        <div className={`h-10 w-10 shrink-0 rounded-xl ${step.bg} flex items-center justify-center ${step.color} group-hover:scale-110 transition-transform`}>
+          <Zap className="h-5 w-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Votre prochain pas</p>
+          <p className={`text-sm font-bold ${step.color}`}>{step.label}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{step.description}</p>
+        </div>
+        <ChevronRight className={`h-4 w-4 shrink-0 ${step.color} opacity-0 group-hover:opacity-100 transition-opacity`} />
+      </div>
+    </Link>
+  );
+}
+
+// ─── Checklist Widget (F-1) ───────────────────────────────────────────────────
+
+function ChecklistWidget({ data }: { data: DashboardData }) {
+  const steps = [
+    { label: "Créer votre compte", done: true },
+    { label: "Compléter votre profil", done: !!data.clientInfo?.annual_income },
+    { label: "Passer l'évaluation de risque", done: !!data.riskAssessment },
+    { label: "Définir un objectif de vie", done: data.goals.length > 0 },
+    { label: "Générer votre portefeuille", done: !!data.selectedPortfolio },
+    { label: "Poser une question à l'IA", done: data.chatMessages.some((m) => m.role === "user") },
+  ];
+  const doneCount = steps.filter((s) => s.done).length;
+  const pct = Math.round((doneCount / steps.length) * 100);
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          <CheckCircle2 className="h-4 w-4 text-primary" />
+          Guide de démarrage
+        </CardTitle>
+        <CardDescription className="text-xs">{doneCount}/{steps.length} étapes complétées · {pct}%</CardDescription>
+        <Progress value={pct} className="h-1.5 mt-1" />
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {steps.map((step, i) => (
+          <div key={i} className="flex items-center gap-2.5">
+            {step.done ? (
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
+            ) : (
+              <Circle className="h-4 w-4 shrink-0 text-muted-foreground/40" />
+            )}
+            <span className={`text-xs font-medium ${step.done ? "line-through text-muted-foreground/50" : ""}`}>
+              {step.label}
+            </span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
 }
 
 interface NetWorthSnapshot {
@@ -350,6 +450,8 @@ export default function DashboardPage() {
     );
   }
 
+  const { isSimple } = useSimpleMode();
+
   const riskProfile = data.riskAssessment?.risk_profile
     ? RISK_PROFILES[data.riskAssessment.risk_profile]
     : null;
@@ -409,11 +511,14 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Market Ticker */}
-      <MarketTicker />
+      {/* Next Step Card */}
+      <NextStepCard data={data} />
 
-      {/* Summary Cards */}
-      <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Market Ticker — hidden in simple mode */}
+      {!isSimple && <MarketTicker />}
+
+      {/* Summary Cards — 3 in simple mode, 4 in advanced */}
+      <div className={`grid gap-3 sm:gap-4 sm:grid-cols-2 ${isSimple ? "lg:grid-cols-3" : "lg:grid-cols-4"}`}>
         {/* C.1 — Net Worth */}
         <Card className="group relative overflow-hidden border-none shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20 opacity-100 group-hover:opacity-80 transition-opacity" />
@@ -473,31 +578,33 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Score de Risque */}
-        <Card className="group relative overflow-hidden border-none shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
-          <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-rose-500/10 dark:from-orange-500/20 dark:to-rose-500/20" />
-          <CardContent className="p-6 relative">
-            <div className="flex items-center justify-between mb-4">
-              <div className="h-10 w-10 rounded-xl bg-orange-500/20 flex items-center justify-center text-orange-600 dark:text-orange-400">
-                <Shield className="h-5 w-5" />
+        {/* Score de Risque — hidden in simple mode */}
+        {!isSimple && (
+          <Card className="group relative overflow-hidden border-none shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
+            <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-rose-500/10 dark:from-orange-500/20 dark:to-rose-500/20" />
+            <CardContent className="p-6 relative">
+              <div className="flex items-center justify-between mb-4">
+                <div className="h-10 w-10 rounded-xl bg-orange-500/20 flex items-center justify-center text-orange-600 dark:text-orange-400">
+                  <Shield className="h-5 w-5" />
+                </div>
+                <Badge variant="secondary" className="bg-orange-500/10 text-orange-600 border-none text-[10px]">PROFIL</Badge>
               </div>
-              <Badge variant="secondary" className="bg-orange-500/10 text-orange-600 border-none text-[10px]">PROFIL</Badge>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Score de Risque</p>
-              <div className="flex items-baseline gap-2">
-                <p className="text-2xl sm:text-3xl font-black mt-1 tracking-tight text-orange-700 dark:text-orange-300">
-                  {data.riskAssessment?.risk_score || "—"}<span className="text-sm font-medium opacity-50">/10</span>
-                </p>
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Score de Risque</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-2xl sm:text-3xl font-black mt-1 tracking-tight text-orange-700 dark:text-orange-300">
+                    {data.riskAssessment?.risk_score || "—"}<span className="text-sm font-medium opacity-50">/10</span>
+                  </p>
+                </div>
+                <div className="mt-2">
+                  <Badge className="bg-orange-600 text-white border-none text-[9px] tracking-wide uppercase">
+                    {riskProfile?.label || "Non évalué"}
+                  </Badge>
+                </div>
               </div>
-              <div className="mt-2">
-                <Badge className="bg-orange-600 text-white border-none text-[9px] tracking-wide uppercase">
-                  {riskProfile?.label || "Non évalué"}
-                </Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* C.4 — Épargne mensuelle */}
         <Card className="group relative overflow-hidden border-none shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
@@ -528,8 +635,11 @@ export default function DashboardPage() {
       {/* Quick Actions — always visible after KPI cards */}
       <QuickActionsCard />
 
-      {/* Net Worth Chart */}
-      <NetWorthChart snapshots={data.snapshots} />
+      {/* Simple mode: show checklist widget prominently */}
+      {isSimple && <ChecklistWidget data={data} />}
+
+      {/* Net Worth Chart — hidden in simple mode */}
+      {!isSimple && <NetWorthChart snapshots={data.snapshots} />}
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Portfolio allocation + metrics row */}
@@ -552,33 +662,68 @@ export default function DashboardPage() {
             <CardContent>
               <AllocationChart allocations={data.selectedPortfolio.allocations} />
 
-              {/* Portfolio metrics: expected return, volatility, Sharpe, MER */}
-              <div className="mt-4 pt-4 border-t grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <div className="text-center">
-                  <MetricLabel label="Rendement attendu" className="text-xs text-muted-foreground" />
-                  <p className="text-lg font-bold text-green-600 dark:text-green-400">
-                    {data.selectedPortfolio.expected_return}%
-                  </p>
+              {/* Portfolio metrics: expected return, volatility, Sharpe, MER — hidden in simple mode */}
+              {!isSimple && (
+                <div className="mt-4 pt-4 border-t grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="text-center">
+                    <MetricLabel label="Rendement attendu" className="text-xs text-muted-foreground" />
+                    <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                      {data.selectedPortfolio.expected_return}%
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <MetricLabel label="Volatilité" className="text-xs text-muted-foreground" />
+                    <p className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                      {data.selectedPortfolio.volatility}%
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <MetricLabel label="Ratio de Sharpe" className="text-xs text-muted-foreground" />
+                    <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                      {data.selectedPortfolio.sharpe_ratio ?? "—"}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <MetricLabel label="RFG moyen" className="text-xs text-muted-foreground" />
+                    <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                      {merDisplay != null ? `${merDisplay}%` : "—"}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <MetricLabel label="Volatilité" className="text-xs text-muted-foreground" />
-                  <p className="text-lg font-bold text-orange-600 dark:text-orange-400">
-                    {data.selectedPortfolio.volatility}%
-                  </p>
-                </div>
-                <div className="text-center">
-                  <MetricLabel label="Ratio de Sharpe" className="text-xs text-muted-foreground" />
-                  <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                    {data.selectedPortfolio.sharpe_ratio ?? "—"}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <MetricLabel label="RFG moyen" className="text-xs text-muted-foreground" />
-                  <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
-                    {merDisplay != null ? `${merDisplay}%` : "—"}
-                  </p>
-                </div>
-              </div>
+              )}
+
+              {/* F-3: "Ce que ça veut dire pour toi" — plain-language projection */}
+              {(() => {
+                const ret = data.selectedPortfolio.expected_return || 0;
+                const monthly = monthlySavings;
+                const current = totalInvested;
+                const horizon = 20;
+                if (ret <= 0 || (monthly <= 0 && current <= 0)) return null;
+                const r = ret / 100 / 12;
+                const projected20 = r > 0
+                  ? current * Math.pow(1 + r, horizon * 12) + monthly * ((Math.pow(1 + r, horizon * 12) - 1) / r)
+                  : current + monthly * horizon * 12;
+                const merAmt = merDisplay ? Math.round((parseFloat(merDisplay) / 100) * current) : null;
+                return (
+                  <div className="mt-4 pt-4 border-t">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-3">Ce que ça veut dire pour vous</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 p-3">
+                        <p className="text-xs text-muted-foreground">Dans 20 ans (avec {monthly > 0 ? `${formatCurrency(monthly)}/mois` : "vos actifs actuels"})</p>
+                        <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{formatCurrency(Math.round(projected20))}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">à {ret}% de rendement annuel</p>
+                      </div>
+                      {merAmt !== null && (
+                        <div className="rounded-xl bg-orange-500/5 border border-orange-500/20 p-3">
+                          <p className="text-xs text-muted-foreground">Frais de gestion (RFG) estimés</p>
+                          <p className="text-xl font-black text-orange-600 dark:text-orange-400 mt-1">{formatCurrency(merAmt)}/an</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">sur vos {formatCurrency(current)} actuels</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         )}
@@ -747,14 +892,17 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Row 2: Activity Timeline — full width */}
-        <div className="lg:col-span-3">
-          <ActivityTimeline
-            goals={data.goals}
-            chatMessages={data.chatMessages}
-            portfolios={data.selectedPortfolio ? [data.selectedPortfolio] : []}
-            profileUpdated={data.profile?.updated_at}
-          />
+        {/* Row 2: Activity Timeline + Checklist in advanced mode */}
+        <div className="lg:col-span-3 grid gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <ActivityTimeline
+              goals={data.goals}
+              chatMessages={data.chatMessages}
+              portfolios={data.selectedPortfolio ? [data.selectedPortfolio] : []}
+              profileUpdated={data.profile?.updated_at}
+            />
+          </div>
+          <ChecklistWidget data={data} />
         </div>
       </div>
     </div>

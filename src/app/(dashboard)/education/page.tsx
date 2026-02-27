@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { ClientInfo } from "@/types/database";
+import { useSimpleMode } from "@/contexts/simple-mode-context";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -578,12 +579,22 @@ function renderContent(text: string) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+// Ordered beginner learning path (5 articles)
+const BEGINNER_PATH = [
+  { id: "celi-vs-reer", label: "CELI vs REER" },
+  { id: "etf-intro", label: "C'est quoi un ETF ?" },
+  { id: "actions-vs-obligations", label: "Actions vs obligations" },
+  { id: "dca", label: "Stratégie DCA" },
+  { id: "reequilibrage", label: "Rééquilibrer son portefeuille" },
+];
+
 export default function EducationPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Tous");
   const [readArticles, setReadArticles] = useState<Set<string>>(new Set());
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
+  const { isSimple } = useSimpleMode();
 
   // Chat panel
   const [chatOpen, setChatOpen] = useState(false);
@@ -829,6 +840,49 @@ export default function EducationPage() {
         ))}
       </div>
 
+      {/* Beginner path — shown in simple mode or when no search/category active */}
+      {(isSimple || (!search && activeCategory === "Tous")) && (
+        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Compass className="h-4 w-4 text-primary" />
+            <p className="text-sm font-bold text-primary">Par où commencer ?</p>
+            <Badge variant="outline" className="text-[9px] border-primary/20 text-primary bg-primary/5 ml-auto">
+              {BEGINNER_PATH.filter(p => readArticles.has(p.id)).length}/{BEGINNER_PATH.length} lus
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">5 articles essentiels pour tout investisseur canadien, dans l&apos;ordre recommandé.</p>
+          <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
+            {BEGINNER_PATH.map((step, i) => {
+              const isRead = readArticles.has(step.id);
+              const article = EDUCATION_CONTENT.find(a => a.id === step.id);
+              return (
+                <button
+                  key={step.id}
+                  onClick={() => {
+                    setSearch("");
+                    setActiveCategory("Tous");
+                    setExpandedId(step.id);
+                    setTimeout(() => {
+                      document.getElementById(`article-${step.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }, 100);
+                  }}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-all text-left ${
+                    isRead
+                      ? "border-primary/30 bg-primary/10 text-primary line-through opacity-60"
+                      : "border-border bg-card hover:border-primary/40 hover:bg-primary/5"
+                  }`}
+                >
+                  <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isRead ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}>
+                    {isRead ? "✓" : i + 1}
+                  </span>
+                  <span>{article?.title || step.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Articles */}
       <div className="space-y-3">
         {filtered.length === 0 ? (
@@ -846,6 +900,7 @@ export default function EducationPage() {
             return (
               <Card
                 key={article.id}
+                id={`article-${article.id}`}
                 className={`transition-all ${isExpanded ? "border-primary/40 shadow-sm" : isRecommended ? "border-amber-400/50 dark:border-amber-500/40" : "hover:border-primary/20"}`}
               >
                 <CardContent className="p-4 space-y-3">

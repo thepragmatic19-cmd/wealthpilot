@@ -21,8 +21,10 @@ import {
   ChevronRight,
   Target,
   BookOpen,
+  Gauge,
 } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
+import { useSimpleMode } from "@/contexts/simple-mode-context";
 
 const navGroups = [
   {
@@ -67,6 +69,7 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const { isFree } = useSubscription();
+  const { isSimple, toggle: toggleSimple } = useSimpleMode();
 
   return (
     <aside
@@ -134,7 +137,30 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </nav>
       </div>
 
-      <div className="border-t p-2">
+      <div className="border-t p-2 space-y-1">
+        {/* Mode Simplifié toggle */}
+        <Button
+          variant="ghost"
+          className={cn("w-full", collapsed && "justify-center px-0")}
+          onClick={toggleSimple}
+          aria-label={isSimple ? "Passer en mode avancé" : "Passer en mode simplifié"}
+        >
+          <Gauge className={cn("h-4 w-4 shrink-0", isSimple ? "text-primary" : "text-muted-foreground", collapsed ? "" : "mr-2")} />
+          {!collapsed && (
+            <span className={cn("text-sm font-medium flex-1 text-left", isSimple ? "text-primary" : "")}>
+              {isSimple ? "Mode simplifié" : "Mode avancé"}
+            </span>
+          )}
+          {!collapsed && (
+            <span className={cn(
+              "text-[9px] font-bold px-1.5 py-0.5 rounded-full",
+              isSimple ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+            )}>
+              {isSimple ? "ON" : "OFF"}
+            </span>
+          )}
+        </Button>
+
         <Button variant="ghost" className="w-full" onClick={onToggle} aria-label={collapsed ? "Ouvrir le menu" : "Réduire le menu"}>
           {collapsed ? (
             <ChevronRight className="h-4 w-4" />

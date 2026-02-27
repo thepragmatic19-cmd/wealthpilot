@@ -15,10 +15,13 @@ import {
     Info,
     Crown,
     Sparkles,
+    ChevronDown,
+    ChevronUp,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 import { useSubscription } from "@/hooks/use-subscription";
+import { useSimpleMode } from "@/contexts/simple-mode-context";
 import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
 import {
     AreaChart,
@@ -143,6 +146,8 @@ export default function RetirementPage() {
     const [pensionOverridden, setPensionOverridden] = useState(false);
     const { canAccess, isLoading: subLoading } = useSubscription();
     const [showUpgrade, setShowUpgrade] = useState(false);
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const { isSimple } = useSimpleMode();
 
     const updateParam = useCallback((key: keyof typeof DEFAULT_PARAMS, value: number) => {
         setParams((prev) => {
@@ -415,16 +420,57 @@ export default function RetirementPage() {
                         </Card>
                     </div>
 
-                    {/* Monte Carlo Chart */}
+                    {/* Simple mode plain-language summary */}
+                    {isSimple && !showAdvanced && (
+                        <Card className="bg-gradient-to-br from-primary/5 to-blue-500/5 border-primary/20">
+                            <CardContent className="p-5 space-y-4">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">En clair</p>
+                                <p className="text-sm leading-relaxed">
+                                    Si vous épargnez <strong>{formatCurrency(params.monthlyContribution)}/mois</strong> jusqu'à <strong>{params.retirementAge} ans</strong>,{" "}
+                                    votre capital estimé sera d'environ <strong className="text-emerald-600 dark:text-emerald-400">{formatCurrency(finalMedian)}</strong>.{" "}
+                                    Cela vous donnera un revenu mensuel d'environ <strong className="text-blue-600 dark:text-blue-400">{formatCurrency(afterTaxMonthlyIncome)}/mois</strong>{" "}
+                                    (après impôt), incluant vos pensions gouvernementales.
+                                </p>
+                                {afterTaxMonthlyIncome >= params.monthlyExpenses ? (
+                                    <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                                        Votre revenu couvre vos dépenses prévues de {formatCurrency(params.monthlyExpenses)}/mois.
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2 text-xs text-orange-600 dark:text-orange-400 font-medium">
+                                        <span className="h-2 w-2 rounded-full bg-orange-500" />
+                                        Il manque environ {formatCurrency(params.monthlyExpenses - afterTaxMonthlyIncome)}/mois. Augmentez vos cotisations ou réduisez vos dépenses cibles.
+                                    </div>
+                                )}
+                                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowAdvanced(true)}>
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                    Voir l&apos;analyse avancée (Monte Carlo)
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* Monte Carlo Chart + Info — hidden in simple mode unless expanded */}
+                    {(!isSimple || showAdvanced) && (<>
                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                <TrendingUp className="h-5 w-5" />
-                                Projection Monte Carlo
-                            </CardTitle>
-                            <CardDescription>
-                                Intervalles de confiance 10e–90e percentile (ajusté pour l&apos;inflation)
-                            </CardDescription>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <TrendingUp className="h-5 w-5" />
+                                        Projection Monte Carlo
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Intervalles de confiance 10e–90e percentile (ajusté pour l&apos;inflation)
+                                    </CardDescription>
+                                </div>
+                                {isSimple && showAdvanced && (
+                                    <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={() => setShowAdvanced(false)}>
+                                        <ChevronUp className="h-3.5 w-3.5" />
+                                        Réduire
+                                    </Button>
+                                )}
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <div className="h-[250px] md:h-[350px]">
@@ -534,6 +580,7 @@ export default function RetirementPage() {
                             </div>
                         </CardContent>
                     </Card>
+                    </>)}
                 </div>
             </div>
         </div>

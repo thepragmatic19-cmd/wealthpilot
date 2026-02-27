@@ -44,15 +44,30 @@ interface ClientContext {
   hasGoals: boolean;
   hasCeli: boolean;
   hasReer: boolean;
+  hasCeliBalance: boolean; // true if CELI balance > 0
   goals: Array<{ label: string; target_date: string | null }>;
+  age: number | null;
+  monthlySavings: number | null;
 }
 
 function buildSuggestions(ctx: ClientContext): string[] {
   const suggestions: string[] = [];
 
-  if (ctx.hasPortfolio) {
+  // Priority: guide beginner/new users first
+  if (!ctx.hasGoals) {
+    suggestions.push("Aide-moi à définir mon premier objectif financier");
+  }
+
+  if (!ctx.hasCeli && !ctx.hasReer) {
+    suggestions.push("Par où commencer pour investir au Canada ?");
+  } else if (ctx.hasCeli && !ctx.hasCeliBalance) {
+    suggestions.push("Combien cotiser à mon CELI cette année ?");
+  }
+
+  if (ctx.age !== null && ctx.age < 35 && !ctx.hasPortfolio) {
+    suggestions.push("Quelle stratégie pour un jeune investisseur débutant ?");
+  } else if (ctx.hasPortfolio) {
     suggestions.push("Analyse détaillée de mon portefeuille");
-    suggestions.push("Comment rééquilibrer mon portefeuille ?");
   } else {
     suggestions.push("Quel portefeuille me recommandez-vous ?");
   }
@@ -69,21 +84,20 @@ function buildSuggestions(ctx: ClientContext): string[] {
     } else {
       suggestions.push(`Progression vers : ${ctx.goals[0].label}`);
     }
-  } else {
-    suggestions.push("Comment définir mes objectifs financiers ?");
   }
 
   if (ctx.hasCeli && ctx.hasReer) {
     suggestions.push("Optimiser la répartition CELI vs REER");
-  } else if (!ctx.hasCeli) {
-    suggestions.push("Devrais-je ouvrir un CELI ?");
-  } else if (!ctx.hasReer) {
+  } else if (!ctx.hasReer && ctx.hasGoals) {
     suggestions.push("Est-ce que le REER vaut le coup pour moi ?");
-  } else {
-    suggestions.push("Stratégie d'épargne mensuelle");
   }
 
-  suggestions.push("Simuler ma retraite à 60 ans");
+  if (ctx.monthlySavings && ctx.monthlySavings > 0) {
+    suggestions.push("Simuler ma retraite à 60 ans");
+  } else {
+    suggestions.push("Comment augmenter mon épargne mensuelle ?");
+  }
+
   return suggestions.slice(0, 4);
 }
 
@@ -170,7 +184,7 @@ export function ChatInterface({ initialMessage }: ChatInterfaceProps) {
         supabase.from("goals").select("label, target_date").eq("user_id", user.id),
         supabase
           .from("client_info")
-          .select("has_celi, has_reer")
+          .select("has_celi, has_reer, celi_balance, age, monthly_savings")
           .eq("user_id", user.id)
           .maybeSingle(),
       ]);
@@ -193,10 +207,13 @@ export function ChatInterface({ initialMessage }: ChatInterfaceProps) {
           hasGoals: (goals ?? []).length > 0,
           hasCeli: clientInfo?.has_celi ?? false,
           hasReer: clientInfo?.has_reer ?? false,
+          hasCeliBalance: Number(clientInfo?.celi_balance ?? 0) > 0,
           goals: (goals ?? []) as Array<{
             label: string;
             target_date: string | null;
           }>,
+          age: (clientInfo as { age?: number | null } | null)?.age ?? null,
+          monthlySavings: (clientInfo as { monthly_savings?: number | null } | null)?.monthly_savings ?? null,
         })
       );
     }
