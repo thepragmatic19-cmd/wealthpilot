@@ -482,43 +482,80 @@ export default function DashboardPage() {
     : null;
 
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-6 pb-10">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
             Bonjour, {data.profile?.full_name?.split(" ")[0] || "investisseur"} 👋
           </h1>
-          <p className="text-muted-foreground mt-1">Votre cockpit financier est à jour.</p>
+          <p className="text-muted-foreground mt-1">
+            {isSimple
+              ? "Voici un résumé simple de votre situation financière."
+              : "Votre cockpit financier est à jour."}
+          </p>
         </div>
 
-        {/* Wealth Score indicator */}
-        <div className="flex items-center gap-4 p-3 rounded-2xl border bg-card/50 backdrop-blur-sm shadow-sm">
-          <div className="relative h-12 w-12">
-            <svg className="h-full w-full" viewBox="0 0 36 36">
-              <path className="stroke-muted fill-none" strokeWidth="3" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-              <path className="stroke-primary fill-none transition-all duration-1000" strokeDasharray={`${Math.min(100, savingsRate * 2)}, 100`} strokeLinecap="round" strokeWidth="3" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold">
-              {savingsRate}%
+        {/* Taux d'épargne — masqué en mode simplifié (valeur souvent confuse) */}
+        {!isSimple && savingsRate > 0 && savingsRate <= 100 && (
+          <div className="flex items-center gap-4 p-3 rounded-2xl border bg-card/50 backdrop-blur-sm shadow-sm">
+            <div className="relative h-12 w-12">
+              <svg className="h-full w-full" viewBox="0 0 36 36">
+                <path className="stroke-muted fill-none" strokeWidth="3" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                <path className="stroke-primary fill-none transition-all duration-1000" strokeDasharray={`${Math.min(100, savingsRate * 2)}, 100`} strokeLinecap="round" strokeWidth="3" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold">
+                {savingsRate}%
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Taux d&apos;épargne</p>
+              <p className="text-sm font-bold">
+                {savingsRate >= 30 ? "Excellent 🚀" : savingsRate >= 20 ? "Bon travail 👍" : savingsRate >= 10 ? "En progrès" : "À améliorer"}
+              </p>
             </div>
           </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Taux d&apos;épargne</p>
-            <p className="text-sm font-bold">
-              {savingsRate >= 30 ? "Excellent 🚀" : savingsRate >= 20 ? "Bon travail 👍" : savingsRate >= 10 ? "En progrès" : savingsRate > 0 ? "À améliorer" : "Non renseigné"}
-            </p>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Next Step Card */}
       <NextStepCard data={data} />
 
+      {/* Simple mode: plain-language summary strip */}
+      {isSimple && (totalInvested > 0 || monthlySavings > 0) && (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="flex items-center gap-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 px-5 py-4">
+            <Wallet className="h-7 w-7 text-emerald-600 shrink-0" />
+            <div>
+              <p className="text-xs text-muted-foreground">J&apos;ai en ce moment</p>
+              <p className="text-xl font-black text-emerald-700 dark:text-emerald-400">{formatCurrency(totalInvested)}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-2xl bg-purple-500/10 border border-purple-500/20 px-5 py-4">
+            <PiggyBank className="h-7 w-7 text-purple-600 shrink-0" />
+            <div>
+              <p className="text-xs text-muted-foreground">J&apos;épargne chaque mois</p>
+              <p className="text-xl font-black text-purple-700 dark:text-purple-400">
+                {monthlySavings > 0 ? formatCurrency(monthlySavings) : "Non renseigné"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 px-5 py-4">
+            <TrendingUp className="h-7 w-7 text-blue-600 shrink-0" />
+            <div>
+              <p className="text-xs text-muted-foreground">Dans 1 an, j&apos;aurai environ</p>
+              <p className="text-xl font-black text-blue-700 dark:text-blue-400">
+                {projectedValue > 0 ? formatCurrency(projectedValue) : "—"}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Market Ticker — hidden in simple mode */}
       {!isSimple && <MarketTicker />}
 
-      {/* Summary Cards — 3 in simple mode, 4 in advanced */}
-      <div className={`grid gap-3 sm:gap-4 sm:grid-cols-2 ${isSimple ? "lg:grid-cols-3" : "lg:grid-cols-4"}`}>
+      {/* Summary Cards — advanced mode only */}
+      {!isSimple && <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* C.1 — Net Worth */}
         <Card className="group relative overflow-hidden border-none shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20 opacity-100 group-hover:opacity-80 transition-opacity" />
@@ -630,7 +667,7 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </div>}
 
       {/* Quick Actions — always visible after KPI cards */}
       <QuickActionsCard />

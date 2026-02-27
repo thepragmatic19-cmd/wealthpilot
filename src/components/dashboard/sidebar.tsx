@@ -21,12 +21,13 @@ import {
   ChevronRight,
   Target,
   BookOpen,
-  Gauge,
+  Layers,
 } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useSimpleMode } from "@/contexts/simple-mode-context";
 
-const navGroups = [
+// Full nav (advanced mode)
+const navGroupsFull = [
   {
     label: "Synthèse",
     items: [
@@ -61,6 +62,31 @@ const navGroups = [
   }
 ];
 
+// Simplified nav — only essentials for beginners
+const navGroupsSimple = [
+  {
+    label: "Principal",
+    items: [
+      { href: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
+      { href: "/portfolio", icon: PieChart, label: "Mon portefeuille" },
+      { href: "/goals", icon: Target, label: "Mes objectifs" },
+    ]
+  },
+  {
+    label: "Aide",
+    items: [
+      { href: "/chat", icon: MessageSquare, label: "Conseiller IA" },
+      { href: "/education", icon: BookOpen, label: "Apprendre" },
+    ]
+  },
+  {
+    label: "Compte",
+    items: [
+      { href: "/profile", icon: User, label: "Mon Profil" },
+    ]
+  }
+];
+
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
@@ -70,6 +96,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const { isFree } = useSubscription();
   const { isSimple, toggle: toggleSimple } = useSimpleMode();
+
+  const navGroups = isSimple ? navGroupsSimple : navGroupsFull;
 
   return (
     <aside
@@ -138,26 +166,31 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </div>
 
       <div className="border-t p-2 space-y-1">
-        {/* Mode Simplifié toggle */}
+        {/* Mode toggle — clear for beginners */}
         <Button
           variant="ghost"
-          className={cn("w-full", collapsed && "justify-center px-0")}
-          onClick={toggleSimple}
-          aria-label={isSimple ? "Passer en mode avancé" : "Passer en mode simplifié"}
-        >
-          <Gauge className={cn("h-4 w-4 shrink-0", isSimple ? "text-primary" : "text-muted-foreground", collapsed ? "" : "mr-2")} />
-          {!collapsed && (
-            <span className={cn("text-sm font-medium flex-1 text-left", isSimple ? "text-primary" : "")}>
-              {isSimple ? "Mode simplifié" : "Mode avancé"}
-            </span>
+          className={cn(
+            "w-full gap-2 text-muted-foreground hover:text-foreground",
+            collapsed && "justify-center px-0"
           )}
+          onClick={toggleSimple}
+          aria-label={isSimple ? "Afficher toutes les fonctionnalités" : "Passer en vue simplifiée"}
+        >
+          <Layers className="h-4 w-4 shrink-0" />
           {!collapsed && (
-            <span className={cn(
-              "text-[9px] font-bold px-1.5 py-0.5 rounded-full",
-              isSimple ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
-            )}>
-              {isSimple ? "ON" : "OFF"}
-            </span>
+            <>
+              <span className="text-xs flex-1 text-left">
+                {isSimple ? "Vue simplifiée" : "Vue complète"}
+              </span>
+              <span className={cn(
+                "text-[9px] font-bold px-1.5 py-0.5 rounded-full border",
+                isSimple
+                  ? "bg-primary/10 text-primary border-primary/20"
+                  : "bg-muted text-muted-foreground border-border"
+              )}>
+                {isSimple ? "ACTIF" : "AVANCÉ"}
+              </span>
+            </>
           )}
         </Button>
 

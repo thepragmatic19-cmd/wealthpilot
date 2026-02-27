@@ -8,19 +8,21 @@ interface SimpleModeContextType {
 }
 
 const SimpleModeContext = createContext<SimpleModeContextType>({
-  isSimple: false,
+  isSimple: true,
   toggle: () => {},
 });
 
 export function SimpleModeProvider({ children }: { children: React.ReactNode }) {
-  const [isSimple, setIsSimple] = useState(false);
+  // Default: simple mode ON — advanced users can disable it
+  const [isSimple, setIsSimple] = useState(true);
 
   useEffect(() => {
     try {
       const stored = localStorage.getItem("wealthpilot-simple-mode");
-      if (stored === "true") setIsSimple(true);
+      // Only override if explicitly stored — null means first visit → simple mode
+      if (stored !== null) setIsSimple(stored === "true");
     } catch {
-      // localStorage not available (SSR guard)
+      // localStorage not available
     }
   }, []);
 
