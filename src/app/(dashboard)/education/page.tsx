@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,10 @@ import {
   Bot,
   Send,
   Sparkles,
+  Star,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import type { ClientInfo } from "@/types/database";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -543,6 +546,16 @@ const CATEGORIES = ["Tous", ...Array.from(new Set(EDUCATION_CONTENT.map((a) => a
 const TOTAL = EDUCATION_CONTENT.length;
 const LS_KEY = "wp_edu_read";
 
+// Tags mapping for personalized recommendations (based on user's accounts)
+const ARTICLE_TAGS: Record<string, string[]> = {
+  "celi-vs-reer": ["celi", "reer"],
+  "reee-guide": ["reee"],
+  "celiapp": ["celiapp"],
+  "reits": ["reer"],
+  "gain-capital": ["celi", "reer"],
+  "recolte-pertes": ["celi", "reer"],
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function renderContent(text: string) {
@@ -570,6 +583,7 @@ export default function EducationPage() {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Tous");
   const [readArticles, setReadArticles] = useState<Set<string>>(new Set());
+  const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
 
   // Chat panel
   const [chatOpen, setChatOpen] = useState(false);
@@ -579,24 +593,50 @@ export default function EducationPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Load reading progress from localStorage
+  // Load reading progress: localStorage first, then sync from Supabase + load clientInfo
   useEffect(() => {
+    // Immediate local load
     try {
       const stored = localStorage.getItem(LS_KEY);
       if (stored) setReadArticles(new Set(JSON.parse(stored) as string[]));
-    } catch {
-      // ignore
+    } catch { /* ignore */ }
+
+    // Supabase sync
+    async function syncFromSupabase() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const [{ data: reads }, { data: ci }] = await Promise.all([
+        supabase.from("education_reads").select("article_id").eq("user_id", user.id),
+        supabase.from("client_info").select("has_celi,has_reer,has_reee,has_celiapp").eq("user_id", user.id).maybeSingle(),
+      ]);
+
+      if (reads && reads.length > 0) {
+        const ids = reads.map((r: { article_id: string }) => r.article_id);
+        setReadArticles(new Set(ids));
+        try { localStorage.setItem(LS_KEY, JSON.stringify(ids)); } catch { /* ignore */ }
+      }
+      if (ci) setClientInfo(ci as ClientInfo);
     }
+    syncFromSupabase();
   }, []);
 
-  function markRead(id: string) {
+  async function markRead(id: string) {
     if (readArticles.has(id)) return;
     const next = new Set([...readArticles, id]);
     setReadArticles(next);
     try {
       localStorage.setItem(LS_KEY, JSON.stringify([...next]));
-    } catch {
-      // ignore
+    } catch { /* ignore */ }
+    // Persist to Supabase for cross-device sync
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from("education_reads").upsert(
+        { user_id: user.id, article_id: id },
+        { onConflict: "user_id,article_id" }
+      );
     }
   }
 
@@ -687,16 +727,46 @@ export default function EducationPage() {
     [chatLoading, chatArticle, chatMessages]
   );
 
-  const filtered = EDUCATION_CONTENT.filter((article) => {
-    const matchesCategory = activeCategory === "Tous" || article.category === activeCategory;
-    const q = search.toLowerCase();
-    const matchesSearch =
-      !q ||
-      article.title.toLowerCase().includes(q) ||
-      article.summary.toLowerCase().includes(q) ||
-      article.category.toLowerCase().includes(q);
-    return matchesCategory && matchesSearch;
-  });
+  // Compute recommended article IDs based on user's registered accounts
+  const recommendedIds = useMemo(() => {
+    if (!clientInfo) return new Set<string>();
+    const userTags: string[] = [];
+    if (clientInfo.has_celi) userTags.push("celi");
+    if (clientInfo.has_reer) userTags.push("reer");
+    if (clientInfo.has_reee) userTags.push("reee");
+    // has_celiapp may not exist yet on ClientInfo type (added by migration FM-3)
+    if ((clientInfo as ClientInfo & { has_celiapp?: boolean }).has_celiapp) userTags.push("celiapp");
+    if (userTags.length === 0) return new Set<string>();
+    const scored = Object.entries(ARTICLE_TAGS)
+      .map(([id, tags]) => ({ id, score: tags.filter((t) => userTags.includes(t)).length }))
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .map(({ id }) => id);
+    return new Set(scored);
+  }, [clientInfo]);
+
+  const filtered = useMemo(() => {
+    const base = EDUCATION_CONTENT.filter((article) => {
+      const matchesCategory = activeCategory === "Tous" || article.category === activeCategory;
+      const q = search.toLowerCase();
+      const matchesSearch =
+        !q ||
+        article.title.toLowerCase().includes(q) ||
+        article.summary.toLowerCase().includes(q) ||
+        article.category.toLowerCase().includes(q);
+      return matchesCategory && matchesSearch;
+    });
+    // Sort: recommended unread articles first (only when no active search/category filter)
+    if (recommendedIds.size > 0 && !search && activeCategory === "Tous") {
+      return [...base].sort((a, b) => {
+        const aRec = recommendedIds.has(a.id) && !readArticles.has(a.id) ? -1 : 0;
+        const bRec = recommendedIds.has(b.id) && !readArticles.has(b.id) ? -1 : 0;
+        return aRec - bRec;
+      });
+    }
+    return base;
+  }, [activeCategory, search, recommendedIds, readArticles]);
 
   const readCount = readArticles.size;
   const progressPct = Math.round((readCount / TOTAL) * 100);
@@ -770,12 +840,13 @@ export default function EducationPage() {
             const Icon = article.categoryIcon;
             const isExpanded = expandedId === article.id;
             const isRead = readArticles.has(article.id);
+            const isRecommended = recommendedIds.has(article.id) && !isRead;
             const styles = categoryStyles[article.categoryColor];
 
             return (
               <Card
                 key={article.id}
-                className={`transition-all ${isExpanded ? "border-primary/40 shadow-sm" : "hover:border-primary/20"}`}
+                className={`transition-all ${isExpanded ? "border-primary/40 shadow-sm" : isRecommended ? "border-amber-400/50 dark:border-amber-500/40" : "hover:border-primary/20"}`}
               >
                 <CardContent className="p-4 space-y-3">
                   {/* Top row */}
@@ -786,6 +857,12 @@ export default function EducationPage() {
                     <div className="flex-1 min-w-0">
                       {/* Meta badges row */}
                       <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                        {isRecommended && (
+                          <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-full px-1.5 py-0">
+                            <Star className="h-2.5 w-2.5 fill-current" />
+                            Recommandé
+                          </span>
+                        )}
                         <Badge variant="outline" className={`text-[10px] border px-1.5 py-0 ${styles.badge}`}>
                           {article.category}
                         </Badge>

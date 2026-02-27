@@ -14,6 +14,7 @@ import {
     RefreshCw,
     Info,
     Crown,
+    Sparkles,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
@@ -104,32 +105,85 @@ function runMonteCarlo(
 }
 
 
+// Calculate estimated RRQ/RPC annual benefit (simplified formula)
+// Based on: ~25% of average career income, capped at ~$16,375/year (2026 max)
+function estimateRRQ(annualIncome: number, currentAge: number, retirementAge: number): number {
+    const RRQ_MAX_ANNUAL = 16375; // 2026 approximate maximum
+    const RRQ_ACCRUAL_RATE = 0.0125; // 1.25% per year of earnings (simplified QPP/CPP formula)
+    const yearsContributing = Math.max(0, retirementAge - 18); // assume contributions from age 18
+    const yearsWorked = Math.max(0, currentAge - 18);
+    // Estimated average earnings (assume current income was earned over career)
+    const avgEarnings = Math.min(annualIncome, 73200); // YMPE 2026 approximate
+    const estimatedBenefit = avgEarnings * RRQ_ACCRUAL_RATE * Math.min(yearsContributing, 40);
+    // Adjust for early/late start (actuarial factor: -0.6%/month before 65, +0.7%/month after)
+    const ageAdjustment = retirementAge !== 65 ? 1 + (retirementAge - 65) * 12 * (retirementAge < 65 ? -0.006 : 0.007) : 1;
+    return Math.min(estimatedBenefit * Math.max(0.36, ageAdjustment), RRQ_MAX_ANNUAL);
+}
+
+// Calculate estimated PSV/OAS annual benefit
+function estimatePSV(retirementAge: number): number {
+    const PSV_AT_65 = 8000; // ~$667/month at 65 (2026 estimate)
+    const PSV_DEFERRAL_BONUS = 0.006; // 0.6%/month deferral after 65 (max at 70)
+    if (retirementAge < 65) return 0; // OAS only starts at 65
+    const deferralMonths = Math.min((retirementAge - 65) * 12, 60); // max 5 years deferral
+    return PSV_AT_65 * (1 + deferralMonths * PSV_DEFERRAL_BONUS);
+}
+
+interface GouvPensionEstimate {
+    rrq: number;
+    psv: number;
+    total: number;
+    source: "auto" | "manual";
+}
+
 export default function RetirementPage() {
     const [params, setParams] = useState(DEFAULT_PARAMS);
     const [simKey, setSimKey] = useState(0);
+    const [pensionEstimate, setPensionEstimate] = useState<GouvPensionEstimate | null>(null);
+    const [pensionOverridden, setPensionOverridden] = useState(false);
     const { canAccess, isLoading: subLoading } = useSubscription();
     const [showUpgrade, setShowUpgrade] = useState(false);
 
     const updateParam = useCallback((key: keyof typeof DEFAULT_PARAMS, value: number) => {
-        setParams((prev) => ({ ...prev, [key]: value }));
+        setParams((prev) => {
+            const next = { ...prev, [key]: value };
+            // Re-compute pension estimate when age or retirement age changes (if not manually overridden)
+            return next;
+        });
+        if (key === "governmentPension") setPensionOverridden(true);
     }, []);
 
     useEffect(() => {
-        async function loadPortfolioVolatility() {
+        async function loadUserData() {
             const supabase = createClient();
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
-            const { data: portfolio } = await supabase
-                .from("portfolios")
-                .select("volatility")
-                .eq("user_id", user.id)
-                .eq("is_selected", true)
-                .maybeSingle();
+
+            const [{ data: portfolio }, { data: ci }] = await Promise.all([
+                supabase.from("portfolios").select("volatility").eq("user_id", user.id).eq("is_selected", true).maybeSingle(),
+                supabase.from("client_info").select("age,annual_income").eq("user_id", user.id).maybeSingle(),
+            ]);
+
             if (portfolio?.volatility) {
                 updateParam("portfolioVolatility", portfolio.volatility);
             }
+            // Auto-populate age from profile
+            if (ci?.age) {
+                setParams((prev) => ({ ...prev, currentAge: ci.age as number }));
+            }
+            // Compute RRQ/PSV estimates
+            const age = ci?.age ?? DEFAULT_PARAMS.currentAge;
+            const income = Number(ci?.annual_income) || 0;
+            if (income > 0) {
+                const retAge = DEFAULT_PARAMS.retirementAge;
+                const rrq = estimateRRQ(income, age, retAge);
+                const psv = estimatePSV(retAge);
+                const total = rrq + psv;
+                setPensionEstimate({ rrq, psv, total, source: "auto" });
+                setParams((prev) => ({ ...prev, governmentPension: Math.round(total) }));
+            }
         }
-        loadPortfolioVolatility();
+        loadUserData();
     }, [updateParam]);
 
     const results = useMemo(() => {
@@ -275,6 +329,36 @@ export default function RetirementPage() {
                                 value={params.governmentPension}
                                 onChange={(e) => updateParam("governmentPension", Number(e.target.value))}
                             />
+                            {pensionEstimate && !pensionOverridden && (
+                                <div className="rounded-lg bg-primary/5 border border-primary/10 p-2.5 space-y-1">
+                                    <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                                        <Sparkles className="h-3 w-3" />
+                                        Estimation automatique
+                                    </div>
+                                    <div className="space-y-0.5 text-xs text-muted-foreground">
+                                        <div className="flex justify-between">
+                                            <span>RRQ/RPC estimé</span>
+                                            <span className="font-medium">{Math.round(pensionEstimate.rrq / 12).toLocaleString("fr-CA")}$/mois</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>PSV/OAS estimée</span>
+                                            <span className="font-medium">{Math.round(pensionEstimate.psv / 12).toLocaleString("fr-CA")}$/mois</span>
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground/70">Basé sur votre revenu et votre âge. Vous pouvez ajuster manuellement.</p>
+                                </div>
+                            )}
+                            {pensionOverridden && pensionEstimate && (
+                                <button
+                                    className="text-xs text-primary/70 hover:text-primary underline"
+                                    onClick={() => {
+                                        setPensionOverridden(false);
+                                        setParams((prev) => ({ ...prev, governmentPension: Math.round(pensionEstimate.total) }));
+                                    }}
+                                >
+                                    Restaurer l&apos;estimation automatique
+                                </button>
+                            )}
                         </div>
                         <div className="space-y-2">
                             <Label>Taux d&apos;imposition à la retraite: {params.withdrawalTaxRate}%</Label>

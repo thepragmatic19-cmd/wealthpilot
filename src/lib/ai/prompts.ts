@@ -419,6 +419,12 @@ export function buildPortfolioUserMessage(context: {
     celi_balance: number | null;
     reer_balance: number | null;
     reee_balance: number | null;
+    has_celiapp?: boolean;
+    celiapp_balance?: number | null;
+    has_cri?: boolean;
+    cri_balance?: number | null;
+    has_frv?: boolean;
+    frv_balance?: number | null;
     tax_bracket: string | null;
   };
   goals: Array<{

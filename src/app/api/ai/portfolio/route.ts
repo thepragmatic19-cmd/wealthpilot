@@ -83,6 +83,9 @@ export async function POST(request: NextRequest) {
           total_debts: null, monthly_savings: null, investment_experience: null,
           has_celi: false, has_reer: false, has_reee: false,
           celi_balance: null, reer_balance: null, reee_balance: null,
+          has_celiapp: false, celiapp_balance: null,
+          has_cri: false, cri_balance: null,
+          has_frv: false, frv_balance: null,
           tax_bracket: null,
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

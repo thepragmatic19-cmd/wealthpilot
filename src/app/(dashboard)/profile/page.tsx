@@ -71,6 +71,9 @@ const clientInfoSchema = z.object({
   celi_balance: z.coerce.number().min(0).optional(),
   reer_balance: z.coerce.number().min(0).optional(),
   reee_balance: z.coerce.number().min(0).optional(),
+  celiapp_balance: z.coerce.number().min(0).optional(),
+  cri_balance: z.coerce.number().min(0).optional(),
+  frv_balance: z.coerce.number().min(0).optional(),
 });
 
 type ProfileFormInput = z.infer<typeof profileFormSchema>;
@@ -114,6 +117,9 @@ export default function ProfilePage() {
       celi_balance: 0,
       reer_balance: 0,
       reee_balance: 0,
+      celiapp_balance: 0,
+      cri_balance: 0,
+      frv_balance: 0,
     },
   });
 
@@ -153,6 +159,9 @@ export default function ProfilePage() {
           celi_balance: Number(info.celi_balance) || 0,
           reer_balance: Number(info.reer_balance) || 0,
           reee_balance: Number(info.reee_balance) || 0,
+          celiapp_balance: Number(info.celiapp_balance) || 0,
+          cri_balance: Number(info.cri_balance) || 0,
+          frv_balance: Number(info.frv_balance) || 0,
         });
       }
       if (ra) setRiskAssessment(ra as RiskAssessment);
@@ -184,9 +193,13 @@ export default function ProfilePage() {
     const celiBalance = data.celi_balance ?? 0;
     const reerBalance = data.reer_balance ?? 0;
     const reeeBalance = data.reee_balance ?? 0;
+    const celiappBalance = data.celiapp_balance ?? 0;
+    const criBalance = data.cri_balance ?? 0;
+    const frvBalance = data.frv_balance ?? 0;
     const totalAssets = data.total_assets ?? 0;
-    if (totalAssets > 0 && (celiBalance + reerBalance + reeeBalance) > totalAssets * 1.1) {
-      toast.warning("Vérification : vos soldes CELI/REER/REEE semblent supérieurs à vos actifs totaux. Veuillez vérifier vos données.");
+    const totalRegistered = celiBalance + reerBalance + reeeBalance + celiappBalance + criBalance + frvBalance;
+    if (totalAssets > 0 && totalRegistered > totalAssets * 1.1) {
+      toast.warning("Vérification : vos soldes de comptes enregistrés semblent supérieurs à vos actifs totaux. Veuillez vérifier vos données.");
     }
 
     setSavingFinancial(true);
@@ -203,6 +216,9 @@ export default function ProfilePage() {
         celi_balance: data.celi_balance ?? null,
         reer_balance: data.reer_balance ?? null,
         reee_balance: data.reee_balance ?? null,
+        celiapp_balance: data.celiapp_balance ?? null,
+        cri_balance: data.cri_balance ?? null,
+        frv_balance: data.frv_balance ?? null,
       })
       .eq("id", clientInfo.id);
 
@@ -220,6 +236,9 @@ export default function ProfilePage() {
         celi_balance: data.celi_balance ?? null,
         reer_balance: data.reer_balance ?? null,
         reee_balance: data.reee_balance ?? null,
+        celiapp_balance: data.celiapp_balance ?? null,
+        cri_balance: data.cri_balance ?? null,
+        frv_balance: data.frv_balance ?? null,
       });
       toast.success("Données financières mises à jour");
       setEditingFinancial(false);
@@ -458,6 +477,45 @@ export default function ProfilePage() {
                         )}
                       />
                     )}
+                    {clientInfo.has_celiapp && (
+                      <FormField
+                        control={clientInfoForm.control}
+                        name="celiapp_balance"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Solde CELIAPP ($)</FormLabel>
+                            <FormControl><Input type="number" min={0} {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                    {clientInfo.has_cri && (
+                      <FormField
+                        control={clientInfoForm.control}
+                        name="cri_balance"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Solde CRI ($)</FormLabel>
+                            <FormControl><Input type="number" min={0} {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                    {clientInfo.has_frv && (
+                      <FormField
+                        control={clientInfoForm.control}
+                        name="frv_balance"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Solde FRV ($)</FormLabel>
+                            <FormControl><Input type="number" min={0} {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <Button type="submit" disabled={savingFinancial} className="gap-2">
@@ -480,6 +538,9 @@ export default function ProfilePage() {
                           celi_balance: Number(clientInfo.celi_balance) || 0,
                           reer_balance: Number(clientInfo.reer_balance) || 0,
                           reee_balance: Number(clientInfo.reee_balance) || 0,
+                          celiapp_balance: Number(clientInfo.celiapp_balance) || 0,
+                          cri_balance: Number(clientInfo.cri_balance) || 0,
+                          frv_balance: Number(clientInfo.frv_balance) || 0,
                         });
                       }}
                     >
@@ -534,6 +595,9 @@ export default function ProfilePage() {
                       {clientInfo.has_celi && <Badge variant="outline">CELI {clientInfo.celi_balance ? `· ${formatCurrency(Number(clientInfo.celi_balance))}` : ""}</Badge>}
                       {clientInfo.has_reer && <Badge variant="outline">REER {clientInfo.reer_balance ? `· ${formatCurrency(Number(clientInfo.reer_balance))}` : ""}</Badge>}
                       {clientInfo.has_reee && <Badge variant="outline">REEE</Badge>}
+                      {clientInfo.has_celiapp && <Badge variant="outline">CELIAPP {clientInfo.celiapp_balance ? `· ${formatCurrency(Number(clientInfo.celiapp_balance))}` : ""}</Badge>}
+                      {clientInfo.has_cri && <Badge variant="outline">CRI {clientInfo.cri_balance ? `· ${formatCurrency(Number(clientInfo.cri_balance))}` : ""}</Badge>}
+                      {clientInfo.has_frv && <Badge variant="outline">FRV {clientInfo.frv_balance ? `· ${formatCurrency(Number(clientInfo.frv_balance))}` : ""}</Badge>}
                     </div>
                   </div>
                 </div>

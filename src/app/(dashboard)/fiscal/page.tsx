@@ -51,6 +51,9 @@ const SCEE_RATE = 0.20; // 20% basic SCEE
 const SCEE_MAX_ANNUAL = 500; // max grant per child per year
 const SCEE_OPTIMAL_CONTRIBUTION = SCEE_MAX_ANNUAL / SCEE_RATE; // $2,500
 const SCEE_LIFETIME_MAX = 7200; // lifetime max per child
+// CELIAPP constants (since 2023)
+const CELIAPP_ANNUAL_LIMIT = 8000;
+const CELIAPP_LIFETIME_LIMIT = 40000;
 
 interface FiscalData {
     clientInfo: ClientInfo | null;
@@ -138,6 +141,8 @@ export default function FiscalPage() {
     const celiBalance = Number(clientInfo?.celi_balance) || 0;
     const reerBalance = Number(clientInfo?.reer_balance) || 0;
     const reeeBalance = Number(clientInfo?.reee_balance) || 0;
+    const celiappBalance = Number((clientInfo as ClientInfo & { celiapp_balance?: number })?.celiapp_balance) || 0;
+    const hasCeliapp = Boolean((clientInfo as ClientInfo & { has_celiapp?: boolean })?.has_celiapp);
 
     // REER computation
     const reerLimit = Math.min(annualIncome * REER_RATE, REER_MAX);
@@ -327,6 +332,50 @@ export default function FiscalPage() {
                         </div>
                     </CardContent>
                 </Card>
+                {/* CELIAPP Card — shown only if user has CELIAPP */}
+                {hasCeliapp && (
+                    <Card className="border-teal-200 dark:border-teal-900/50">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <PiggyBank className="h-5 w-5 text-teal-500" />
+                                CELIAPP
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">Solde actuel</span>
+                                    <span className="font-semibold">${celiappBalance.toLocaleString("fr-CA")}</span>
+                                </div>
+                                <Progress value={Math.min(100, (celiappBalance / CELIAPP_LIFETIME_LIMIT) * 100)} className="mt-2 h-2" />
+                                <div className="flex items-center justify-between mt-1">
+                                    <span className="text-xs text-muted-foreground">{Math.round((celiappBalance / CELIAPP_LIFETIME_LIMIT) * 100)}% du plafond à vie</span>
+                                    <span className="text-xs text-muted-foreground">/ {CELIAPP_LIFETIME_LIMIT.toLocaleString("fr-CA")}$</span>
+                                </div>
+                            </div>
+                            <div className="rounded-lg bg-teal-50 dark:bg-teal-900/20 p-3 space-y-1.5">
+                                <div className="flex items-center gap-2">
+                                    <Info className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                                    <span className="text-sm font-medium">Compte premier achat</span>
+                                </div>
+                                <div className="space-y-1 text-xs">
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Limite annuelle</span>
+                                        <span className="font-medium">{CELIAPP_ANNUAL_LIMIT.toLocaleString("fr-CA")}$</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Espace restant</span>
+                                        <span className="font-semibold text-teal-600 dark:text-teal-400">{Math.max(0, CELIAPP_LIFETIME_LIMIT - celiappBalance).toLocaleString("fr-CA")}$</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Avantage</span>
+                                        <span className="font-medium text-teal-600 dark:text-teal-400">Déductible + retrait ND</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
             </div>
 
             {/* Contribution Optimizer */}

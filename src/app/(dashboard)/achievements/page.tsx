@@ -21,6 +21,13 @@ import {
 } from "lucide-react";
 import type { Profile, ClientInfo, Goal, Portfolio, ChatMessage } from "@/types/database";
 
+interface BadgeProgress {
+    current: number;
+    target: number;
+    label: string;
+    formatValue?: (v: number) => string;
+}
+
 // Badge definitions
 const BADGE_DEFINITIONS = [
     {
@@ -32,6 +39,7 @@ const BADGE_DEFINITIONS = [
         color: "text-yellow-500",
         bgColor: "bg-yellow-500/10",
         check: () => true, // Always earned
+        getProgress: null as ((data: GamificationData) => BadgeProgress | null) | null,
     },
     {
         id: "profile_complete",
@@ -42,6 +50,7 @@ const BADGE_DEFINITIONS = [
         color: "text-blue-500",
         bgColor: "bg-blue-500/10",
         check: (data: GamificationData) => data.profile?.onboarding_completed === true,
+        getProgress: null as ((data: GamificationData) => BadgeProgress | null) | null,
     },
     {
         id: "first_portfolio",
@@ -52,6 +61,7 @@ const BADGE_DEFINITIONS = [
         color: "text-green-500",
         bgColor: "bg-green-500/10",
         check: (data: GamificationData) => data.portfolios.length > 0,
+        getProgress: null as ((data: GamificationData) => BadgeProgress | null) | null,
     },
     {
         id: "goal_setter",
@@ -62,6 +72,7 @@ const BADGE_DEFINITIONS = [
         color: "text-purple-500",
         bgColor: "bg-purple-500/10",
         check: (data: GamificationData) => data.goals.length > 0,
+        getProgress: null as ((data: GamificationData) => BadgeProgress | null) | null,
     },
     {
         id: "goal_50",
@@ -73,6 +84,13 @@ const BADGE_DEFINITIONS = [
         bgColor: "bg-orange-500/10",
         check: (data: GamificationData) =>
             data.goals.some((g) => g.target_amount > 0 && g.current_amount / g.target_amount >= 0.5),
+        getProgress: (data: GamificationData): BadgeProgress | null => {
+            if (data.goals.length === 0) return null;
+            const maxPct = Math.max(...data.goals.map((g) =>
+                g.target_amount > 0 ? Math.min((g.current_amount / g.target_amount) * 100, 50) : 0
+            ));
+            return { current: Math.round(maxPct), target: 50, label: "% de progression vers la cible" };
+        },
     },
     {
         id: "goal_achieved",
@@ -84,6 +102,13 @@ const BADGE_DEFINITIONS = [
         bgColor: "bg-amber-500/10",
         check: (data: GamificationData) =>
             data.goals.some((g) => g.target_amount > 0 && g.current_amount >= g.target_amount),
+        getProgress: (data: GamificationData): BadgeProgress | null => {
+            if (data.goals.length === 0) return null;
+            const maxPct = Math.max(...data.goals.map((g) =>
+                g.target_amount > 0 ? Math.min((g.current_amount / g.target_amount) * 100, 100) : 0
+            ));
+            return { current: Math.round(maxPct), target: 100, label: "% de progression vers la cible" };
+        },
     },
     {
         id: "chat_curious",
@@ -95,6 +120,11 @@ const BADGE_DEFINITIONS = [
         bgColor: "bg-cyan-500/10",
         check: (data: GamificationData) =>
             data.chatMessages.filter((m) => m.role === "user").length >= 5,
+        getProgress: (data: GamificationData): BadgeProgress => ({
+            current: Math.min(data.chatMessages.filter((m) => m.role === "user").length, 5),
+            target: 5,
+            label: "messages envoyés",
+        }),
     },
     {
         id: "chat_expert",
@@ -106,6 +136,11 @@ const BADGE_DEFINITIONS = [
         bgColor: "bg-pink-500/10",
         check: (data: GamificationData) =>
             data.chatMessages.filter((m) => m.role === "user").length >= 20,
+        getProgress: (data: GamificationData): BadgeProgress => ({
+            current: Math.min(data.chatMessages.filter((m) => m.role === "user").length, 20),
+            target: 20,
+            label: "messages envoyés",
+        }),
     },
     {
         id: "diversified",
@@ -117,6 +152,12 @@ const BADGE_DEFINITIONS = [
         bgColor: "bg-indigo-500/10",
         check: (data: GamificationData) =>
             data.portfolios.some((p) => ((p as PortfolioWithAllocations).allocations?.length ?? 0) >= 5),
+        getProgress: (data: GamificationData): BadgeProgress => {
+            const maxCount = Math.max(0, ...data.portfolios.map(
+                (p) => (p as PortfolioWithAllocations).allocations?.length ?? 0
+            ));
+            return { current: Math.min(maxCount, 5), target: 5, label: "ETFs dans votre portefeuille" };
+        },
     },
     {
         id: "big_saver",
@@ -129,6 +170,15 @@ const BADGE_DEFINITIONS = [
         check: (data: GamificationData) => {
             const total = Number(data.clientInfo?.total_assets || 0);
             return total >= 100000;
+        },
+        getProgress: (data: GamificationData): BadgeProgress => {
+            const total = Math.min(Number(data.clientInfo?.total_assets || 0), 100000);
+            return {
+                current: total,
+                target: 100000,
+                label: "$ en actifs",
+                formatValue: (v) => `${Math.round(v / 1000)}k$`,
+            };
         },
     },
 ];
@@ -379,23 +429,40 @@ export default function GamificationPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {lockedBadges.map((badge) => (
-                                <div
-                                    key={badge.id}
-                                    className="flex items-start gap-3 rounded-xl p-3 border border-dashed opacity-60"
-                                >
-                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
-                                        <badge.icon className="h-5 w-5 text-muted-foreground" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium">{badge.name}</p>
-                                        <p className="text-xs text-muted-foreground">{badge.description}</p>
-                                        {badge.hint && (
-                                            <p className="text-xs text-primary/70 mt-0.5">→ {badge.hint}</p>
+                            {lockedBadges.map((badge) => {
+                                const prog = badge.getProgress ? badge.getProgress(data) : null;
+                                const pct = prog ? Math.min(100, Math.round((prog.current / prog.target) * 100)) : null;
+                                return (
+                                    <div
+                                        key={badge.id}
+                                        className="flex flex-col gap-2 rounded-xl p-3 border border-dashed opacity-70"
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
+                                                <badge.icon className="h-5 w-5 text-muted-foreground" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium">{badge.name}</p>
+                                                <p className="text-xs text-muted-foreground">{badge.description}</p>
+                                                {badge.hint && (
+                                                    <p className="text-xs text-primary/70 mt-0.5">→ {badge.hint}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {prog && pct !== null && (
+                                            <div className="space-y-1">
+                                                <div className="flex justify-between text-xs text-muted-foreground">
+                                                    <span>
+                                                        {prog.formatValue ? prog.formatValue(prog.current) : prog.current} / {prog.formatValue ? prog.formatValue(prog.target) : prog.target} {prog.label}
+                                                    </span>
+                                                    <span className="font-semibold tabular-nums">{pct}%</span>
+                                                </div>
+                                                <Progress value={pct} className="h-1.5" />
+                                            </div>
                                         )}
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </CardContent>
                 </Card>

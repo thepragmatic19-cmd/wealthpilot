@@ -6,6 +6,7 @@ import { useSubscription, LAUNCH_END_DATE } from "@/hooks/use-subscription";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import {
   CreditCard,
@@ -15,8 +16,10 @@ import {
   ExternalLink,
   Loader2,
   Timer,
+  MessageSquare,
 } from "lucide-react";
 import { getPlanLabel, PLAN_PRICES } from "@/lib/subscription";
+import { createClient } from "@/lib/supabase/client";
 
 function useCountdown(target: Date) {
   const calc = () => {
@@ -72,11 +75,14 @@ function LaunchCountdown() {
   );
 }
 
+const AI_DAILY_LIMIT = 50;
+
 export default function BillingPage() {
   const { subscription, plan, isLoading, isFree } = useSubscription();
   const searchParams = useSearchParams();
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [aiUsageToday, setAiUsageToday] = useState<number | null>(null);
 
   useEffect(() => {
     if (searchParams.get("success") === "true") {
@@ -86,6 +92,24 @@ export default function BillingPage() {
       toast.info("Paiement annulé.");
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    async function fetchAiUsage() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const { count } = await supabase
+        .from("chat_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("role", "user")
+        .gte("created_at", todayStart.toISOString());
+      setAiUsageToday(count ?? 0);
+    }
+    fetchAiUsage();
+  }, []);
 
   async function handleCheckout(targetPlan: "pro" | "elite") {
     setCheckoutLoading(targetPlan);
@@ -180,6 +204,35 @@ export default function BillingPage() {
              </div>
           </div>
           <LaunchCountdown />
+
+          {/* AI usage gauge — always visible */}
+          {aiUsageToday !== null && (
+            <div className="rounded-xl border bg-muted/30 p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-primary" />
+                  <p className="text-sm font-medium">Messages IA aujourd&apos;hui</p>
+                </div>
+                <span className="text-sm font-bold tabular-nums">
+                  <span className={aiUsageToday >= AI_DAILY_LIMIT ? "text-destructive" : "text-primary"}>
+                    {aiUsageToday}
+                  </span>
+                  <span className="text-muted-foreground font-normal"> / {AI_DAILY_LIMIT}</span>
+                </span>
+              </div>
+              <Progress
+                value={Math.min(100, (aiUsageToday / AI_DAILY_LIMIT) * 100)}
+                className="h-2"
+              />
+              {aiUsageToday >= AI_DAILY_LIMIT ? (
+                <p className="text-xs text-destructive">Limite atteinte — se réinitialise à minuit.</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {AI_DAILY_LIMIT - aiUsageToday} messages restants aujourd&apos;hui (plan Pro/Launch).
+                </p>
+              )}
+            </div>
+          )}
 
           {subscription?.current_period_end && (
             <p className="text-sm text-muted-foreground">
