@@ -23,6 +23,7 @@ import Link from "next/link";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useSimpleMode } from "@/contexts/simple-mode-context";
 import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
+import { FloatingHelpButton } from "@/components/ui/floating-help-button";
 import {
     AreaChart,
     Area,
@@ -583,6 +584,7 @@ export default function RetirementPage() {
                     </>)}
                 </div>
             </div>
+            <FloatingHelpButton question="Explique-moi ma situation de retraite en termes simples" />
         </div>
     );
 }

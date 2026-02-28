@@ -21,6 +21,8 @@ import { useSubscription } from "@/hooks/use-subscription";
 import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
 import { Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useSimpleMode } from "@/contexts/simple-mode-context";
+import { FloatingHelpButton } from "@/components/ui/floating-help-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
@@ -55,6 +57,13 @@ const SCEE_LIFETIME_MAX = 7200; // lifetime max per child
 const CELIAPP_ANNUAL_LIMIT = 8000;
 const CELIAPP_LIFETIME_LIMIT = 40000;
 
+const ACCOUNT_PLAIN_DESC: Record<string, string> = {
+    CELI:    "Vos gains (intérêts, dividendes, plus-values) ne sont jamais imposés. Retirez quand vous voulez.",
+    REER:    "Vos cotisations réduisent votre impôt maintenant. L'argent est imposé seulement à la retraite.",
+    REEE:    "Pour les études de vos enfants. Le gouvernement ajoute 20% de vos cotisations en subventions (SCEE).",
+    CELIAPP: "Pour votre première maison. Déductible comme un REER, et retraits non imposés.",
+};
+
 interface FiscalData {
     clientInfo: ClientInfo | null;
     portfolio: (Portfolio & { portfolio_allocations: PortfolioAllocation[] }) | null;
@@ -68,6 +77,8 @@ export default function FiscalPage() {
     const [contributionAmount, setContributionAmount] = useState(5000);
     const { canAccess, isLoading: subLoading } = useSubscription();
     const [showUpgrade, setShowUpgrade] = useState(false);
+    const { isSimple } = useSimpleMode();
+    const [showAdvanced, setShowAdvanced] = useState(false);
 
     useEffect(() => {
         async function load() {
@@ -138,6 +149,10 @@ export default function FiscalPage() {
 
     const { clientInfo, portfolio, transactions } = data;
     const annualIncome = Number(clientInfo?.annual_income) || 0;
+    const age = Number(clientInfo?.age) || 0;
+    const dependents = Number(clientInfo?.dependents) || 0;
+    const hasCeli = Boolean(clientInfo?.has_celi);
+    const hasReer = Boolean(clientInfo?.has_reer);
     const celiBalance = Number(clientInfo?.celi_balance) || 0;
     const reerBalance = Number(clientInfo?.reer_balance) || 0;
     const reeeBalance = Number(clientInfo?.reee_balance) || 0;
@@ -253,6 +268,11 @@ export default function FiscalPage() {
                                 Limite annuelle {CELI_ANNUAL_LIMIT.toLocaleString("fr-CA")}$ (2026)
                             </p>
                         </div>
+                        {isSimple && (
+                            <p className="mt-3 text-xs text-muted-foreground italic border-t pt-2">
+                                {ACCOUNT_PLAIN_DESC.CELI}
+                            </p>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -288,6 +308,11 @@ export default function FiscalPage() {
                                 18% du revenu, max {REER_MAX.toLocaleString("fr-CA")}$ ({new Date().getFullYear()})
                             </p>
                         </div>
+                        {isSimple && (
+                            <p className="mt-3 text-xs text-muted-foreground italic border-t pt-2">
+                                {ACCOUNT_PLAIN_DESC.REER}
+                            </p>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -330,6 +355,11 @@ export default function FiscalPage() {
                                 )}
                             </div>
                         </div>
+                        {isSimple && (
+                            <p className="mt-3 text-xs text-muted-foreground italic border-t pt-2">
+                                {ACCOUNT_PLAIN_DESC.REEE}
+                            </p>
+                        )}
                     </CardContent>
                 </Card>
                 {/* CELIAPP Card — shown only if user has CELIAPP */}
@@ -373,10 +403,86 @@ export default function FiscalPage() {
                                     </div>
                                 </div>
                             </div>
+                            {isSimple && (
+                                <p className="mt-3 text-xs text-muted-foreground italic border-t pt-2">
+                                    {ACCOUNT_PLAIN_DESC.CELIAPP}
+                                </p>
+                            )}
                         </CardContent>
                     </Card>
                 )}
             </div>
+
+            {/* Plan d'action prioritaire */}
+            {(() => {
+                const actions: Array<{ label: string; priority: "high" | "medium" | "low"; q: string }> = [];
+                if (!hasCeli) {
+                    actions.push({ label: "Ouvrir un CELI", priority: "high", q: "Comment ouvrir un CELI et par où commencer ?" });
+                } else if (celiRoom > 0) {
+                    actions.push({ label: `Maximiser votre CELI — ${celiRoom.toLocaleString("fr-CA")} $ disponibles`, priority: "high", q: "Comment maximiser mon CELI cette année ?" });
+                }
+                if (!hasReer && annualIncome > 40000) {
+                    actions.push({ label: "Ouvrir un REER", priority: "medium", q: "Comment ouvrir un REER et quels sont les avantages ?" });
+                } else if (reerRoom > 0 && annualIncome > 45000) {
+                    const saving = Math.round(reerRoom * combinedRate);
+                    actions.push({ label: `Cotiser au REER — économisez ~${saving.toLocaleString("fr-CA")} $ d'impôt`, priority: "medium", q: "Combien devrais-je cotiser à mon REER cette année ?" });
+                }
+                if (!hasCeliapp && age > 0 && age < 40) {
+                    actions.push({ label: "Ouvrir un CELIAPP", priority: "medium", q: "Comment ouvrir un CELIAPP et est-ce avantageux pour moi ?" });
+                }
+                if (reeeBalance === 0 && dependents > 0) {
+                    actions.push({ label: "Ouvrir un REEE", priority: "low", q: "Comment ouvrir un REEE et obtenir les subventions SCEE ?" });
+                }
+                if (actions.length === 0) return null;
+                const top4 = actions.slice(0, 4);
+                const badgeClass = (p: "high" | "medium" | "low") =>
+                    p === "high" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+                    p === "medium" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" :
+                    "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
+                const badgeLabel = (p: "high" | "medium" | "low") =>
+                    p === "high" ? "Prioritaire" : p === "medium" ? "Important" : "À faire";
+                return (
+                    <Card className="border-amber-200 dark:border-amber-900/50">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                                Plan d&apos;action prioritaire
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <ol className="space-y-2">
+                                {top4.map((action, i) => (
+                                    <li key={i} className="flex items-center gap-3">
+                                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold">{i + 1}</span>
+                                        <Link
+                                            href={`/chat?q=${encodeURIComponent(action.q)}`}
+                                            className="flex-1 text-sm font-medium hover:underline"
+                                        >
+                                            {action.label}
+                                        </Link>
+                                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold shrink-0 ${badgeClass(action.priority)}`}>
+                                            {badgeLabel(action.priority)}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ol>
+                        </CardContent>
+                    </Card>
+                );
+            })()}
+
+            {/* Simple mode: show/hide advanced toggle */}
+            {isSimple && !showAdvanced && (
+                <button
+                    onClick={() => setShowAdvanced(true)}
+                    className="w-full rounded-xl border border-dashed py-3 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-all"
+                >
+                    Voir l&apos;analyse avancée →
+                </button>
+            )}
+
+            {(!isSimple || showAdvanced) && (
+            <>
 
             {/* Contribution Optimizer */}
             {annualIncome > 0 && (
@@ -611,6 +717,19 @@ export default function FiscalPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            {isSimple && showAdvanced && (
+                <button
+                    onClick={() => setShowAdvanced(false)}
+                    className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                    ↑ Masquer l&apos;analyse avancée
+                </button>
+            )}
+
+            </>)}
+
+            <FloatingHelpButton question="Explique-moi comment maximiser mes comptes CELI et REER" />
         </div>
     );
 }

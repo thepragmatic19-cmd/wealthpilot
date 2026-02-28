@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -94,6 +95,7 @@ const EMPTY_FORM: GoalForm = {
 };
 
 export default function GoalsPage() {
+    const router = useRouter();
     const [goals, setGoals] = useState<Goal[]>([]);
     const [monthlySavings, setMonthlySavings] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -173,6 +175,15 @@ export default function GoalsPage() {
             toast.error("Erreur lors de la sauvegarde");
         } else {
             toast.success(editingGoal ? "Objectif mis à jour" : "Objectif créé");
+            if (!editingGoal) {
+                toast.success("Objectif créé", {
+                    action: {
+                        label: "💬 Stratégie IA",
+                        onClick: () => router.push(`/chat?q=${encodeURIComponent("Quelle stratégie pour mon objectif " + form.label)}`),
+                    },
+                    duration: 6000,
+                });
+            }
             setShowDialog(false);
             loadGoals();
         }

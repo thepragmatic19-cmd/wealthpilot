@@ -29,11 +29,13 @@ const ExportPdfButton = dynamic(
   () => import("@/components/portfolio/export-pdf-button").then((m) => ({ default: m.ExportPdfButton })),
   { ssr: false, loading: () => null }
 );
-import { formatPercent, ASSET_CLASS_COLORS } from "@/lib/utils";
+import { formatPercent, formatCurrency, ASSET_CLASS_COLORS } from "@/lib/utils";
+import { useSimpleMode } from "@/contexts/simple-mode-context";
+import { FloatingHelpButton } from "@/components/ui/floating-help-button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FINANCIAL_TERMS } from "@/lib/financial-terms";
 import { toast } from "sonner";
-import { CheckCircle, TrendingUp, Shield, BarChart3, Star, Info, RefreshCw, Loader2, Download, Scale, FileBarChart2 } from "lucide-react";
+import { CheckCircle, TrendingUp, Shield, BarChart3, Star, Info, RefreshCw, Loader2, Download, Scale, FileBarChart2, LayoutGrid } from "lucide-react";
 import { computeWeightedMer, computeAccountSummary } from "@/lib/portfolio/helpers";
 import type { Portfolio, PortfolioAllocation, ClientInfo, Transaction } from "@/types/database";
 import { Input } from "@/components/ui/input";
@@ -69,8 +71,44 @@ function MetricLabel({ label }: { label: string }) {
   );
 }
 
+function getStabiliteLabel(vol: number) {
+  if (vol <= 8)  return { label: "Stable",     color: "text-green-700 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/20" };
+  if (vol <= 15) return { label: "Équilibré",  color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-900/20" };
+  return          { label: "Dynamique",    color: "text-red-700 dark:text-red-400",   bg: "bg-red-50 dark:bg-red-900/20" };
+}
+
+function StabiliteGauge({ volatility }: { volatility: number }) {
+  const s = getStabiliteLabel(volatility);
+  const pct = Math.min(100, (volatility / 25) * 100);
+  return (
+    <div className={`rounded-xl p-4 ${s.bg} space-y-2`}>
+      <div className="flex justify-between items-center">
+        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Stabilité</p>
+        <span className={`text-sm font-bold ${s.color}`}>{s.label}</span>
+      </div>
+      <div className="h-2.5 w-full rounded-full bg-black/10 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-700 ${
+            s.label === "Stable" ? "bg-green-500" : s.label === "Équilibré" ? "bg-amber-500" : "bg-red-500"
+          }`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        {s.label === "Stable"
+          ? "Peu de fluctuations — idéal si vous aimez la sécurité"
+          : s.label === "Équilibré"
+          ? "Fluctuations modérées — bon équilibre risque/rendement"
+          : "Fluctuations importantes — potentiel élevé, patience requise"}
+      </p>
+    </div>
+  );
+}
+
 export default function PortfolioPage() {
   const router = useRouter();
+  const { isSimple, toggle: toggleSimple } = useSimpleMode();
+  const [simpleActiveId, setSimpleActiveId] = useState<string | null>(null);
   const [portfolios, setPortfolios] = useState<PortfolioWithAllocations[]>([]);
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
   const [transactions, setTransactions] = useState<Record<string, Transaction[]>>({});
@@ -82,6 +120,7 @@ export default function PortfolioPage() {
   const [totalValueOverride, setTotalValueOverride] = useState<Record<string, number>>({});
   const [savingRebalance, setSavingRebalance] = useState<string | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -164,10 +203,17 @@ export default function PortfolioPage() {
 
       if (selectError) throw selectError;
 
+      const selectedPort = portfolios.find((p) => p.id === portfolioId);
       setPortfolios((prev) =>
         prev.map((p) => ({ ...p, is_selected: p.id === portfolioId }))
       );
-      toast.success("Portefeuille sélectionné");
+      toast.success("Portefeuille sélectionné", {
+        action: {
+          label: "💬 Expliquer ce portefeuille",
+          onClick: () => router.push(`/chat?q=${encodeURIComponent("Explique-moi mon nouveau portefeuille " + (selectedPort?.name || "") + " et ses ETFs")}`),
+        },
+        duration: 6000,
+      });
     } catch (err) {
       console.error("Portfolio selection error:", err);
       toast.error("Erreur lors de la sélection du portefeuille");
@@ -344,6 +390,12 @@ export default function PortfolioPage() {
     (a, b) => typeOrder.indexOf(a.type) - typeOrder.indexOf(b.type)
   );
   const selected = sorted.find((p) => p.is_selected) ?? sorted[1] ?? sorted[0] ?? null;
+  const simplePortfolio =
+    (simpleActiveId ? sorted.find((p) => p.id === simpleActiveId) : null) ??
+    sorted.find((p) => p.is_selected) ??
+    sorted.find((p) => p.type === "suggéré") ??
+    sorted[0] ??
+    null;
 
   const riskReturnData = sorted.map((p) => ({
     name: p.name,
@@ -360,8 +412,154 @@ export default function PortfolioPage() {
   const initialInvestment = Number(clientInfo?.total_assets || 10000);
   const monthlyContribution = Number(clientInfo?.monthly_savings || 500);
 
+  const simpleMerAvg = simplePortfolio ? computeWeightedMer(simplePortfolio.allocations) : null;
+  const simpleInitialInvestment = Number(clientInfo?.total_assets || 10000);
+  const simpleMonthlyContribution = Number(clientInfo?.monthly_savings || 500);
+  const simpleExpectedReturn = (simplePortfolio?.expected_return ?? 5) / 100;
+  // 20yr projection inline
+  const simpleProjection20yr = (() => {
+    let val = simpleInitialInvestment;
+    const monthlyRate = simpleExpectedReturn / 12;
+    for (let m = 0; m < 240; m++) {
+      val = val * (1 + monthlyRate) + simpleMonthlyContribution;
+    }
+    return Math.round(val);
+  })();
+
+  const SIMPLE_LABELS: Record<string, string> = {
+    "conservateur": "Prudent",
+    "suggéré": "Recommandé",
+    "ambitieux": "Ambitieux",
+  };
+
   return (
     <div className="space-y-6">
+      {isSimple && simplePortfolio ? (
+        <>
+          {/* Simple mode header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Mon portefeuille</h1>
+              <p className="text-sm text-muted-foreground">Vue simplifiée — l&apos;essentiel pour décider</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={toggleSimple} className="text-muted-foreground gap-1">
+              Vue avancée →
+            </Button>
+          </div>
+
+          {/* 3 quick portfolio cards */}
+          <div className="grid grid-cols-3 gap-2">
+            {sorted.map((p) => {
+              const isActive = p.id === simplePortfolio.id;
+              const label = SIMPLE_LABELS[p.type] ?? p.type;
+              const s = getStabiliteLabel(p.volatility ?? 0);
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setSimpleActiveId(p.id)}
+                  className={`rounded-xl border p-3 text-left transition-all hover:shadow-md ${
+                    isActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+                  }`}
+                >
+                  <div className="flex items-center gap-1 mb-1">
+                    {p.type === "suggéré" && <Star className="h-3 w-3 fill-yellow-500 text-yellow-500 shrink-0" />}
+                    <span className="text-xs font-semibold truncate">{label}</span>
+                  </div>
+                  <p className="text-lg font-bold text-green-600">+{p.expected_return?.toFixed(1)}%</p>
+                  <p className="text-[10px] text-muted-foreground mb-1">par an</p>
+                  <span className={`text-[10px] font-semibold ${s.color}`}>{s.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Stabilite gauge */}
+          <StabiliteGauge volatility={simplePortfolio.volatility ?? 0} />
+
+          {/* 2 decoded metrics */}
+          <div className="grid grid-cols-2 gap-3">
+            <Card>
+              <CardContent className="p-4 space-y-1">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Croissance estimée</p>
+                <p className="text-xl font-bold text-green-600">+{simplePortfolio.expected_return?.toFixed(1)}%/an</p>
+                <p className="text-[11px] text-muted-foreground">en moyenne sur le long terme</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 space-y-1">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Frais annuels</p>
+                {simpleInitialInvestment > 0 && simpleMerAvg != null ? (
+                  <>
+                    <p className="text-xl font-bold">~{formatCurrency(simpleInitialInvestment * parseFloat(simpleMerAvg) / 100)}</p>
+                    <p className="text-[11px] text-muted-foreground">{simpleMerAvg}% de votre capital</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xl font-bold">{simpleMerAvg != null ? `${simpleMerAvg}%` : "—"}</p>
+                    <p className="text-[11px] text-muted-foreground">de votre capital par an</p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Allocation chart */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Comment votre argent est réparti</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AllocationChart allocations={simplePortfolio.allocations} />
+            </CardContent>
+          </Card>
+
+          {/* 20yr projection */}
+          <Card className="bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
+            <CardContent className="p-5 space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Projection sur 20 ans</p>
+              <p className="text-2xl font-bold">
+                Dans 20 ans, votre portefeuille pourrait valoir ~{formatCurrency(simpleProjection20yr)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Basé sur {formatCurrency(simpleInitialInvestment)} investis aujourd&apos;hui +{" "}
+                {formatCurrency(simpleMonthlyContribution)}/mois, au rendement de{" "}
+                {simplePortfolio.expected_return?.toFixed(1)}%/an.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* AI rationale */}
+          {simplePortfolio.ai_rationale && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Pourquoi ce portefeuille ?</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground leading-relaxed">{simplePortfolio.ai_rationale}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* CTA */}
+          {simplePortfolio.is_selected ? (
+            <div className="flex items-center justify-center gap-2 rounded-xl border border-primary/20 bg-primary/5 py-3">
+              <CheckCircle className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold text-primary">Portefeuille actif</span>
+            </div>
+          ) : (
+            <Button
+              onClick={() => selectPortfolio(simplePortfolio.id)}
+              disabled={selecting}
+              className="w-full gap-2"
+              size="lg"
+            >
+              <CheckCircle className="h-4 w-4" />
+              Sélectionner ce portefeuille
+            </Button>
+          )}
+        </>
+      ) : (
+        <>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Vos portefeuilles recommandés</h1>
@@ -369,20 +567,103 @@ export default function PortfolioPage() {
             Comparez les 3 options et sélectionnez votre portefeuille idéal.
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={regeneratePortfolios}
-          disabled={regenerating}
-          className="gap-2 shrink-0"
-        >
-          {regenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          {regenerating ? "Génération en cours..." : "Régénérer"}
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant={compareMode ? "default" : "outline"}
+            size="sm"
+            onClick={() => setCompareMode((v) => !v)}
+            className="gap-2"
+          >
+            <LayoutGrid className="h-4 w-4" />
+            {compareMode ? "Vue normale" : "Comparer"}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={regeneratePortfolios}
+            disabled={regenerating}
+            className="gap-2"
+          >
+            {regenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {regenerating ? "Génération..." : "Régénérer"}
+          </Button>
+        </div>
       </div>
 
+      {/* Inline comparison table */}
+      {compareMode && (
+        <div className="overflow-x-auto rounded-xl border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Métrique</th>
+                {sorted.map((p) => (
+                  <th
+                    key={p.id}
+                    className={`px-4 py-3 text-center font-semibold capitalize ${p.is_selected ? "bg-primary/5 border-x border-primary/20 text-primary" : ""}`}
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      {p.type === "suggéré" && <Star className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500" />}
+                      {p.is_selected && <CheckCircle className="h-3.5 w-3.5 text-primary" />}
+                      {p.type}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {[
+                { label: "Rendement attendu", getValue: (p: PortfolioWithAllocations) => `${p.expected_return?.toFixed(1) ?? "—"}%` },
+                { label: "Volatilité", getValue: (p: PortfolioWithAllocations) => `${p.volatility?.toFixed(1) ?? "—"}%` },
+                { label: "Ratio de Sharpe", getValue: (p: PortfolioWithAllocations) => p.sharpe_ratio?.toFixed(2) ?? "—" },
+                { label: "RFG moyen", getValue: (p: PortfolioWithAllocations) => { const m = computeWeightedMer(p.allocations); return m != null ? `${m}%` : "—"; } },
+                { label: "Nb ETFs", getValue: (p: PortfolioWithAllocations) => String(p.allocations.length) },
+                { label: "Type", getValue: (p: PortfolioWithAllocations) => p.type },
+              ].map((row) => (
+                <tr key={row.label} className="hover:bg-muted/30">
+                  <td className="px-4 py-2.5 font-medium text-muted-foreground">{row.label}</td>
+                  {sorted.map((p) => (
+                    <td
+                      key={p.id}
+                      className={`px-4 py-2.5 text-center font-medium ${p.is_selected ? "bg-primary/5 border-x border-primary/20" : ""}`}
+                    >
+                      {row.getValue(p)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              <tr>
+                <td className="px-4 py-3" />
+                {sorted.map((p) => (
+                  <td
+                    key={p.id}
+                    className={`px-4 py-3 text-center ${p.is_selected ? "bg-primary/5 border-x border-b border-primary/20" : ""}`}
+                  >
+                    {p.is_selected ? (
+                      <Badge className="gap-1">
+                        <CheckCircle className="h-3 w-3" />
+                        Sélectionné
+                      </Badge>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => selectPortfolio(p.id)}
+                        disabled={selecting}
+                      >
+                        Sélectionner
+                      </Button>
+                    )}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* Quick comparison cards — horizontal scroll on mobile, 3-col on sm+ */}
-      <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-3 sm:overflow-visible">
+      {!compareMode && <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-3 sm:overflow-visible">
         {sorted.map((p) => {
           const avgMer = computeWeightedMer(p.allocations);
           const isSelected = p.is_selected;
@@ -419,10 +700,10 @@ export default function PortfolioPage() {
             </button>
           );
         })}
-      </div>
+      </div>}
 
       {/* Portfolio tabs */}
-      <Tabs value={activeTab || selected?.type || "suggéré"} onValueChange={setActiveTab}>
+      {!compareMode && <Tabs value={activeTab || selected?.type || "suggéré"} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="conservateur" className="text-xs sm:text-sm gap-1">
             <Shield className="hidden sm:block h-4 w-4" />
@@ -872,7 +1153,10 @@ export default function PortfolioPage() {
             </TabsContent>
           );
         })}
-      </Tabs>
+      </Tabs>}
+        </>
+      )}
+      <FloatingHelpButton question="Explique-moi les différences entre mes 3 portefeuilles et lequel choisir" />
     </div>
   );
 }

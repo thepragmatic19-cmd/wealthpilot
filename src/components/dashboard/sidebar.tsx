@@ -21,6 +21,7 @@ import {
   ChevronRight,
   Target,
   BookOpen,
+  BookMarked,
   Layers,
 } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -49,6 +50,7 @@ const navGroupsFull = [
     items: [
       { href: "/chat", icon: MessageSquare, label: "Conseiller IA" },
       { href: "/education", icon: BookOpen, label: "Hub Éducatif" },
+      { href: "/lexique", icon: BookMarked, label: "Lexique" },
       { href: "/onboarding", icon: ClipboardList, label: "Évaluation" },
     ]
   },
@@ -77,6 +79,7 @@ const navGroupsSimple = [
     items: [
       { href: "/chat", icon: MessageSquare, label: "Conseiller IA" },
       { href: "/education", icon: BookOpen, label: "Apprendre" },
+      { href: "/lexique", icon: BookMarked, label: "Lexique" },
     ]
   },
   {

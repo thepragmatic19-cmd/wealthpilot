@@ -31,6 +31,7 @@ const MarketTicker = dynamic(
 );
 import { computeWeightedMer } from "@/lib/portfolio/helpers";
 import { formatCurrency, RISK_PROFILES, GOAL_ICONS } from "@/lib/utils";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { useSimpleMode } from "@/contexts/simple-mode-context";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -50,8 +51,7 @@ import {
   PiggyBank,
   CheckCircle2,
   Circle,
-  Zap,
-  ChevronRight,
+  User,
 } from "lucide-react";
 import type {
   Profile,
@@ -87,19 +87,19 @@ function QuickActionsCard() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       {[
-        { href: "/chat", icon: MessageSquare, label: "Chat IA", color: "text-blue-500", bg: "bg-blue-500/10" },
-        { href: "/transactions", icon: Calculator, label: "Transaction", color: "text-emerald-500", bg: "bg-emerald-500/10" },
-        { href: "/portfolio", icon: PieChart, label: "Portefeuille", color: "text-orange-500", bg: "bg-orange-500/10" },
-        { href: "/fiscal", icon: Shield, label: "Planification", color: "text-purple-500", bg: "bg-purple-500/10" },
+        { href: "/chat", icon: MessageSquare, label: "Chat IA", sublabel: "Conseiller IA", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10 hover:bg-blue-500/20" },
+        { href: "/transactions", icon: Calculator, label: "Transaction", sublabel: "Ajouter", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10 hover:bg-emerald-500/20" },
+        { href: "/portfolio", icon: PieChart, label: "Portefeuille", sublabel: "Voir mon plan", color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-500/10 hover:bg-orange-500/20" },
+        { href: "/goals", icon: Target, label: "Objectifs", sublabel: "Ma progression", color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10 hover:bg-purple-500/20" },
       ].map((action, i) => (
         <Link key={i} href={action.href}>
-          <div className="group flex items-center gap-3 p-3 sm:p-4 rounded-2xl border bg-card/50 backdrop-blur-sm hover:border-primary/30 hover:bg-card transition-all cursor-pointer shadow-sm">
-            <div className={`h-9 w-9 shrink-0 rounded-xl ${action.bg} flex items-center justify-center ${action.color} group-hover:scale-110 transition-transform`}>
-              <action.icon className="h-4 w-4" />
+          <div className={`group flex flex-col items-center justify-center gap-2.5 p-4 rounded-2xl ${action.bg} transition-all cursor-pointer text-center shadow-sm hover:shadow-md hover:-translate-y-0.5`}>
+            <div className={`h-11 w-11 rounded-xl bg-white/50 dark:bg-black/20 flex items-center justify-center ${action.color} group-hover:scale-110 transition-transform shadow-sm`}>
+              <action.icon className="h-5 w-5" />
             </div>
-            <div className="min-w-0">
-              <p className="text-sm font-bold truncate">{action.label}</p>
-              <p className="hidden sm:block text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">Accès rapide</p>
+            <div>
+              <p className={`text-sm font-bold ${action.color}`}>{action.label}</p>
+              <p className="text-[10px] text-muted-foreground">{action.sublabel}</p>
             </div>
           </div>
         </Link>
@@ -176,59 +176,6 @@ function generateRecommendations(data: DashboardData): Recommendation[] {
   return recs;
 }
 
-// ─── Next Step Card (QW-A) ────────────────────────────────────────────────────
-
-interface NextStep {
-  label: string;
-  description: string;
-  href: string;
-  color: string;
-  bg: string;
-}
-
-function computeNextStep(data: DashboardData): NextStep {
-  const ci = data.clientInfo;
-
-  if (!data.riskAssessment) {
-    return { label: "Évaluez votre profil de risque", description: "Étape essentielle pour recevoir un portefeuille personnalisé.", href: "/onboarding", color: "text-orange-600", bg: "bg-orange-500/10" };
-  }
-  if (!data.selectedPortfolio) {
-    return { label: "Générez votre portefeuille", description: "Votre profil est prêt — obtenez votre allocation personnalisée.", href: "/portfolio", color: "text-blue-600", bg: "bg-blue-500/10" };
-  }
-  if (data.goals.length === 0) {
-    return { label: "Définissez votre premier objectif", description: "Retraite, maison, études — un objectif donne une direction à votre épargne.", href: "/goals", color: "text-purple-600", bg: "bg-purple-500/10" };
-  }
-  if (ci && !ci.has_celi && !ci.has_reer) {
-    return { label: "Ouvrez un CELI ou REER", description: "Investir dans des comptes enregistrés réduit vos impôts et accélère votre croissance.", href: "/fiscal", color: "text-emerald-600", bg: "bg-emerald-500/10" };
-  }
-  if (ci && Number(ci.monthly_savings || 0) === 0) {
-    return { label: "Renseignez votre épargne mensuelle", description: "Complétez votre profil pour des projections précises.", href: "/profile", color: "text-amber-600", bg: "bg-amber-500/10" };
-  }
-  if (data.chatMessages.filter((m) => m.role === "user").length === 0) {
-    return { label: "Posez votre première question à l'IA", description: "Votre conseiller IA est prêt à analyser votre situation personnalisée.", href: "/chat", color: "text-primary", bg: "bg-primary/10" };
-  }
-  return { label: "Consultez votre plan fiscal", description: "Optimisez la répartition de vos comptes CELI, REER et REEE.", href: "/fiscal", color: "text-teal-600", bg: "bg-teal-500/10" };
-}
-
-function NextStepCard({ data }: { data: DashboardData }) {
-  const step = computeNextStep(data);
-  return (
-    <Link href={step.href}>
-      <div className={`group flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed hover:border-solid ${step.bg} border-current/20 hover:border-current/40 transition-all cursor-pointer`}>
-        <div className={`h-10 w-10 shrink-0 rounded-xl ${step.bg} flex items-center justify-center ${step.color} group-hover:scale-110 transition-transform`}>
-          <Zap className="h-5 w-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Votre prochain pas</p>
-          <p className={`text-sm font-bold ${step.color}`}>{step.label}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{step.description}</p>
-        </div>
-        <ChevronRight className={`h-4 w-4 shrink-0 ${step.color} opacity-0 group-hover:opacity-100 transition-opacity`} />
-      </div>
-    </Link>
-  );
-}
-
 // ─── Checklist Widget (F-1) ───────────────────────────────────────────────────
 
 function ChecklistWidget({ data }: { data: DashboardData }) {
@@ -242,30 +189,139 @@ function ChecklistWidget({ data }: { data: DashboardData }) {
   ];
   const doneCount = steps.filter((s) => s.done).length;
   const pct = Math.round((doneCount / steps.length) * 100);
+  const circumference = 2 * Math.PI * 15;
+  const nextIdx = steps.findIndex((s) => !s.done);
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <CheckCircle2 className="h-4 w-4 text-primary" />
-          Guide de démarrage
-        </CardTitle>
-        <CardDescription className="text-xs">{doneCount}/{steps.length} étapes complétées · {pct}%</CardDescription>
-        <Progress value={pct} className="h-1.5 mt-1" />
-      </CardHeader>
-      <CardContent className="space-y-2">
+    <Card className="overflow-hidden">
+      <div className="flex items-center gap-4 p-5 bg-gradient-to-br from-primary/5 to-background border-b">
+        <div className="relative h-16 w-16 shrink-0">
+          <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90">
+            <circle cx="18" cy="18" r="15" fill="none" strokeWidth="3" className="stroke-muted" />
+            <circle
+              cx="18" cy="18" r="15" fill="none" strokeWidth="3" strokeLinecap="round"
+              className="stroke-primary transition-all duration-700"
+              strokeDasharray={`${(pct / 100) * circumference} ${circumference}`}
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-sm font-black text-primary">{pct}%</span>
+          </div>
+        </div>
+        <div>
+          <h3 className="font-bold text-sm">Guide de démarrage</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">{doneCount} / {steps.length} étapes complétées</p>
+        </div>
+      </div>
+      <div className="divide-y">
         {steps.map((step, i) => (
-          <div key={i} className="flex items-center gap-2.5">
+          <div key={i} className={`flex items-center gap-3 px-5 py-2.5 transition-colors ${step.done ? "opacity-50" : "hover:bg-muted/30"}`}>
             {step.done ? (
               <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
             ) : (
-              <Circle className="h-4 w-4 shrink-0 text-muted-foreground/40" />
+              <div className="h-4 w-4 shrink-0 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center">
+                {i === nextIdx && <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />}
+              </div>
             )}
-            <span className={`text-xs font-medium ${step.done ? "line-through text-muted-foreground/50" : ""}`}>
+            <span className={`text-xs font-medium flex-1 ${step.done ? "line-through" : "text-foreground"}`}>
               {step.label}
             </span>
+            {!step.done && i === nextIdx && (
+              <Badge className="text-[9px] h-4 px-1.5 bg-primary/10 text-primary border-none font-bold">À faire</Badge>
+            )}
           </div>
         ))}
+      </div>
+    </Card>
+  );
+}
+
+// ─── Health Score Card ────────────────────────────────────────────────────────
+
+function HealthScoreCard({ data }: { data: DashboardData }) {
+  const annualIncome = Number(data.clientInfo?.annual_income || 0);
+  const monthlySavings = Number(data.clientInfo?.monthly_savings || 0);
+  const savingsRate = annualIncome > 0 ? Math.round((monthlySavings * 12 / annualIncome) * 100) : 0;
+
+  const pillars = [
+    {
+      label: "Profil complet",
+      done: !!(data.clientInfo?.annual_income && data.clientInfo?.monthly_savings),
+      href: "/profile",
+      Icon: User,
+    },
+    {
+      label: "Comptes enregistrés",
+      done: !!(data.clientInfo?.has_celi || data.clientInfo?.has_reer),
+      href: "/fiscal",
+      Icon: Shield,
+    },
+    {
+      label: "Objectif de vie",
+      done: data.goals.length > 0,
+      href: "/goals",
+      Icon: Target,
+    },
+    {
+      label: "Épargne saine (≥10%)",
+      done: savingsRate >= 10,
+      href: "/profile",
+      Icon: TrendingUp,
+    },
+  ];
+
+  const doneCount = pillars.filter((p) => p.done).length;
+  const score = doneCount * 25;
+
+  const { grade, gradeColor, gradeBorder, gradeBg, message } =
+    score === 100
+      ? { grade: "A+", gradeColor: "text-emerald-600 dark:text-emerald-400", gradeBorder: "border-emerald-500", gradeBg: "bg-emerald-500/10", message: "Votre situation financière est excellente 🎉" }
+      : score >= 75
+      ? { grade: "B", gradeColor: "text-green-600 dark:text-green-400", gradeBorder: "border-green-500", gradeBg: "bg-green-500/10", message: "Bonne situation, quelques points à améliorer" }
+      : score >= 50
+      ? { grade: "C", gradeColor: "text-amber-600 dark:text-amber-400", gradeBorder: "border-amber-500", gradeBg: "bg-amber-500/10", message: "Des actions importantes vous attendent" }
+      : { grade: "D", gradeColor: "text-orange-600 dark:text-orange-400", gradeBorder: "border-orange-500", gradeBg: "bg-orange-500/10", message: "Commençons par les bases" };
+
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className={`h-12 w-12 rounded-xl flex items-center justify-center font-black text-2xl border-2 ${gradeBorder} ${gradeBg} ${gradeColor}`}>
+              {grade}
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Santé financière</p>
+              <p className={`text-sm font-semibold ${gradeColor}`}>{message}</p>
+            </div>
+          </div>
+          <Badge variant="outline" className="text-xs shrink-0">
+            {doneCount}/4 piliers
+          </Badge>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {pillars.map((pillar, i) => {
+            if (pillar.done) {
+              return (
+                <div key={i} className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/30">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
+                  <span className="text-xs text-muted-foreground line-through">{pillar.label}</span>
+                </div>
+              );
+            }
+            return (
+              <Link key={i} href={pillar.href}>
+                <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-muted/10 border border-dashed hover:border-primary/50 hover:bg-muted/30 transition-colors cursor-pointer">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Circle className="h-4 w-4 shrink-0 text-muted-foreground/40" />
+                    <span className="text-xs font-medium truncate">{pillar.label}</span>
+                  </div>
+                  <Badge className="text-[9px] h-4 px-1.5 bg-primary/10 text-primary border-none font-bold shrink-0">À faire</Badge>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
       </CardContent>
     </Card>
   );
@@ -298,48 +354,38 @@ export default function DashboardPage() {
     chatMessages: [],
     snapshots: [],
   });
-  const [loading, setLoading] = useState(true);
+  const [loadingMain, setLoadingMain] = useState(true);
+  const [loadingSecondary, setLoadingSecondary] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
     async function load() {
-      try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoadingMain(false);
+        setLoadingSecondary(false);
+        return;
+      }
 
-        const [
-          { data: profile },
-          { data: clientInfo },
-          { data: goals },
-          { data: riskAssessment },
-          { data: portfolio },
-          { data: chatMsgs },
-        ] = await Promise.all([
-          supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
-          supabase.from("client_info").select("*").eq("user_id", user.id).maybeSingle(),
-          supabase.from("goals").select("*").eq("user_id", user.id).order("priority"),
-          supabase
-            .from("risk_assessments")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-          supabase
-            .from("portfolios")
-            .select("*, portfolio_allocations(*)")
-            .eq("user_id", user.id)
-            .eq("is_selected", true)
-            .maybeSingle(),
-          supabase
-            .from("chat_messages")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: true })
-            .limit(20),
-        ]);
-
+      // Batch 1 (fast): profile, clientInfo, riskAssessment, chatMessages
+      Promise.all([
+        supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+        supabase.from("client_info").select("*").eq("user_id", user.id).maybeSingle(),
+        supabase
+          .from("risk_assessments")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("chat_messages")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: true })
+          .limit(20),
+      ]).then(([{ data: profile }, { data: clientInfo }, { data: riskAssessment }, { data: chatMsgs }]) => {
         // Fire-and-forget today's net worth snapshot
         if (clientInfo) {
           fetch("/api/net-worth/snapshot", {
@@ -351,36 +397,56 @@ export default function DashboardPage() {
             }),
           }).catch(() => {});
         }
-
-        // Fetch net worth history
-        const snapshotsRes = await fetch("/api/net-worth/snapshot");
-        const snapshotsData = snapshotsRes.ok ? await snapshotsRes.json() : { snapshots: [] };
-
-        setData({
+        setData((prev) => ({
+          ...prev,
           profile: profile as Profile | null,
           clientInfo: clientInfo as ClientInfo | null,
-          goals: (goals as Goal[]) || [],
           riskAssessment: riskAssessment as RiskAssessment | null,
-          selectedPortfolio: portfolio
-            ? {
-              ...portfolio,
-              allocations: portfolio.portfolio_allocations || [],
-            } as Portfolio & { allocations: PortfolioAllocation[] }
-            : null,
           chatMessages: (chatMsgs as ChatMessage[]) || [],
-          snapshots: snapshotsData.snapshots || [],
-        });
-      } catch (err) {
-        console.error("Dashboard load error:", err);
+        }));
+      }).catch((err) => {
+        console.error("Dashboard load error (batch 1):", err);
         setError(true);
-      } finally {
-        setLoading(false);
-      }
+      }).finally(() => {
+        setLoadingMain(false);
+      });
+
+      // Batch 2 (parallel): portfolio, goals, snapshots
+      Promise.all([
+        supabase
+          .from("portfolios")
+          .select("*, portfolio_allocations(*)")
+          .eq("user_id", user.id)
+          .eq("is_selected", true)
+          .maybeSingle(),
+        supabase.from("goals").select("*").eq("user_id", user.id).order("priority"),
+        fetch("/api/net-worth/snapshot")
+          .then((r) => (r.ok ? r.json() : { snapshots: [] }))
+          .catch(() => ({ snapshots: [] })),
+      ]).then(([portfolioRes, goalsRes, snapshotsData]) => {
+        const portfolio = portfolioRes.data;
+        const goals = goalsRes.data;
+        setData((prev) => ({
+          ...prev,
+          selectedPortfolio: portfolio
+            ? ({
+                ...portfolio,
+                allocations: portfolio.portfolio_allocations || [],
+              } as Portfolio & { allocations: PortfolioAllocation[] })
+            : null,
+          goals: (goals as Goal[]) || [],
+          snapshots: snapshotsData.snapshots || [],
+        }));
+      }).catch((err) => {
+        console.error("Dashboard load error (batch 2):", err);
+      }).finally(() => {
+        setLoadingSecondary(false);
+      });
     }
     load();
   }, []);
 
-  if (loading) {
+  if (loadingMain) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-48" />
@@ -464,6 +530,23 @@ export default function DashboardPage() {
   const monthlySavings = Number(data.clientInfo?.monthly_savings || 0);
   const annualIncome = Number(data.clientInfo?.annual_income || 0);
   const savingsRate = annualIncome > 0 ? Math.round((monthlySavings * 12 / annualIncome) * 100) : 0;
+
+  const checklistDone = [
+    !!data.clientInfo?.annual_income,
+    !!data.riskAssessment,
+    data.goals.length > 0,
+    !!data.selectedPortfolio,
+    data.chatMessages.some((m) => m.role === "user"),
+  ].every(Boolean);
+
+  const allocations = data.selectedPortfolio?.allocations || [];
+  const actionsWeight = Math.round(
+    allocations
+      .filter((a) => /action|equity|stock/i.test(a.asset_class || "") || /action|equity|stock/i.test(a.instrument_name || ""))
+      .reduce((sum, a) => sum + (a.weight || 0), 0)
+  );
+  const obligationsWeight = 100 - actionsWeight;
+
   const expectedReturn = data.selectedPortfolio?.expected_return || 0;
   const projectedValue = totalInvested > 0
     ? Math.round(totalInvested * (1 + expectedReturn / 100) + monthlySavings * 12)
@@ -483,67 +566,84 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 pb-10">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Bonjour, {data.profile?.full_name?.split(" ")[0] || "investisseur"} 👋
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            {isSimple
-              ? "Voici un résumé simple de votre situation financière."
-              : "Votre cockpit financier est à jour."}
-          </p>
-        </div>
-
-        {/* Taux d'épargne — masqué en mode simplifié (valeur souvent confuse) */}
-        {!isSimple && savingsRate > 0 && savingsRate <= 100 && (
-          <div className="flex items-center gap-4 p-3 rounded-2xl border bg-card/50 backdrop-blur-sm shadow-sm">
-            <div className="relative h-12 w-12">
-              <svg className="h-full w-full" viewBox="0 0 36 36">
-                <path className="stroke-muted fill-none" strokeWidth="3" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                <path className="stroke-primary fill-none transition-all duration-1000" strokeDasharray={`${Math.min(100, savingsRate * 2)}, 100`} strokeLinecap="round" strokeWidth="3" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold">
-                {savingsRate}%
-              </div>
+      <div className="rounded-3xl border bg-gradient-to-br from-primary/5 via-background to-muted/20 p-6 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-xl font-black text-primary shadow-sm shrink-0">
+              {(data.profile?.full_name?.split(" ")[0] || "W")[0].toUpperCase()}
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Taux d&apos;épargne</p>
-              <p className="text-sm font-bold">
-                {savingsRate >= 30 ? "Excellent 🚀" : savingsRate >= 20 ? "Bon travail 👍" : savingsRate >= 10 ? "En progrès" : "À améliorer"}
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Tableau de bord</p>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                Bonjour, {data.profile?.full_name?.split(" ")[0] || "investisseur"} 👋
+              </h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {isSimple
+                  ? "Voici un résumé simple de votre situation financière."
+                  : "Votre cockpit financier est à jour."}
               </p>
             </div>
           </div>
-        )}
+
+          {/* Taux d'épargne — masqué en mode simplifié (valeur souvent confuse) */}
+          {!isSimple && savingsRate > 0 && savingsRate <= 100 && (
+            <div className="flex items-center gap-4 p-3 rounded-2xl border bg-card/50 backdrop-blur-sm shadow-sm">
+              <div className="relative h-12 w-12">
+                <svg className="h-full w-full" viewBox="0 0 36 36">
+                  <path className="stroke-muted fill-none" strokeWidth="3" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path className="stroke-primary fill-none transition-all duration-1000" strokeDasharray={`${Math.min(100, savingsRate * 2)}, 100`} strokeLinecap="round" strokeWidth="3" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold">
+                  {savingsRate}%
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Taux d&apos;épargne</p>
+                <p className="text-sm font-bold">
+                  {savingsRate >= 30 ? "Excellent 🚀" : savingsRate >= 20 ? "Bon travail 👍" : savingsRate >= 10 ? "En progrès" : "À améliorer"}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Next Step Card */}
-      <NextStepCard data={data} />
+      {/* Health Score Card — simple mode only */}
+      {isSimple && <HealthScoreCard data={data} />}
 
       {/* Simple mode: plain-language summary strip */}
       {isSimple && (totalInvested > 0 || monthlySavings > 0) && (
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="flex items-center gap-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 px-5 py-4">
-            <Wallet className="h-7 w-7 text-emerald-600 shrink-0" />
-            <div>
-              <p className="text-xs text-muted-foreground">J&apos;ai en ce moment</p>
-              <p className="text-xl font-black text-emerald-700 dark:text-emerald-400">{formatCurrency(totalInvested)}</p>
+          <div className="relative overflow-hidden flex items-center gap-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 px-5 py-5 shadow-sm">
+            <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-t-2xl" />
+            <div className="h-12 w-12 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
+              <Wallet className="h-6 w-6 text-emerald-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium text-muted-foreground">J&apos;ai en ce moment</p>
+              <p className="text-2xl font-black text-emerald-700 dark:text-emerald-400 leading-tight truncate">{formatCurrency(totalInvested)}</p>
             </div>
           </div>
-          <div className="flex items-center gap-3 rounded-2xl bg-purple-500/10 border border-purple-500/20 px-5 py-4">
-            <PiggyBank className="h-7 w-7 text-purple-600 shrink-0" />
-            <div>
-              <p className="text-xs text-muted-foreground">J&apos;épargne chaque mois</p>
-              <p className="text-xl font-black text-purple-700 dark:text-purple-400">
-                {monthlySavings > 0 ? formatCurrency(monthlySavings) : "Non renseigné"}
+          <div className="relative overflow-hidden flex items-center gap-4 rounded-2xl bg-purple-50 dark:bg-purple-950/40 px-5 py-5 shadow-sm">
+            <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-purple-400 to-purple-500 rounded-t-2xl" />
+            <div className="h-12 w-12 rounded-xl bg-purple-500/15 flex items-center justify-center shrink-0">
+              <PiggyBank className="h-6 w-6 text-purple-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium text-muted-foreground">J&apos;épargne chaque mois</p>
+              <p className="text-2xl font-black text-purple-700 dark:text-purple-400 leading-tight truncate">
+                {monthlySavings > 0 ? formatCurrency(monthlySavings) : "—"}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 px-5 py-4">
-            <TrendingUp className="h-7 w-7 text-blue-600 shrink-0" />
-            <div>
-              <p className="text-xs text-muted-foreground">Dans 1 an, j&apos;aurai environ</p>
-              <p className="text-xl font-black text-blue-700 dark:text-blue-400">
+          <div className="relative overflow-hidden flex items-center gap-4 rounded-2xl bg-blue-50 dark:bg-blue-950/40 px-5 py-5 shadow-sm">
+            <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-blue-400 to-blue-500 rounded-t-2xl" />
+            <div className="h-12 w-12 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
+              <TrendingUp className="h-6 w-6 text-blue-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium text-muted-foreground">Dans 1 an, j&apos;aurai environ</p>
+              <p className="text-2xl font-black text-blue-700 dark:text-blue-400 leading-tight truncate">
                 {projectedValue > 0 ? formatCurrency(projectedValue) : "—"}
               </p>
             </div>
@@ -672,15 +772,47 @@ export default function DashboardPage() {
       {/* Quick Actions — always visible after KPI cards */}
       <QuickActionsCard />
 
-      {/* Simple mode: show checklist widget prominently */}
-      {isSimple && <ChecklistWidget data={data} />}
+      {/* Simple mode: show checklist widget prominently — hidden once all steps done */}
+      {isSimple && !checklistDone && <ChecklistWidget data={data} />}
 
       {/* Net Worth Chart — hidden in simple mode */}
-      {!isSimple && <NetWorthChart snapshots={data.snapshots} />}
+      {!isSimple && (
+        <ErrorBoundary>
+          {loadingSecondary ? <Skeleton className="h-[260px] w-full" /> : <NetWorthChart snapshots={data.snapshots} />}
+        </ErrorBoundary>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
+        {/* Secondary loading skeletons */}
+        {loadingSecondary && (
+          <>
+            <Skeleton className="lg:col-span-2 h-[400px] w-full" />
+            <Skeleton className="h-[400px] w-full" />
+          </>
+        )}
+
+        {!loadingSecondary && <>
+        {/* Simple mode: empty portfolio CTA */}
+        {isSimple && !data.selectedPortfolio && (
+          <Card className="lg:col-span-2 border-dashed border-2 flex items-center justify-center p-8 text-center bg-muted/10">
+            <div>
+              <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <PieChart className="h-7 w-7 text-primary" />
+              </div>
+              <h3 className="font-bold mb-1">Découvrez votre portefeuille idéal</h3>
+              <p className="text-sm text-muted-foreground mb-4 max-w-xs mx-auto">
+                En 5 minutes, obtenez une allocation personnalisée en ETFs canadiens.
+              </p>
+              <Link href="/portfolio">
+                <Button>Voir les portefeuilles <ArrowRight className="h-4 w-4 ml-1" /></Button>
+              </Link>
+            </div>
+          </Card>
+        )}
+
         {/* Portfolio allocation + metrics row */}
         {data.selectedPortfolio && (
+          <ErrorBoundary>
           <Card className="lg:col-span-2">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -698,6 +830,17 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <AllocationChart allocations={data.selectedPortfolio.allocations} />
+
+              {/* Simple mode: 1-sentence portfolio summary */}
+              {isSimple && (
+                <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
+                  Votre portefeuille est composé d&apos;environ{" "}
+                  <strong>{actionsWeight}% d&apos;actions</strong> et{" "}
+                  <strong>{obligationsWeight}% d&apos;obligations</strong> —{" "}
+                  adapté à votre profil{" "}
+                  <strong>{riskProfile?.label?.toLowerCase() || "équilibré"}</strong>.
+                </p>
+              )}
 
               {/* Portfolio metrics: expected return, volatility, Sharpe, MER — hidden in simple mode */}
               {!isSimple && (
@@ -763,9 +906,11 @@ export default function DashboardPage() {
               })()}
             </CardContent>
           </Card>
+          </ErrorBoundary>
         )}
 
         {/* Goals with days-remaining badges */}
+        <ErrorBoundary>
         <Card className="flex flex-col">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -847,6 +992,8 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        </ErrorBoundary>
+        </>}
       </div>
 
       {/* Strategic Insights Row — 3-column layout */}
@@ -901,7 +1048,7 @@ export default function DashboardPage() {
         )}
 
         {/* Col 2: AI Insights Panel */}
-        <AiInsightsPanel />
+        <ErrorBoundary><AiInsightsPanel /></ErrorBoundary>
 
         {/* Col 3: AI Recommendations */}
         <Card className="flex flex-col">
@@ -932,12 +1079,14 @@ export default function DashboardPage() {
         {/* Row 2: Activity Timeline + Checklist in advanced mode */}
         <div className="lg:col-span-3 grid gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <ActivityTimeline
-              goals={data.goals}
-              chatMessages={data.chatMessages}
-              portfolios={data.selectedPortfolio ? [data.selectedPortfolio] : []}
-              profileUpdated={data.profile?.updated_at}
-            />
+            <ErrorBoundary>
+              <ActivityTimeline
+                goals={data.goals}
+                chatMessages={data.chatMessages}
+                portfolios={data.selectedPortfolio ? [data.selectedPortfolio] : []}
+                profileUpdated={data.profile?.updated_at}
+              />
+            </ErrorBoundary>
           </div>
           <ChecklistWidget data={data} />
         </div>
