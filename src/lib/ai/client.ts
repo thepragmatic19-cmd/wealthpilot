@@ -1,7 +1,9 @@
 import Groq from "groq-sdk";
 
 // ============================================================
-// AI Provider: Groq (Llama 3.3 70B - High Authority)
+// AI Provider: Groq
+// Primary: Llama 3.3 70B (qualité CFA-grade)
+// Fallback: Llama 3.1 8B Instant (haute vélocité, sans limite TPM)
 // ============================================================
 
 const groq = new Groq({
@@ -9,6 +11,7 @@ const groq = new Groq({
 });
 
 export const AI_MODEL = "llama-3.3-70b-versatile";
+export const AI_MODEL_FAST = "llama-3.1-8b-instant"; // Fallback si 429 TPM
 
 // ============================================================
 // Unified AI Interface
@@ -29,18 +32,29 @@ export async function generateAIResponse(options: {
 }): Promise<AIResponse> {
   const { systemPrompt, userMessage, maxTokens = 2048, temperature = 0.7 } = options;
 
-  const response = await groq.chat.completions.create({
-    model: AI_MODEL,
-    max_tokens: maxTokens,
-    temperature,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userMessage },
-    ],
-  });
-
-  const text = response.choices[0]?.message?.content || "";
-  return { text };
+  // Try primary model first, fallback to fast model on rate limit
+  for (const model of [AI_MODEL, AI_MODEL_FAST]) {
+    try {
+      const response = await groq.chat.completions.create({
+        model,
+        max_tokens: maxTokens,
+        temperature,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
+      });
+      const text = response.choices[0]?.message?.content || "";
+      return { text };
+    } catch (error: any) {
+      if (error?.status === 429 && model === AI_MODEL) {
+        console.warn("[AI] Groq 429 sur modèle primaire, bascule sur modèle rapide...");
+        continue; // retry with fallback
+      }
+      throw error;
+    }
+  }
+  return { text: "" };
 }
 
 /**
@@ -62,15 +76,26 @@ export async function generateChatResponse(options: {
       ...messages,
     ];
 
-  const response = await groq.chat.completions.create({
-    model: AI_MODEL,
-    max_tokens: maxTokens,
-    temperature,
-    messages: groqMessages,
-  });
-
-  const text = response.choices[0]?.message?.content || "";
-  return { text };
+  // Try primary model first, fallback to fast model on rate limit
+  for (const model of [AI_MODEL, AI_MODEL_FAST]) {
+    try {
+      const response = await groq.chat.completions.create({
+        model,
+        max_tokens: maxTokens,
+        temperature,
+        messages: groqMessages,
+      });
+      const text = response.choices[0]?.message?.content || "";
+      return { text };
+    } catch (error: any) {
+      if (error?.status === 429 && model === AI_MODEL) {
+        console.warn("[AI] Groq 429 sur modèle primaire, bascule sur modèle rapide...");
+        continue;
+      }
+      throw error;
+    }
+  }
+  return { text: "" };
 }
 
 /**
@@ -138,12 +163,13 @@ export async function chatWithTools(options: {
     ...messages,
   ];
 
-  const callGroq = async (msgs: any[], toolsList: any[]) => {
+  const callGroq = async (msgs: any[], toolsList: any[], modelOverride?: string) => {
+    const model = modelOverride || AI_MODEL;
     let attempts = 0;
     while (attempts < 3) {
       try {
         return await groq.chat.completions.create({
-          model: AI_MODEL,
+          model,
           max_tokens: maxTokens,
           temperature,
           messages: msgs,
@@ -154,7 +180,6 @@ export async function chatWithTools(options: {
       } catch (error: any) {
         if (error?.status === 429 && attempts < 2) {
           attempts++;
-          // Exponential backoff: 1.5s, 3s
           await new Promise(resolve => setTimeout(resolve, 1500 * attempts));
           continue;
         }
@@ -164,6 +189,11 @@ export async function chatWithTools(options: {
   };
 
   let response = await callGroq(groqMessages, groqTools);
+  // If primary model hits rate limit, fallback to fast model
+  if (!response) {
+    console.warn("[AI] callGroq primary failed, trying fast model fallback...");
+    response = await callGroq(groqMessages, groqTools, AI_MODEL_FAST);
+  }
   if (!response) throw new Error("Groq API: aucune réponse après 3 tentatives");
 
   let maxIterations = 10;

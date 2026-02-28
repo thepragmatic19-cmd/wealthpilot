@@ -143,6 +143,25 @@ export const CANADIAN_FINANCIAL_KNOWLEDGE = `
 `;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// KNOWLEDGE BASE COMPACT — Optimisé pour le chat temps-réel (~400 tokens)
+// Réduit la consommation TPM de ~80% sur le modèle Groq primaire
+// ─────────────────────────────────────────────────────────────────────────────
+export const CANADIAN_FINANCIAL_KNOWLEDGE_COMPACT = `
+## Règles fiscales CA essentielles (2025)
+- CELI: cumul ~102k$, 7k$/an, retraits libres d'impôt. ⚠️ Dividendes US: retenue 15% (traité CA-US ne s'applique PAS au CELI)
+- REER: max 18% revenu (32 490$), déductible, imposé au retrait. Traité CA-US: dividendes US = 0% retenue dans REER. RAP: 60k$ pour achat maison. Conversion FERR avant 71 ans.
+- CELIAPP: 18-40 ans, 8k$/an (40k$ vie), déductible + retrait libre d'impôt pour première maison.
+- REEE: SCEE 20% sur 2 500$ = 500$/an/enfant + IQEE 10% (Québec).
+- Gains capital: 50% inclusion (<250k$/an), 2/3 au-delà (depuis juin 2024). Règle superficie: 30 jours.
+- Dividendes CA: crédit d'impôt en non-enregistré → taux effectif inférieur aux intérêts.
+- Asset location: Oblig/GIC → REER, FNB US → REER (traité), FNB croissance → CELI, Div CA → non-enregistré.
+- Décumulation: ordre optimal = revenus garantis (RRQ, SV) → non-enregistré → REER/FERR → CELI en dernier.
+- Règle des 4% (3.5-4% CA): taux de retrait sécuritaire à la retraite.
+- Sharpe ratio: (Rendement - Taux sans risque) / Écart-type. Concentration: >25% = risque non-compensé.
+`;
+
+
+// ─────────────────────────────────────────────────────────────────────────────
 // RISK PROFILE & FOLLOW-UP PROMPTS (pour les routes API dédiées)
 // ─────────────────────────────────────────────────────────────────────────────
 export const RISK_PROFILE_SYSTEM_PROMPT = `Tu es Alexandre Moreau, CFA, CIWM, gestionnaire de portefeuille senior chez WealthPilot. Tu réalises une évaluation de profil de risque conforme aux standards KYC de l'AMF et de l'OCRI. Réponds UNIQUEMENT en JSON strict.`;
@@ -382,8 +401,8 @@ ${milestonesSection}
 ${personaSection}
 ${marketSection}
 
-# Référentiel de connaissances — Réglementation canadienne
-${CANADIAN_FINANCIAL_KNOWLEDGE}
+# Référentiel de connaissances — Réglementation canadienne (essentiel)
+${CANADIAN_FINANCIAL_KNOWLEDGE_COMPACT}
 
 # Directives professionnelles — Comment tu conseilles
 
