@@ -1,29 +1,31 @@
-import Groq from "groq-sdk";
+import OpenAI from "openai";
 
 // ============================================================
-// AI Provider: Groq
-// Primary: Llama 3.3 70B (qualité CFA-grade)
-// Fallback: Llama 3.1 8B Instant (haute vélocité, sans limite TPM)
+// AI Provider: Google Gemini 2.0 Flash
+// Via OpenAI-compatible endpoint — aucun changement dans les routes API
+// Limites: 1 500 req/jour, 32 768 TPM gratuit (vs 14 400 sur Groq)
 // ============================================================
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY!,
+const genAI = new OpenAI({
+  apiKey: process.env.GOOGLE_AI_API_KEY!,
+  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
 });
 
-export const AI_MODEL = "llama-3.3-70b-versatile";
-export const AI_MODEL_FAST = "llama-3.1-8b-instant"; // Fallback si 429 TPM
+export const AI_MODEL = "gemini-2.0-flash";
+export const AI_MODEL_FAST = "gemini-2.0-flash"; // même modèle — Gemini gère sa propre optimisation
 
 // ============================================================
-// Unified AI Interface
+// Types
 // ============================================================
 
-interface AIResponse {
+export interface AIResponse {
   text: string;
 }
 
-/**
- * Generate a response from the AI model (single prompt, no history).
- */
+// ============================================================
+// generateAIResponse — Réponse simple (insights, rapports, etc.)
+// ============================================================
+
 export async function generateAIResponse(options: {
   systemPrompt: string;
   userMessage: string;
@@ -32,34 +34,24 @@ export async function generateAIResponse(options: {
 }): Promise<AIResponse> {
   const { systemPrompt, userMessage, maxTokens = 2048, temperature = 0.7 } = options;
 
-  // Try primary model first, fallback to fast model on rate limit
-  for (const model of [AI_MODEL, AI_MODEL_FAST]) {
-    try {
-      const response = await groq.chat.completions.create({
-        model,
-        max_tokens: maxTokens,
-        temperature,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
-      });
-      const text = response.choices[0]?.message?.content || "";
-      return { text };
-    } catch (error: any) {
-      if (error?.status === 429 && model === AI_MODEL) {
-        console.warn("[AI] Groq 429 sur modèle primaire, bascule sur modèle rapide...");
-        continue; // retry with fallback
-      }
-      throw error;
-    }
-  }
-  return { text: "" };
+  const response = await genAI.chat.completions.create({
+    model: AI_MODEL,
+    max_tokens: maxTokens,
+    temperature,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
+    ],
+  });
+
+  const text = response.choices[0]?.message?.content || "";
+  return { text };
 }
 
-/**
- * Chat with conversation history.
- */
+// ============================================================
+// generateChatResponse — Chat avec historique (sans outils)
+// ============================================================
+
 export async function generateChatResponse(options: {
   systemPrompt: string;
   messages: Array<{ role: "user" | "assistant"; content: string }>;
@@ -76,125 +68,84 @@ export async function generateChatResponse(options: {
       ...messages,
     ];
 
-  // Try primary model first, fallback to fast model on rate limit
-  for (const model of [AI_MODEL, AI_MODEL_FAST]) {
-    try {
-      const response = await groq.chat.completions.create({
-        model,
-        max_tokens: maxTokens,
-        temperature,
-        messages: groqMessages,
-      });
-      const text = response.choices[0]?.message?.content || "";
-      return { text };
-    } catch (error: any) {
-      if (error?.status === 429 && model === AI_MODEL) {
-        console.warn("[AI] Groq 429 sur modèle primaire, bascule sur modèle rapide...");
-        continue;
-      }
-      throw error;
-    }
-  }
-  return { text: "" };
+  const response = await genAI.chat.completions.create({
+    model: AI_MODEL,
+    max_tokens: maxTokens,
+    temperature,
+    messages: groqMessages,
+  });
+
+  const text = response.choices[0]?.message?.content || "";
+  return { text };
 }
 
-/**
- * Stream a chat response from Groq.
- */
-export async function streamChatResponse(options: {
+// ============================================================
+// chatWithTools — Chat complet avec tool-calling + streaming final
+// ============================================================
+
+interface Tool {
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+}
+
+type ToolInput = Record<string, unknown>;
+
+export async function chatWithTools(options: {
   systemPrompt: string;
   messages: Array<{ role: "user" | "assistant"; content: string }>;
+  tools: Tool[];
+  executeTool: (name: string, args: ToolInput) => string;
   maxTokens?: number;
   temperature?: number;
-}) {
-  const { systemPrompt, messages, maxTokens = 2048, temperature = 0.7 } = options;
+  streamFinal?: boolean;
+  onToolCall?: (toolName: string) => void;
+}): Promise<any> {
+  const {
+    systemPrompt,
+    messages,
+    tools,
+    executeTool,
+    maxTokens = 2048,
+    temperature = 0.7,
+    streamFinal = false,
+    onToolCall,
+  } = options;
+
+  // Convert tools to OpenAI function calling format
+  const openAITools = tools.map((tool) => ({
+    type: "function" as const,
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.input_schema,
+    },
+  }));
 
   const groqMessages: Array<{
-    role: "system" | "user" | "assistant";
+    role: "system" | "user" | "assistant" | "tool";
     content: string;
+    tool_calls?: any[];
+    tool_call_id?: string;
+    name?: string;
   }> = [
       { role: "system", content: systemPrompt },
       ...messages,
     ];
 
-  return groq.chat.completions.create({
-    model: AI_MODEL,
-    max_tokens: maxTokens,
-    temperature,
-    messages: groqMessages,
-    stream: true,
-  });
-}
-
-/**
- * Chat with tool use (function calling) support.
- * Groq supports OpenAI-compatible tool calling.
- */
-export async function chatWithTools(options: {
-  systemPrompt: string;
-  messages: Array<{ role: "user" | "assistant"; content: string }>;
-  tools: Array<{
-    name: string;
-    description: string;
-    input_schema: Record<string, unknown>;
-  }>;
-  executeTool: (name: string, args: Record<string, unknown>) => string;
-  onToolCall?: (name: string) => void;
-  maxTokens?: number;
-  temperature?: number;
-  streamFinal?: boolean;
-}): Promise<AIResponse | any> {
-  const { systemPrompt, messages, tools, executeTool, onToolCall, maxTokens = 2048, temperature = 0.7, streamFinal = false } =
-    options;
-
-  // Convert tools to OpenAI function calling format
-  const groqTools = tools.map((t) => ({
-    type: "function" as const,
-    function: {
-      name: t.name,
-      description: t.description,
-      parameters: t.input_schema,
-    },
-  }));
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const groqMessages: any[] = [
-    { role: "system", content: systemPrompt },
-    ...messages,
-  ];
-
-  const callGroq = async (msgs: any[], toolsList: any[], modelOverride?: string) => {
-    const model = modelOverride || AI_MODEL;
-    let attempts = 0;
-    while (attempts < 3) {
-      try {
-        return await groq.chat.completions.create({
-          model,
-          max_tokens: maxTokens,
-          temperature,
-          messages: msgs,
-          tools: toolsList.length > 0 ? toolsList : undefined,
-          tool_choice: toolsList.length > 0 ? "auto" : undefined,
-          stream: false,
-        });
-      } catch (error: any) {
-        if (error?.status === 429 && attempts < 2) {
-          attempts++;
-          await new Promise(resolve => setTimeout(resolve, 1500 * attempts));
-          continue;
-        }
-        throw error;
-      }
-    }
+  const callAI = async (msgs: any[], toolsList: any[]) => {
+    return await genAI.chat.completions.create({
+      model: AI_MODEL,
+      max_tokens: maxTokens,
+      temperature,
+      messages: msgs,
+      tools: toolsList.length > 0 ? toolsList : undefined,
+      tool_choice: toolsList.length > 0 ? "auto" : undefined,
+      stream: false,
+    });
   };
 
-  let response = await callGroq(groqMessages, groqTools);
-  // If primary model hits rate limit, fallback to fast model
-  if (!response) {
-    console.warn("[AI] callGroq primary failed, trying fast model fallback...");
-    response = await callGroq(groqMessages, groqTools, AI_MODEL_FAST);
-  }
-  if (!response) throw new Error("Groq API: aucune réponse après 3 tentatives");
+  let response = await callAI(groqMessages, openAITools);
 
   let maxIterations = 10;
 
@@ -211,7 +162,7 @@ export async function chatWithTools(options: {
     maxIterations--;
 
     // Add the assistant message with tool calls
-    groqMessages.push(choice.message);
+    groqMessages.push(choice.message as any);
 
     // Execute each tool call and add results
     for (const toolCall of choice.message.tool_calls) {
@@ -234,29 +185,18 @@ export async function chatWithTools(options: {
     }
 
     // Call again with tool results
-    response = await callGroq(groqMessages, groqTools);
-    if (!response) throw new Error("Groq API: aucune réponse après 3 tentatives");
+    response = await callAI(groqMessages, openAITools);
   }
 
   if (streamFinal) {
-    // Try primary model, fall back to fast model on 429
-    for (const model of [AI_MODEL, AI_MODEL_FAST]) {
-      try {
-        return await groq.chat.completions.create({
-          model,
-          max_tokens: maxTokens,
-          temperature,
-          messages: groqMessages,
-          stream: true,
-        });
-      } catch (error: any) {
-        if (error?.status === 429 && model === AI_MODEL) {
-          console.warn("[AI] Stream 429 sur modèle primaire, bascule sur modèle rapide...");
-          continue; // retry with fast model
-        }
-        throw error;
-      }
-    }
+    // Return streaming response
+    return await genAI.chat.completions.create({
+      model: AI_MODEL,
+      max_tokens: maxTokens,
+      temperature,
+      messages: groqMessages,
+      stream: true,
+    });
   }
 
   const text = response.choices[0]?.message?.content || "";
