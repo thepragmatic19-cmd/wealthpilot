@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { chatWithTools } from "@/lib/ai/client";
 import { getChatSystemPrompt } from "@/lib/ai/prompts";
 import { AI_TOOLS, executeTool } from "@/lib/ai/tools";
+import { buildClientPersonaContext, detectClientMilestones } from "@/lib/ai/persona";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { getChatLimit } from "@/lib/subscription";
 import type { SubscriptionPlan } from "@/types/database";
@@ -178,7 +179,7 @@ export async function POST(request: NextRequest) {
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
-        .limit(10), // Limit history to save tokens
+        .limit(20), // Increased from 10 to 20 for better conversation continuity
       getMarketDataContext(),
     ]);
 
@@ -192,7 +193,7 @@ export async function POST(request: NextRequest) {
     // Build system prompt with full client context
     const portfolios = (selectedPortfolio as any[] || []);
     const activePortfolio = portfolios.find(p => p.is_selected) || portfolios[0];
-    
+
     // Process all portfolios for comparison
     const allPortfoliosContext = portfolios.map(p => ({
       name: p.name,
@@ -235,6 +236,35 @@ export async function POST(request: NextRequest) {
       };
     });
 
+    // Build persona context for CFA-grade personalization
+    const personaData = {
+      age: clientInfo?.age ?? null,
+      investmentExperience: clientInfo?.investment_experience ?? null,
+      riskScore: riskAssessment?.risk_score ?? 5,
+      riskProfile: riskAssessment?.risk_profile ?? "modéré",
+      hasDependents: (clientInfo?.dependents ?? 0) > 0,
+      hasReee: clientInfo?.has_reee ?? false,
+      annualIncome: clientInfo?.annual_income ?? null,
+      totalDebts: clientInfo?.total_debts ?? null,
+      totalAssets: clientInfo?.total_assets ?? null,
+      monthlySavings: clientInfo?.monthly_savings ?? null,
+      monthlyExpenses: clientInfo?.monthly_expenses ?? null,
+      celiBalance: clientInfo?.celi_balance ?? null,
+      reerBalance: clientInfo?.reer_balance ?? null,
+    };
+
+    const persona = buildClientPersonaContext(personaData);
+    const milestones = detectClientMilestones({
+      ...personaData,
+      hasCeliapp: clientInfo?.has_celiapp ?? false,
+      goals: (goals ?? []).map((g: any) => ({
+        label: g.label as string,
+        targetAmount: g.target_amount as number,
+        currentAmount: g.current_amount as number,
+        targetDate: g.target_date as string | null,
+      })),
+    });
+
     const systemPrompt = getChatSystemPrompt({
       clientName: profile?.full_name || "Client",
       clientAge: clientInfo?.age ?? null,
@@ -260,21 +290,21 @@ export async function POST(request: NextRequest) {
       riskKeyFactors: (riskAssessment?.key_factors as string[] | null) ?? null,
       portfolio: activePortfolio
         ? {
-            name: activePortfolio.name,
-            type: activePortfolio.type,
-            expectedReturn: activePortfolio.expected_return,
-            volatility: activePortfolio.volatility,
-            sharpeRatio: (activePortfolio as any).sharpe_ratio ?? null,
-            maxDrawdown: (activePortfolio as any).max_drawdown ?? null,
-            totalMer: (activePortfolio as any).total_mer ?? null,
-            taxStrategy: (activePortfolio as any).tax_strategy ?? null,
-            rationale: (activePortfolio as any).ai_rationale ?? null,
-            allocations,
-            // Inject pre-calculated metrics
-            metrics: portfolioAnalysis,
-            // Include all portfolios for comparison
-            allPortfolios: allPortfoliosContext,
-          }
+          name: activePortfolio.name,
+          type: activePortfolio.type,
+          expectedReturn: activePortfolio.expected_return,
+          volatility: activePortfolio.volatility,
+          sharpeRatio: (activePortfolio as any).sharpe_ratio ?? null,
+          maxDrawdown: (activePortfolio as any).max_drawdown ?? null,
+          totalMer: (activePortfolio as any).total_mer ?? null,
+          taxStrategy: (activePortfolio as any).tax_strategy ?? null,
+          rationale: (activePortfolio as any).ai_rationale ?? null,
+          allocations,
+          // Inject pre-calculated metrics
+          metrics: portfolioAnalysis,
+          // Include all portfolios for comparison
+          allPortfolios: allPortfoliosContext,
+        }
         : null,
       goals: (goals ?? []).map((g: any, i: number) => ({
         type: g.type as string,
@@ -286,6 +316,8 @@ export async function POST(request: NextRequest) {
         analysis: goalAnalysis[i],
       })),
       marketData: marketData || undefined,
+      persona,
+      milestones,
     });
 
     // Build conversation history
@@ -347,10 +379,10 @@ export async function POST(request: NextRequest) {
           console.error("Chat stream error:", error);
           if (!closed) {
             try {
-              const errorMessage = error?.status === 429 
+              const errorMessage = error?.status === 429
                 ? "Limite de messages atteinte pour ce modèle. Réessayez dans une minute."
                 : `Désolé, j'ai rencontré une difficulté technique : ${error?.message || "Erreur inconnue"}`;
-                
+
               controller.enqueue(
                 encoder.encode(
                   `data: ${JSON.stringify({

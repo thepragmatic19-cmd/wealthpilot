@@ -164,6 +164,7 @@ export async function chatWithTools(options: {
   };
 
   let response = await callGroq(groqMessages, groqTools);
+  if (!response) throw new Error("Groq API: aucune réponse après 3 tentatives");
 
   let maxIterations = 10;
 
@@ -185,14 +186,14 @@ export async function chatWithTools(options: {
     // Execute each tool call and add results
     for (const toolCall of choice.message.tool_calls) {
       if (onToolCall) onToolCall(toolCall.function.name);
-      
+
       let args = {};
       try {
         args = JSON.parse(toolCall.function.arguments || "{}");
       } catch (e) {
         console.warn(`Failed to parse tool arguments for ${toolCall.function.name}:`, toolCall.function.arguments);
       }
-      
+
       const result = executeTool(toolCall.function.name, args);
 
       groqMessages.push({
@@ -203,9 +204,8 @@ export async function chatWithTools(options: {
     }
 
     // Call again with tool results
-    // If it's the last iteration or we expect no more tools, we could stream here, 
-    // but simplified: we only stream the VERY final response after the loop.
     response = await callGroq(groqMessages, groqTools);
+    if (!response) throw new Error("Groq API: aucune réponse après 3 tentatives");
   }
 
   if (streamFinal) {

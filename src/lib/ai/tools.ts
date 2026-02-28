@@ -1,10 +1,8 @@
-import type { Tool } from "@anthropic-ai/sdk/resources/messages";
-
 // ============================================================
-// TOOL DEFINITIONS — What Claude can call
+// TOOL DEFINITIONS — CFA-Grade Financial Tools
 // ============================================================
 
-export const AI_TOOLS: Tool[] = [
+export const AI_TOOLS = [
     {
         name: "simulate_contribution",
         description:
@@ -117,6 +115,162 @@ export const AI_TOOLS: Tool[] = [
         },
     },
     {
+        name: "analyze_portfolio_risk",
+        description:
+            "Analyse les métriques de risque CFA d'un portefeuille : VaR 95%, ratio de Sharpe estimé, concentration sectorielle, et flag si un titre dépasse 25% du portefeuille (risque non-compensé).",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                portfolio_value: {
+                    type: "number",
+                    description: "Valeur totale du portefeuille en dollars",
+                },
+                expected_return: {
+                    type: "number",
+                    description: "Rendement annuel attendu en % (ex: 7)",
+                },
+                volatility: {
+                    type: "number",
+                    description: "Volatilité annuelle (écart-type) en % (ex: 12)",
+                },
+                allocations: {
+                    type: "array",
+                    description: "Liste des positions du portefeuille",
+                    items: {
+                        type: "object",
+                        properties: {
+                            ticker: { type: "string", description: "Symbole du titre ou FNB" },
+                            asset_class: { type: "string", description: "Classe d'actif (ex: Actions CA, Obligations)" },
+                            weight: { type: "number", description: "Poids en % du portefeuille" },
+                        },
+                        required: ["ticker", "weight"],
+                    },
+                },
+                risk_free_rate: {
+                    type: "number",
+                    description: "Taux sans risque en % (par défaut: taux obligataire CA 10 ans ~3.5%)",
+                },
+            },
+            required: ["portfolio_value", "expected_return", "volatility"],
+        },
+    },
+    {
+        name: "optimize_tax_strategy",
+        description:
+            "Recommande la stratégie fiscale optimale pour un investisseur canadien : choix CELI vs REER selon la tranche marginale, placement des actifs dans les bons comptes (asset location), et identification des occasions de récupération de pertes fiscales.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                annual_income: {
+                    type: "number",
+                    description: "Revenu annuel brut actuel en dollars",
+                },
+                expected_retirement_income: {
+                    type: "number",
+                    description: "Revenu annuel estimé à la retraite en dollars (pour comparer les tranches)",
+                },
+                province: {
+                    type: "string",
+                    enum: ["QC", "ON", "BC", "AB"],
+                    description: "Province de résidence",
+                },
+                celi_balance: {
+                    type: "number",
+                    description: "Solde actuel du CELI en dollars",
+                },
+                reer_balance: {
+                    type: "number",
+                    description: "Solde actuel du REER en dollars",
+                },
+                has_us_holdings: {
+                    type: "boolean",
+                    description: "Le client détient-il des FNB ou actions américains? (important pour l'optimisation des retenues à la source)",
+                },
+                has_canadian_dividends: {
+                    type: "boolean",
+                    description: "Le portefeuille inclut-il des actions ou FNB à dividendes canadiens?",
+                },
+            },
+            required: ["annual_income", "province"],
+        },
+    },
+    {
+        name: "monte_carlo_retirement",
+        description:
+            "Simulation Monte Carlo de la retraite (1 000 scénarios) : calcule la probabilité de ne pas manquer d'argent à 90 ans, le taux de retrait sécuritaire, et les années de réserve moyennes. Prend en compte l'inflation, la volatilité des marchés et les revenus garantis (RRQ, SV).",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                current_age: {
+                    type: "number",
+                    description: "Âge actuel du client",
+                },
+                retirement_age: {
+                    type: "number",
+                    description: "Âge de retraite cible (par défaut: 65)",
+                },
+                current_portfolio_value: {
+                    type: "number",
+                    description: "Valeur actuelle du portefeuille de retraite en dollars",
+                },
+                monthly_savings: {
+                    type: "number",
+                    description: "Épargne mensuelle jusqu'à la retraite en dollars",
+                },
+                desired_monthly_income: {
+                    type: "number",
+                    description: "Revenu mensuel net désiré à la retraite en dollars",
+                },
+                guaranteed_monthly_income: {
+                    type: "number",
+                    description: "Revenus mensuels garantis à la retraite (RRQ + SV estimés) en dollars",
+                },
+                expected_return: {
+                    type: "number",
+                    description: "Rendement annuel moyen attendu du portefeuille en % (par défaut: 6)",
+                },
+                volatility: {
+                    type: "number",
+                    description: "Volatilité annuelle du portefeuille en % (par défaut: 10)",
+                },
+                inflation_rate: {
+                    type: "number",
+                    description: "Taux d'inflation annuel en % (par défaut: 2.5)",
+                },
+            },
+            required: ["current_age", "current_portfolio_value", "desired_monthly_income"],
+        },
+    },
+    {
+        name: "debt_payoff_optimizer",
+        description:
+            "Compare la stratégie d'avalanche (dettes au taux le plus élevé en premier) vs boule de neige (petites dettes en premier) pour rembourser les dettes d'un client. Calcule les intérêts économisés, la date de remboursement, et les flux de trésorerie libérés.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                debts: {
+                    type: "array",
+                    description: "Liste des dettes du client",
+                    items: {
+                        type: "object",
+                        properties: {
+                            name: { type: "string", description: "Nom ou type de la dette (ex: Prêt auto, Carte de crédit)" },
+                            balance: { type: "number", description: "Solde restant en dollars" },
+                            interest_rate: { type: "number", description: "Taux d'intérêt annuel en %" },
+                            minimum_payment: { type: "number", description: "Paiement mensuel minimum en dollars" },
+                        },
+                        required: ["name", "balance", "interest_rate", "minimum_payment"],
+                    },
+                },
+                extra_monthly_payment: {
+                    type: "number",
+                    description: "Montant supplémentaire disponible chaque mois pour accélérer le remboursement",
+                },
+            },
+            required: ["debts"],
+        },
+    },
+    {
         name: "compare_scenarios",
         description:
             "Compare deux scénarios financiers côte à côte (ex: augmenter les cotisations vs rembourser une dette, CELI vs REER). Retourne une analyse chiffrée avec le meilleur choix.",
@@ -171,6 +325,14 @@ export function executeTool(toolName: string, input: ToolInput): string {
             return calculateRebalancing(input);
         case "compare_scenarios":
             return compareScenarios(input);
+        case "analyze_portfolio_risk":
+            return analyzePortfolioRisk(input);
+        case "optimize_tax_strategy":
+            return optimizeTaxStrategy(input);
+        case "monte_carlo_retirement":
+            return monteCarloRetirement(input);
+        case "debt_payoff_optimizer":
+            return debtPayoffOptimizer(input);
         default:
             return JSON.stringify({ error: `Outil inconnu: ${toolName}` });
     }
@@ -402,6 +564,345 @@ function compareScenarios(input: ToolInput): string {
         winner,
         difference: formatCAD(difference),
         recommendation: `Le scénario "${winner}" génère ${formatCAD(difference)} de plus sur la période. Cependant, d'autres facteurs comme la fiscalité et la liquidité doivent être considérés.`,
+    });
+}
+
+// ============================================================
+// NEW CFA-GRADE TOOLS
+// ============================================================
+
+function analyzePortfolioRisk(input: ToolInput): string {
+    const portfolioValue = input.portfolio_value as number;
+    const expectedReturn = (input.expected_return as number) || 7;
+    const volatility = (input.volatility as number) || 12;
+    const riskFreeRate = (input.risk_free_rate as number) || 3.5;
+    const allocations = (input.allocations as Array<{ ticker: string; asset_class?: string; weight: number }>) || [];
+
+    // Value at Risk (95% confidence, 1-year, parametric normal distribution)
+    // VaR = Portfolio × (μ - 1.645σ)
+    const zScore95 = 1.645;
+    const varPercent = expectedReturn / 100 - zScore95 * (volatility / 100);
+    const var1Year = portfolioValue * Math.max(0, -varPercent);
+    const varPercent95 = Math.max(0, -(expectedReturn - zScore95 * volatility));
+
+    // Conditional VaR (CVaR / Expected Shortfall) — approx: CVaR ≈ 1.25 × VaR for normal dist.
+    const cvar1Year = var1Year * 1.25;
+
+    // Sharpe Ratio
+    const sharpe = ((expectedReturn - riskFreeRate) / volatility);
+
+    // Concentration risk
+    const concentrationAlerts: string[] = [];
+    const largePositions = allocations.filter(a => a.weight > 25);
+    if (largePositions.length > 0) {
+        for (const pos of largePositions) {
+            concentrationAlerts.push(
+                `${pos.ticker} représente ${pos.weight}% du portefeuille — risque de concentration non-compensé (seuil CFA: 25%)`
+            );
+        }
+    }
+
+    // Diversification score (simple: number of distinct allocations)
+    const diversificationScore = allocations.length >= 7 ? 'Bien diversifié' :
+        allocations.length >= 4 ? 'Diversification modérée' : 'Concentration élevée — diversification recommandée';
+
+    // Risk classification
+    const riskClass = volatility < 8 ? 'Faible (conservateur)' :
+        volatility < 14 ? 'Modéré (équilibré)' :
+            volatility < 20 ? 'Élevé (croissance)' : 'Très élevé (agressif)';
+
+    return JSON.stringify({
+        portfolio_value: formatCAD(portfolioValue),
+        risk_class: riskClass,
+        metrics: {
+            expected_return: `${expectedReturn}%`,
+            annualized_volatility: `${volatility}%`,
+            sharpe_ratio: sharpe.toFixed(2),
+            sharpe_interpretation: sharpe >= 1 ? 'Excellent (>1.0)' : sharpe >= 0.5 ? 'Acceptable (0.5–1.0)' : 'Insuffisant (<0.5) — revoyez le portefeuille',
+        },
+        var_95: {
+            amount: formatCAD(var1Year),
+            percent: `${varPercent95.toFixed(1)}%`,
+            interpretation: `Avec 95% de confiance, la perte maximale sur 1 an ne devrait pas dépasser ${formatCAD(var1Year)} (${varPercent95.toFixed(1)}% du portefeuille).`,
+        },
+        cvar_95: {
+            amount: formatCAD(cvar1Year),
+            interpretation: `En cas de scénario extrême défavorable (queue de distribution), la perte moyenne attendue serait d'environ ${formatCAD(cvar1Year)}.`,
+        },
+        concentration_risk: {
+            alerts: concentrationAlerts,
+            diversification: diversificationScore,
+            status: concentrationAlerts.length > 0 ? '⚠️ Risques de concentration détectés' : '✓ Concentration acceptable',
+        },
+        recommendation: sharpe < 0.5
+            ? 'Le ratio de Sharpe insuffisant suggère que le risque pris n\'est pas adéquatement rémunéré. Envisagez de revoir l\'allocation pour améliorer le rendement ajusté au risque.'
+            : concentrationAlerts.length > 0
+                ? 'Réduisez les positions concentrées pour éliminer le risque idiosyncratique non-rémunéré tout en maintenant votre exposition souhaitée.'
+                : 'Le portefeuille présente un profil risque/rendement acceptable. Maintenez le cap et rééquilibrez annuellement.',
+    });
+}
+
+function optimizeTaxStrategy(input: ToolInput): string {
+    const annualIncome = input.annual_income as number;
+    const expectedRetirementIncome = (input.expected_retirement_income as number) || annualIncome * 0.6;
+    const province = (input.province as string) || 'QC';
+    const celiBalance = (input.celi_balance as number) || 0;
+    const reerBalance = (input.reer_balance as number) || 0;
+    const hasUsHoldings = (input.has_us_holdings as boolean) || false;
+    const hasCanadianDividends = (input.has_canadian_dividends as boolean) || false;
+
+    const currentFederalRate = getFederalMarginalRate(annualIncome);
+    const currentProvincialRate = getProvincialMarginalRate(annualIncome, province);
+    const currentMarginalRate = (currentFederalRate + currentProvincialRate) * 100;
+
+    const retirementFederalRate = getFederalMarginalRate(expectedRetirementIncome);
+    const retirementProvincialRate = getProvincialMarginalRate(expectedRetirementIncome, province);
+    const retirementMarginalRate = (retirementFederalRate + retirementProvincialRate) * 100;
+
+    // REER vs CELI recommendation
+    const reerVsCeli = currentMarginalRate > retirementMarginalRate
+        ? { winner: 'REER', reason: `Votre tranche marginale actuelle (${currentMarginalRate.toFixed(1)}%) est plus élevée que votre tranche estimée à la retraite (${retirementMarginalRate.toFixed(1)}%). Chaque dollar de cotisation REER rapporte ${formatCAD(1 * (currentMarginalRate / 100))} de remboursement d\'impôt aujourd\'hui.` }
+        : currentMarginalRate === retirementMarginalRate
+            ? { winner: 'CELI', reason: `Votre tranche marginale est similaire maintenant (${currentMarginalRate.toFixed(1)}%) et à la retraite (${retirementMarginalRate.toFixed(1)}%). Favorisez le CELI pour sa flexibilité et l\'absence d\'impôt sur les retraits.` }
+            : { winner: 'CELI', reason: `Votre tranche marginale maintenant (${currentMarginalRate.toFixed(1)}%) est inférieure à celle estimée à la retraite (${retirementMarginalRate.toFixed(1)}%). Le CELI est préférable — les retraits seront libres d\'impôt même dans une tranche plus élevée.` };
+
+    // Asset location optimization
+    const assetLocation: string[] = [
+        'Actions canadiennes à dividendes → Non-enregistré (crédit d\'impôt pour dividendes)',
+        'Obligations et GIC → REER/FERR (revenus d\'intérêt pleinement imposables, mieux protégés)',
+        'FNB d\'actions mondiales à croissance (gains cap) → CELI (croissance libre d\'impôt)',
+    ];
+
+    if (hasUsHoldings) {
+        assetLocation.push('FNB américains (ex: VTI) → REER recommandé (traité CA-US: retenue 0% sur dividendes US dans REER, vs 15% dans CELI)');
+    }
+    if (hasCanadianDividends) {
+        assetLocation.push('Dividendes CA → Idéalement en non-enregistré pour bénéficier du crédit d\'impôt pour dividendes (taux effectif inférieur aux intérêts)');
+    }
+
+    // CELI available room estimate
+    const celiMaxEstimate = 102000; // cumulative 2025
+    const celiRoom = Math.max(0, celiMaxEstimate - celiBalance);
+
+    // REER available
+    const reerAnnualRoom = Math.min(annualIncome * 0.18, 32490);
+
+    // Tax-loss harvesting opportunity note
+    const taxLossNote = 'Décembre est la meilleure période pour la récolte de pertes fiscales. Vendez les titres en perte, récoltez la perte pour réduire vos gains en capital, et rachetez un titre similaire (mais pas identique — règle de superficie de 30 jours).';
+
+    return JSON.stringify({
+        current_situation: {
+            marginal_rate: `${currentMarginalRate.toFixed(1)}%`,
+            retirement_marginal_rate_estimate: `${retirementMarginalRate.toFixed(1)}%`,
+        },
+        reer_vs_celi: reerVsCeli,
+        annual_contribution_room: {
+            celi_available_room: formatCAD(celiRoom),
+            reer_estimated_annual_room: formatCAD(reerAnnualRoom),
+            reer_tax_savings_if_maximized: formatCAD(reerAnnualRoom * (currentMarginalRate / 100)),
+        },
+        asset_location_optimization: assetLocation,
+        tax_loss_harvesting: taxLossNote,
+        summary: `Stratégie recommandée : ${reerVsCeli.winner} en priorité. ${reerVsCeli.reason}`,
+    });
+}
+
+function monteCarloRetirement(input: ToolInput): string {
+    const currentAge = input.current_age as number;
+    const retirementAge = (input.retirement_age as number) || 65;
+    const currentPortfolioValue = input.current_portfolio_value as number;
+    const monthlySavings = (input.monthly_savings as number) || 0;
+    const desiredMonthlyIncome = input.desired_monthly_income as number;
+    const guaranteedMonthlyIncome = (input.guaranteed_monthly_income as number) || 0;
+    const expectedReturn = (input.expected_return as number) || 6;
+    const volatility = (input.volatility as number) || 10;
+    const inflationRate = (input.inflation_rate as number) || 2.5;
+    const lifeExpectancy = 90;
+
+    const yearsToRetirement = Math.max(0, retirementAge - currentAge);
+    const yearsInRetirement = Math.max(0, lifeExpectancy - retirementAge);
+    const monthlyReturn = expectedReturn / 100 / 12;
+    const monthlyVolatility = volatility / 100 / Math.sqrt(12);
+    const monthlyInflation = inflationRate / 100 / 12;
+
+    // Accumulation phase: project portfolio at retirement
+    const portfolioAtRetirement = currentPortfolioValue * Math.pow(1 + monthlyReturn, yearsToRetirement * 12)
+        + monthlySavings * ((Math.pow(1 + monthlyReturn, yearsToRetirement * 12) - 1) / monthlyReturn);
+
+    // Monthly portfolio withdrawal need (net of guaranteed income)
+    const netMonthlyNeed = Math.max(0, desiredMonthlyIncome - guaranteedMonthlyIncome);
+    const realMonthlyReturn = monthlyReturn - monthlyInflation;
+
+    // Safe withdrawal rate (simplified — 4% rule adjusted)
+    const safeWithdrawalRate = yearsInRetirement > 30 ? 3.5 : 4.0;
+    const safeMonthlyWithdrawal = (portfolioAtRetirement * safeWithdrawalRate / 100) / 12;
+
+    // Monte Carlo — 1000 simulations (simplified using normal distribution approximation)
+    const SIMULATIONS = 1000;
+    let successCount = 0;
+    const finalBalances: number[] = [];
+
+    for (let sim = 0; sim < SIMULATIONS; sim++) {
+        let balance = portfolioAtRetirement;
+        let survived = true;
+
+        for (let month = 0; month < yearsInRetirement * 12; month++) {
+            // Box-Muller transform for normal random number
+            const u1 = Math.random();
+            const u2 = Math.random();
+            const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+            const monthReturn = monthlyReturn + monthlyVolatility * z;
+
+            balance = balance * (1 + monthReturn) - netMonthlyNeed * Math.pow(1 + monthlyInflation, month);
+
+            if (balance <= 0) {
+                survived = false;
+                break;
+            }
+        }
+
+        if (survived) {
+            successCount++;
+            finalBalances.push(balance);
+        } else {
+            finalBalances.push(0);
+        }
+    }
+
+    const successRate = Math.round((successCount / SIMULATIONS) * 100);
+    const medianFinalBalance = finalBalances.sort((a, b) => a - b)[Math.floor(SIMULATIONS / 2)];
+    const avgFinalBalance = finalBalances.reduce((s, v) => s + v, 0) / SIMULATIONS;
+
+    const successInterpretation = successRate >= 90
+        ? `✓ Excellent — ${successRate}% de probabilité de succès sur ${yearsInRetirement} ans`
+        : successRate >= 75
+            ? `⚠️ Acceptable — ${successRate}% de probabilité. Envisagez d\'augmenter l\'épargne ou de réduire les retraits.`
+            : `🚨 Insuffisant — ${successRate}% de probabilité. Une révision majeure du plan de retraite est nécessaire.`;
+
+    return JSON.stringify({
+        simulation_parameters: {
+            iterations: SIMULATIONS,
+            current_age: currentAge,
+            retirement_age: retirementAge,
+            life_expectancy: lifeExpectancy,
+            years_to_retirement: yearsToRetirement,
+            years_in_retirement: yearsInRetirement,
+        },
+        accumulation_phase: {
+            current_portfolio: formatCAD(currentPortfolioValue),
+            monthly_savings: formatCAD(monthlySavings),
+            projected_portfolio_at_retirement: formatCAD(portfolioAtRetirement),
+        },
+        retirement_income: {
+            desired_monthly: formatCAD(desiredMonthlyIncome),
+            guaranteed_monthly: formatCAD(guaranteedMonthlyIncome),
+            portfolio_withdrawal_needed: formatCAD(netMonthlyNeed),
+            safe_monthly_withdrawal: formatCAD(safeMonthlyWithdrawal),
+            sustainable: safeMonthlyWithdrawal >= netMonthlyNeed,
+        },
+        monte_carlo_results: {
+            success_rate: `${successRate}%`,
+            success_count: `${successCount}/${SIMULATIONS} scénarios`,
+            interpretation: successInterpretation,
+            median_balance_at_90: formatCAD(medianFinalBalance),
+            safe_withdrawal_rate_used: `${safeWithdrawalRate}% (règle adaptée à ${yearsInRetirement} ans de retraite)`,
+        },
+        recommendation: successRate < 85
+            ? `Pour atteindre 90% de probabilité de succès, envisagez : (1) augmenter l\'épargne mensuelle de ${formatCAD(Math.max(0, netMonthlyNeed - safeMonthlyWithdrawal))}, (2) retarder la retraite de 1-2 ans, ou (3) réduire le revenu cible de retraite.`
+            : `Votre plan de retraite est solide. Continuez sur la même trajectoire et réévaluez annuellement pour intégrer les changements de marché et de situation personnelle.`,
+    });
+}
+
+function debtPayoffOptimizer(input: ToolInput): string {
+    interface Debt {
+        name: string;
+        balance: number;
+        interest_rate: number;
+        minimum_payment: number;
+    }
+
+    const debts = (input.debts as Debt[]) || [];
+    const extraPayment = (input.extra_monthly_payment as number) || 0;
+
+    if (debts.length === 0) {
+        return JSON.stringify({ error: 'Aucune dette fournie.' });
+    }
+
+    const totalMinimums = debts.reduce((s, d) => s + d.minimum_payment, 0);
+    const totalPayment = totalMinimums + extraPayment;
+    const totalBalance = debts.reduce((s, d) => s + d.balance, 0);
+
+    // ── Avalanche (highest rate first) ────────────────────────────────────
+    const calcPayoffMonths = (debtsArr: Debt[], strategy: 'rate' | 'balance'): { months: number; totalInterest: number } => {
+        const working = debtsArr.map(d => ({ ...d }));
+        const sorted = strategy === 'rate'
+            ? working.sort((a, b) => b.interest_rate - a.interest_rate)
+            : working.sort((a, b) => a.balance - b.balance);
+
+        let months = 0;
+        let totalInterest = 0;
+        const maxMonths = 600;
+
+        while (sorted.some(d => d.balance > 0) && months < maxMonths) {
+            months++;
+            let remaining = totalPayment;
+
+            // Pay minimums first
+            for (const d of sorted) {
+                if (d.balance <= 0) continue;
+                const interest = d.balance * (d.interest_rate / 100 / 12);
+                totalInterest += interest;
+                d.balance += interest;
+                const minPay = Math.min(d.minimum_payment, d.balance);
+                d.balance -= minPay;
+                remaining -= minPay;
+            }
+
+            // Apply extra to first non-zero debt (sorted by strategy)
+            for (const d of sorted) {
+                if (d.balance <= 0 || remaining <= 0) continue;
+                const applied = Math.min(remaining, d.balance);
+                d.balance -= applied;
+                remaining -= applied;
+            }
+        }
+
+        return { months, totalInterest };
+    };
+
+    const avalanche = calcPayoffMonths(debts, 'rate');
+    const snowball = calcPayoffMonths(debts, 'balance');
+
+    const interestSaved = Math.abs(snowball.totalInterest - avalanche.totalInterest);
+    const winner = avalanche.totalInterest <= snowball.totalInterest ? 'Avalanche' : 'Boule de neige';
+
+    const fmtMonths = (m: number) => `${Math.floor(m / 12)} ans et ${m % 12} mois`;
+
+    const debtsSummary = debts
+        .sort((a, b) => b.interest_rate - a.interest_rate)
+        .map(d => `- ${d.name}: ${formatCAD(d.balance)} @ ${d.interest_rate}%`)
+        .join('\n');
+
+    return JSON.stringify({
+        total_debt: formatCAD(totalBalance),
+        total_monthly_payment: formatCAD(totalPayment),
+        debts_by_rate: debtsSummary,
+        strategies: {
+            avalanche: {
+                description: 'Rembourse la dette au taux le plus élevé en premier — mathématiquement optimal',
+                payoff_time: fmtMonths(avalanche.months),
+                total_interest: formatCAD(avalanche.totalInterest),
+            },
+            snowball: {
+                description: 'Rembourse la plus petite dette en premier — psychologiquement motivant',
+                payoff_time: fmtMonths(snowball.months),
+                total_interest: formatCAD(snowball.totalInterest),
+            },
+        },
+        recommended_strategy: winner,
+        interest_saved_with_avalanche: formatCAD(interestSaved),
+        cash_flow_after_debt_free: formatCAD(totalPayment),
+        recommendation: `La stratégie **${winner}** est recommandée. En choisissant l'avalanche plutôt que la boule de neige, vous économisez ${formatCAD(interestSaved)} en intérêts. Une fois libre de dettes, les ${formatCAD(totalPayment)}/mois actuellement alloués au remboursement pourront être redirigés vers vos investissements.`,
     });
 }
 

@@ -1,50 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateAIResponse } from "@/lib/ai/client";
+import { getInsightSystemPrompt } from "@/lib/ai/prompts";
+import { detectClientMilestones } from "@/lib/ai/persona";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { canAccess } from "@/lib/subscription";
 import type { SubscriptionPlan } from "@/types/database";
 
-const INSIGHT_SYSTEM_PROMPT = `Tu es l'IA proactive de WealthPilot, conseiller financier canadien expert. Tu analyses la situation financière complète d'un client et génères des insights personnalisés, chiffrés et actionnables.
 
-## Ton rôle
-Produire 3-4 insights percutants, triés du plus urgent au moins urgent, couvrant :
-1. Fiscalité (CELI, REER, REEE) — avec espace disponible et économies d'impôt exactes
-2. Santé financière (taux d'épargne, ratio dette/actif, fonds d'urgence)
-3. Portefeuille (rééquilibrage, dérive d'allocation, optimisation rendement/risque)
-4. Objectifs (retard, urgence, cap manquant)
-5. Marché (impact sur le portefeuille du client si données disponibles)
 
-## Règles strictes
-- CONCIS : 2 phrases max par insight (titre < 55 chars, contenu < 180 chars)
-- CHIFFRÉ : toujours utiliser les vrais chiffres du client (pas de X ou placeholder)
-- QUÉBÉCOIS : français canadien, termes locaux (CELI, REER, RAP, etc.)
-- ACTION : chaque insight = 1 action précise et immédiate
-- DIVERSITÉ : pas deux insights sur le même thème
-- Ne PAS recommander de titres ou actions individuels
-
-## Types disponibles
-- tax_optimization : CELI/REER/REEE sous-utilisés, déductions manquées
-- savings_rate : taux d'épargne insuffisant, budget à optimiser
-- debt_alert : ratio dette élevé, stratégie de remboursement
-- goal_progress : objectif en retard ou presque atteint
-- portfolio_alert : dérive d'allocation, volatilité excessive
-- rebalancing : rééquilibrage nécessaire
-- market_update : impact marché sur le portefeuille
-- general_tip : conseil actionnable si aucun autre thème urgent
-
-## Format JSON strict — réponds UNIQUEMENT avec ce JSON
-{
-  "insights": [
-    {
-      "type": "tax_optimization|savings_rate|debt_alert|goal_progress|portfolio_alert|rebalancing|market_update|general_tip",
-      "title": "Titre accrocheur max 55 chars",
-      "content": "2 phrases avec chiffres réels et action concrète. Max 180 chars.",
-      "priority": "low|normal|high|urgent",
-      "action_url": "/fiscal|/portfolio|/goals|/retirement|/chat"
-    }
-  ]
-}`;
 
 export async function POST(request: NextRequest) {
     try {
@@ -236,11 +200,33 @@ Génère 3-4 insights personnalisés pour ce client, triés du plus urgent au mo
 
         let insights;
         try {
+            // Detect milestones to prepend milestone-triggered insights
+            const milestones = detectClientMilestones({
+                age: age || null,
+                annualIncome: income || null,
+                monthlySavings: monthlySavings || null,
+                monthlyExpenses: monthlyExpenses || null,
+                totalAssets: totalAssets || null,
+                totalDebts: totalDebts || null,
+                celiBalance: celiBalance || null,
+                reerBalance: reerBalance || null,
+                hasDependents: !!(clientInfo?.dependents && Number(clientInfo.dependents) > 0),
+                hasReee: !!(clientInfo?.has_reee),
+                riskScore: riskAssessment?.risk_score || 5,
+                goals: (goals || []).map((g: { label: string; target_amount: number; current_amount: number; target_date?: string }) => ({
+                    label: g.label,
+                    targetAmount: g.target_amount,
+                    currentAmount: g.current_amount,
+                    targetDate: g.target_date || null,
+                })),
+            });
+
+            // Generate AI insights with CFA-grade system prompt
             const aiResponse = await generateAIResponse({
-                systemPrompt: INSIGHT_SYSTEM_PROMPT,
+                systemPrompt: getInsightSystemPrompt(),
                 userMessage: userContext,
-                maxTokens: 1024,
-                temperature: 0.5,
+                maxTokens: 1200,
+                temperature: 0.3, // Lower temperature for consistent, authoritative CFA output
             });
 
             const text = aiResponse.text;
@@ -248,6 +234,24 @@ Génère 3-4 insights personnalisés pour ce client, triés du plus urgent au mo
             // Clean potential markdown code fences from response
             const cleanedText = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
             insights = JSON.parse(cleanedText);
+
+            // Prepend high-urgency milestone insights (max 2) not already covered by AI
+            const milestoneInsights = milestones
+                .filter(m => m.urgency === 'urgent' || m.urgency === 'high')
+                .slice(0, 2)
+                .map(m => ({
+                    type: "milestone_alert",
+                    urgency_level: m.urgency === 'urgent' ? 'critique' : 'important',
+                    title: m.label.slice(0, 60),
+                    content: m.actionPrompt.slice(0, 220),
+                    priority: m.urgency,
+                    cfa_rationale: "Jalon financier critique détecté par le moteur de segmentation client CFA.",
+                    action_url: "/chat",
+                }));
+
+            if (milestoneInsights.length > 0) {
+                insights.insights = [...milestoneInsights, ...(insights.insights || [])];
+            }
         } catch (aiError) {
             console.error("AI Error in Insights (using fallback):", aiError);
             // Generate deterministic fallback insights

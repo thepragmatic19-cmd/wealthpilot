@@ -1,22 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateAIResponse } from "@/lib/ai/client";
+import { getQuarterlyNarrativePrompt } from "@/lib/ai/prompts";
 import { canAccess } from "@/lib/subscription";
 import type { SubscriptionPlan } from "@/types/database";
 
 const REER_MAX = 32490;
 const CELI_CUMULATIVE_LIMIT = 109000;
 
-const NARRATIVE_PROMPT = `Tu es le conseiller financier IA de WealthPilot. Génère un bilan trimestriel personnalisé (~200 mots) en français canadien pour ce client.
 
-Ton bilan doit :
-1. Commenter l'évolution de la valeur nette (positif ou domaines à améliorer)
-2. Évaluer la progression vers les objectifs de vie
-3. Souligner une ou deux optimisations fiscales concrètes (CELI/REER)
-4. Donner un regard constructif et motivant sur la stratégie de portefeuille
-5. Conclure avec une priorité claire pour le prochain trimestre
-
-Ton ton : professionnel, chiffré, encourageant. Utilise les vrais chiffres du client.`;
 
 export async function POST(request: NextRequest) {
   try {
@@ -75,15 +67,33 @@ export async function POST(request: NextRequest) {
       snapshotList.length >= 4
         ? Number(snapshotList[snapshotList.length - 4].net_worth || 0)
         : snapshotList.length >= 2
-        ? Number(snapshotList[0].net_worth || 0)
-        : null;
+          ? Number(snapshotList[0].net_worth || 0)
+          : null;
 
     const oneYearAgo =
       snapshotList.length >= 12
         ? Number(snapshotList[snapshotList.length - 12].net_worth || 0)
         : snapshotList.length >= 2
-        ? Number(snapshotList[0].net_worth || 0)
-        : null;
+          ? Number(snapshotList[0].net_worth || 0)
+          : null;
+
+    // Fetch benchmark returns for portfolio attribution
+    let benchmarkData = "";
+    try {
+      const benchmarkSymbols = "^GSPTSE,^GSPC";
+      const bUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(benchmarkSymbols)}&fields=regularMarketPrice,regularMarketChangePercent,shortName`;
+      const bRes = await fetch(bUrl, { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate: 3600 } });
+      if (bRes.ok) {
+        const bData = await bRes.json();
+        const quotes = (bData.quoteResponse?.result || []);
+        const tsx = quotes.find((q: any) => q.symbol === "^GSPTSE");
+        const sp500 = quotes.find((q: any) => q.symbol === "^GSPC");
+        if (tsx) benchmarkData += `S&P/TSX Composite: ${tsx.regularMarketChangePercent >= 0 ? '+' : ''}${tsx.regularMarketChangePercent?.toFixed(2)}% (séance)`;
+        if (sp500) benchmarkData += ` | S&P 500: ${sp500.regularMarketChangePercent >= 0 ? '+' : ''}${sp500.regularMarketChangePercent?.toFixed(2)}% (séance)`;
+      }
+    } catch {
+      // Benchmark data unavailable — continue without
+    }
 
     // Fiscal computations
     const annualIncome = Number(clientInfo?.annual_income || 0);
@@ -141,13 +151,17 @@ export async function POST(request: NextRequest) {
     const context = `
 ## Client
 - Valeur nette actuelle: ${currentNW.toLocaleString("fr-CA")}$
-- Variation 3 mois: ${var3m}
+- Variation 3 mois: ${var3m}${oneYearAgo && oneYearAgo > 0 ? ` | Variation 12 mois: ${(((currentNW - oneYearAgo) / oneYearAgo) * 100).toFixed(1)}%` : ''}
 - Revenu annuel: ${annualIncome.toLocaleString("fr-CA")}$
 
 ## Portefeuille (${portfolio?.type || "non sélectionné"})
 - Rendement attendu: ${portfolio?.expected_return ?? "—"}%
 - Volatilité: ${portfolio?.volatility ?? "—"}%
 - Sharpe: ${portfolio?.sharpe_ratio?.toFixed(2) ?? "—"}
+- MER total: ${portfolio?.total_mer?.toFixed(2) ?? "—"}%
+
+## Benchmarks du trimestre
+${benchmarkData || "Données non disponibles"}
 
 ## Objectifs
 ${goalsStr}
@@ -160,18 +174,18 @@ ${goalsStr}
 ## Trimestre
 ${new Date().toLocaleDateString("fr-CA", { month: "long", year: "numeric" })}`;
 
-    // Generate AI narrative
+    // Generate AI narrative using CFA-grade quarterly prompt
     let narrative = "";
     try {
       const aiResponse = await generateAIResponse({
-        systemPrompt: NARRATIVE_PROMPT,
+        systemPrompt: getQuarterlyNarrativePrompt(),
         userMessage: context,
-        maxTokens: 512,
-        temperature: 0.6,
+        maxTokens: 1200,
+        temperature: 0.55,
       });
       narrative = aiResponse.text || "";
     } catch {
-      narrative = `Bilan ${new Date().toLocaleDateString("fr-CA", { month: "long", year: "numeric" })} — Votre patrimoine s'élève à ${currentNW.toLocaleString("fr-CA")}$. Continuez à cotiser régulièrement à vos comptes enregistrés pour optimiser votre situation fiscale. Votre portefeuille ${portfolio?.type || ""} reste bien positionné pour atteindre vos objectifs à long terme.`;
+      narrative = `Bilan ${new Date().toLocaleDateString("fr-CA", { month: "long", year: "numeric" })} — Valeur nette : ${currentNW.toLocaleString("fr-CA")}$. Votre portefeuille ${portfolio?.type || ""} est bien positionné. Priorité : maximiser vos comptes enregistrés et réviser vos objectifs avec votre conseiller WealthPilot.\n\nCordialement, Alexandre Moreau, CFA, CIWM — WealthPilot`;
     }
 
     return NextResponse.json({ narrative, data: reportData });
