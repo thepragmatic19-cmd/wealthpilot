@@ -1,14 +1,14 @@
 import Groq from "groq-sdk";
 
 // ============================================================
-// AI Provider: Groq (Llama 3.1 8B - Instant, High Rate Limit)
+// AI Provider: Groq (Llama 3.3 70B - High Authority)
 // ============================================================
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY!,
 });
 
-export const AI_MODEL = "llama-3.1-8b-instant";
+export const AI_MODEL = "llama-3.3-70b-versatile";
 
 // ============================================================
 // Unified AI Interface

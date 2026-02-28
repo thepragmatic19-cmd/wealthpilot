@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
-        .limit(40),
+        .limit(10), // Limit history to save tokens
       getMarketDataContext(),
     ]);
 
