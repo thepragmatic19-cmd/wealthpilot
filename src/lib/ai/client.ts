@@ -80,6 +80,35 @@ export async function generateChatResponse(options: {
 }
 
 // ============================================================
+// streamChatResponse — Streaming SSE (education-chat, etc.)
+// ============================================================
+
+export async function streamChatResponse(options: {
+  systemPrompt: string;
+  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  maxTokens?: number;
+  temperature?: number;
+}) {
+  const { systemPrompt, messages, maxTokens = 600, temperature = 0.7 } = options;
+
+  const allMessages: Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }> = [
+      { role: "system", content: systemPrompt },
+      ...messages,
+    ];
+
+  return await genAI.chat.completions.create({
+    model: AI_MODEL,
+    max_tokens: maxTokens,
+    temperature,
+    messages: allMessages,
+    stream: true,
+  });
+}
+
+// ============================================================
 // chatWithTools — Chat complet avec tool-calling + streaming final
 // ============================================================
 
