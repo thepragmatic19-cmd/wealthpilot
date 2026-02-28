@@ -18,9 +18,9 @@ interface PlanLimits {
 
 export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
   free: {
-    maxPortfolios: 1,
-    chatPerDay: 20,
-    features: [], // Aucune fonctionnalité premium
+    maxPortfolios: 10,
+    chatPerDay: -1, // Illimité pour les tests
+    features: ["fiscal_page", "retirement_page", "ai_insights"], // Activer plus de features par défaut
   },
   pro: {
     maxPortfolios: 5,

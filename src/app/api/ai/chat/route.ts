@@ -74,8 +74,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Rate limiting: 10 requests per minute per user
-    const rateLimit = await checkRateLimit(`chat:${user.id}`, 10);
+    // Rate limiting: 50 requests per minute per user (was 10)
+    const rateLimit = await checkRateLimit(`chat:${user.id}`, 50);
     if (!rateLimit.success) {
       return rateLimitResponse(rateLimit.resetInSeconds);
     }

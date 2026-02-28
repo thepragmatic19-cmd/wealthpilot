@@ -34,8 +34,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 20 requests per minute per user (lighter than main chat)
-    const rateLimit = await checkRateLimit(`edu-chat:${user.id}`, 20);
+    // 100 requests per minute per user (was 20)
+    const rateLimit = await checkRateLimit(`edu-chat:${user.id}`, 100);
     if (!rateLimit.success) {
       return rateLimitResponse(rateLimit.resetInSeconds);
     }
