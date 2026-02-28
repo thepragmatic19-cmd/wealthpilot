@@ -117,8 +117,9 @@ export async function chatWithTools(options: {
   onToolCall?: (name: string) => void;
   maxTokens?: number;
   temperature?: number;
-}): Promise<AIResponse> {
-  const { systemPrompt, messages, tools, executeTool, onToolCall, maxTokens = 2048, temperature = 0.7 } =
+  streamFinal?: boolean;
+}): Promise<AIResponse | any> {
+  const { systemPrompt, messages, tools, executeTool, onToolCall, maxTokens = 2048, temperature = 0.7, streamFinal = false } =
     options;
 
   // Convert tools to OpenAI function calling format
@@ -165,6 +166,7 @@ export async function chatWithTools(options: {
 
     // Execute each tool call and add results
     for (const toolCall of choice.message.tool_calls) {
+      if (onToolCall) onToolCall(toolCall.function.name);
       const args = JSON.parse(toolCall.function.arguments || "{}");
       const result = executeTool(toolCall.function.name, args);
 
@@ -176,6 +178,8 @@ export async function chatWithTools(options: {
     }
 
     // Call again with tool results
+    // If it's the last iteration or we expect no more tools, we could stream here, 
+    // but simplified: we only stream the VERY final response after the loop.
     response = await groq.chat.completions.create({
       model: AI_MODEL,
       max_tokens: maxTokens,
@@ -183,6 +187,16 @@ export async function chatWithTools(options: {
       messages: groqMessages,
       tools: groqTools,
       tool_choice: "auto",
+    });
+  }
+
+  if (streamFinal) {
+    return groq.chat.completions.create({
+      model: AI_MODEL,
+      max_tokens: maxTokens,
+      temperature,
+      messages: groqMessages,
+      stream: true,
     });
   }
 

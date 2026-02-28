@@ -15,14 +15,34 @@ const chatBodySchema = z.object({
 // Fetch live market data for AI context
 async function getMarketDataContext(): Promise<string> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/market/quotes`, {
+    const SYMBOLS = {
+      "^GSPC": { name: "S&P 500", currency: "USD" },
+      "^GSPTSE": { name: "S&P/TSX", currency: "CAD" },
+      "^IXIC": { name: "NASDAQ", currency: "USD" },
+      "CADUSD=X": { name: "CAD/USD", currency: "" },
+    };
+
+    const symbolList = Object.keys(SYMBOLS).join(",");
+    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbolList)}&fields=regularMarketPrice,regularMarketChange,regularMarketChangePercent,shortName`;
+
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0" },
       next: { revalidate: 300 },
     });
+
     if (!res.ok) return "";
 
     const data = await res.json();
-    const quotes = data.quotes || [];
+    const quotes = (data.quoteResponse?.result || []).map(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (q: any) => ({
+        name: SYMBOLS[q.symbol as keyof typeof SYMBOLS]?.name || q.shortName || q.symbol,
+        price: q.regularMarketPrice || 0,
+        changePercent: q.regularMarketChangePercent || 0,
+        currency: SYMBOLS[q.symbol as keyof typeof SYMBOLS]?.currency || "",
+      })
+    );
+
     if (quotes.length === 0) return "";
 
     const lines = quotes.map(
@@ -246,34 +266,31 @@ export async function POST(request: NextRequest) {
       input_schema: t.input_schema as Record<string, unknown>,
     }));
 
-    // Stream response with tool use support
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
         let closed = false;
         try {
-          // Call unified AI client with tool support
-          const aiResponse = await chatWithTools({
+          // Call unified AI client with tool support and request a stream for the final part
+          const streamResponse = await chatWithTools({
             systemPrompt,
             messages: history,
             tools: toolDefs,
             executeTool,
             maxTokens: 2048,
+            streamFinal: true,
           });
 
-          const fullResponse = aiResponse.text;
+          let fullResponse = "";
 
-          // Stream word-by-word for smooth UX
-          const words = fullResponse.split(/(\s+)/);
-          for (let i = 0; i < words.length; i++) {
-            const chunk = words.slice(i, i + 3).join("");
-            i += 2;
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({ text: chunk })}\n\n`
-              )
-            );
-            await new Promise((resolve) => setTimeout(resolve, 15));
+          for await (const chunk of streamResponse) {
+            const content = chunk.choices[0]?.delta?.content || "";
+            if (content) {
+              fullResponse += content;
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ text: content })}\n\n`)
+              );
+            }
           }
 
           // Save assistant message
