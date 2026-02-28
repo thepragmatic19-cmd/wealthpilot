@@ -326,14 +326,18 @@ export async function POST(request: NextRequest) {
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
           closed = true;
-        } catch (error) {
+        } catch (error: any) {
           console.error("Chat stream error:", error);
           if (!closed) {
             try {
+              const errorMessage = error?.status === 429 
+                ? "Limite de messages atteinte pour ce modèle. Réessayez dans une minute."
+                : "Désolé, j'ai rencontré une difficulté technique pour calculer cette analyse. Pouvez-vous reformuler ?";
+                
               controller.enqueue(
                 encoder.encode(
                   `data: ${JSON.stringify({
-                    error: "Erreur lors de la génération",
+                    error: errorMessage,
                   })}\n\n`
                 )
               );
