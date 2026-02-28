@@ -185,7 +185,14 @@ export async function chatWithTools(options: {
     // Execute each tool call and add results
     for (const toolCall of choice.message.tool_calls) {
       if (onToolCall) onToolCall(toolCall.function.name);
-      const args = JSON.parse(toolCall.function.arguments || "{}");
+      
+      let args = {};
+      try {
+        args = JSON.parse(toolCall.function.arguments || "{}");
+      } catch (e) {
+        console.warn(`Failed to parse tool arguments for ${toolCall.function.name}:`, toolCall.function.arguments);
+      }
+      
       const result = executeTool(toolCall.function.name, args);
 
       groqMessages.push({

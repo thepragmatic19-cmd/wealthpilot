@@ -349,7 +349,7 @@ export async function POST(request: NextRequest) {
             try {
               const errorMessage = error?.status === 429 
                 ? "Limite de messages atteinte pour ce modèle. Réessayez dans une minute."
-                : "Désolé, j'ai rencontré une difficulté technique pour calculer cette analyse. Pouvez-vous reformuler ?";
+                : `Désolé, j'ai rencontré une difficulté technique : ${error?.message || "Erreur inconnue"}`;
                 
               controller.enqueue(
                 encoder.encode(
