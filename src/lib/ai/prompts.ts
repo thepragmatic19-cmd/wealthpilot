@@ -710,6 +710,11 @@ interface ChatGoal {
   currentAmount: number;
   targetDate: string | null;
   priority: string;
+  analysis?: {
+    progress: string;
+    isOnTrack: boolean;
+    remainingAmount: number;
+  };
 }
 
 interface ChatAllocation {
@@ -731,6 +736,22 @@ interface ChatPortfolio {
   taxStrategy?: string | null;
   rationale?: string | null;
   allocations: ChatAllocation[];
+  metrics?: {
+    totalValue: number;
+    drift: number;
+    needsRebalancing: boolean;
+  } | null;
+  allPortfolios?: Array<{
+    name: string;
+    type: string;
+    is_active: boolean;
+    expectedReturn: number;
+    volatility: number;
+    allocations: Array<{
+      ticker: string;
+      weight: number;
+    }>;
+  }> | null;
 }
 
 export function getChatSystemPrompt(context: {
@@ -785,19 +806,23 @@ export function getChatSystemPrompt(context: {
     financialSection += `- Aucun compte enregistré ouvert\n`;
   }
 
-  // ── Portefeuille ──────────────────────────────────────────────
-  let portfolioSection = `## Portefeuille sélectionné\n`;
+  // ── Portefeuilles ──────────────────────────────────────────────
+  let portfolioSection = `## Portefeuilles de l'utilisateur\n`;
   if (context.portfolio) {
     const p = context.portfolio;
-    portfolioSection += `**${p.name}** (type : ${p.type})\n`;
+    portfolioSection += `### Portefeuille ACTIF : **${p.name}** (type : ${p.type})\n`;
     portfolioSection += `- Rendement attendu : ${p.expectedReturn}% | Volatilité : ${p.volatility}%`;
     if (p.sharpeRatio != null) portfolioSection += ` | Sharpe : ${p.sharpeRatio}`;
     if (p.maxDrawdown != null) portfolioSection += ` | Drawdown max : ${p.maxDrawdown}%`;
     if (p.totalMer != null) portfolioSection += ` | MER total : ${p.totalMer}%`;
+    
+    if (p.metrics) {
+      portfolioSection += `\n- Analyse de dérive : ${p.metrics.drift.toFixed(1)}% | Besoin de rééquilibrage : ${p.metrics.needsRebalancing ? 'OUI' : 'NON'}`;
+    }
     portfolioSection += '\n';
 
     if (p.allocations.length > 0) {
-      portfolioSection += `\n### Composition détaillée\n`;
+      portfolioSection += `\n#### Composition détaillée de ${p.name}\n`;
       portfolioSection += `| Poids | Ticker | Instrument | Classe d'actif | Compte |\n`;
       portfolioSection += `|-------|--------|------------|----------------|--------|\n`;
       for (const a of [...p.allocations].sort((x, y) => y.weight - x.weight)) {
@@ -805,11 +830,19 @@ export function getChatSystemPrompt(context: {
       }
     }
 
+    if (p.allPortfolios && p.allPortfolios.length > 1) {
+      portfolioSection += `\n### Autres portefeuilles disponibles pour comparaison :\n`;
+      for (const other of p.allPortfolios) {
+        if (other.is_active) continue;
+        portfolioSection += `- **${other.name}** (${other.type}) : Rendement ${other.expectedReturn}% | Volatilité ${other.volatility}%\n`;
+      }
+    }
+
     if (p.taxStrategy) {
-      portfolioSection += `\n### Stratégie fiscale\n${p.taxStrategy}\n`;
+      portfolioSection += `\n#### Stratégie fiscale\n${p.taxStrategy}\n`;
     }
     if (p.rationale) {
-      portfolioSection += `\n### Justification\n${p.rationale}\n`;
+      portfolioSection += `\n#### Justification\n${p.rationale}\n`;
     }
   } else {
     portfolioSection += `Aucun portefeuille sélectionné.\n`;
@@ -835,6 +868,9 @@ export function getChatSystemPrompt(context: {
           ? `${Math.floor(months / 12)} an${Math.floor(months / 12) > 1 ? 's' : ''}${months % 12 > 0 ? ` ${months % 12} mois` : ''}`
           : `${months} mois`;
         line += ` — échéance ${g.targetDate} (dans ${timeLeft})`;
+      }
+      if (g.analysis) {
+        line += ` | Statut : ${g.analysis.isOnTrack ? 'En bonne voie' : 'Attention'} | Reste à épargner : ${fmt(g.analysis.remainingAmount)}`;
       }
       goalsSection += `${line}\n`;
     }

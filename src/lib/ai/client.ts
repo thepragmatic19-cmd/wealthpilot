@@ -138,14 +138,31 @@ export async function chatWithTools(options: {
     ...messages,
   ];
 
-  let response = await groq.chat.completions.create({
-    model: AI_MODEL,
-    max_tokens: maxTokens,
-    temperature,
-    messages: groqMessages,
-    tools: groqTools,
-    tool_choice: "auto",
-  });
+  const callGroq = async (msgs: any[], toolsList: any[]) => {
+    let attempts = 0;
+    while (attempts < 2) {
+      try {
+        return await groq.chat.completions.create({
+          model: AI_MODEL,
+          max_tokens: maxTokens,
+          temperature,
+          messages: msgs,
+          tools: toolsList.length > 0 ? toolsList : undefined,
+          tool_choice: toolsList.length > 0 ? "auto" : undefined,
+          stream: false, // will handle stream separately for final
+        });
+      } catch (error: any) {
+        if (error?.status === 429 && attempts < 1) {
+          attempts++;
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
+        }
+        throw error;
+      }
+    }
+  };
+
+  let response = await callGroq(groqMessages, groqTools);
 
   let maxIterations = 5;
 
@@ -180,24 +197,29 @@ export async function chatWithTools(options: {
     // Call again with tool results
     // If it's the last iteration or we expect no more tools, we could stream here, 
     // but simplified: we only stream the VERY final response after the loop.
-    response = await groq.chat.completions.create({
-      model: AI_MODEL,
-      max_tokens: maxTokens,
-      temperature,
-      messages: groqMessages,
-      tools: groqTools,
-      tool_choice: "auto",
-    });
+    response = await callGroq(groqMessages, groqTools);
   }
 
   if (streamFinal) {
-    return groq.chat.completions.create({
-      model: AI_MODEL,
-      max_tokens: maxTokens,
-      temperature,
-      messages: groqMessages,
-      stream: true,
-    });
+    let attempts = 0;
+    while (attempts < 2) {
+      try {
+        return await groq.chat.completions.create({
+          model: AI_MODEL,
+          max_tokens: maxTokens,
+          temperature,
+          messages: groqMessages,
+          stream: true,
+        });
+      } catch (error: any) {
+        if (error?.status === 429 && attempts < 1) {
+          attempts++;
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
+        }
+        throw error;
+      }
+    }
   }
 
   const text = response.choices[0]?.message?.content || "";

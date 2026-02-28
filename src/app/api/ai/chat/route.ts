@@ -172,8 +172,7 @@ export async function POST(request: NextRequest) {
         .from("portfolios")
         .select("*, portfolio_allocations(*)")
         .eq("user_id", user.id)
-        .eq("is_selected", true)
-        .maybeSingle(),
+        .order("is_selected", { ascending: false }), // Selected first, then others
       supabase
         .from("chat_messages")
         .select("*")
@@ -191,8 +190,24 @@ export async function POST(request: NextRequest) {
     });
 
     // Build system prompt with full client context
+    const portfolios = (selectedPortfolio as any[] || []);
+    const activePortfolio = portfolios.find(p => p.is_selected) || portfolios[0];
+    
+    // Process all portfolios for comparison
+    const allPortfoliosContext = portfolios.map(p => ({
+      name: p.name,
+      type: p.type,
+      is_active: p.is_selected,
+      expectedReturn: p.expected_return,
+      volatility: p.volatility,
+      allocations: (p.portfolio_allocations || []).map((a: any) => ({
+        ticker: a.instrument_ticker,
+        weight: a.weight
+      }))
+    }));
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rawAllocations = (selectedPortfolio as any)?.portfolio_allocations ?? [];
+    const rawAllocations = (activePortfolio?.portfolio_allocations ?? []);
     const allocations = rawAllocations.map((a: any) => ({
       asset_class: a.asset_class as string,
       instrument_name: a.instrument_name as string,
@@ -203,7 +218,7 @@ export async function POST(request: NextRequest) {
 
     // PRE-CALCULATE ANALYSIS to save AI thinking time
     const portfolioValue = Number(clientInfo?.total_assets || 0);
-    const portfolioAnalysis = selectedPortfolio ? {
+    const portfolioAnalysis = activePortfolio ? {
       totalValue: portfolioValue,
       drift: rawAllocations.reduce((sum: number, a: any) => sum + Math.abs((a.weight || 0) - (a.target_weight || a.weight || 0)), 0),
       needsRebalancing: rawAllocations.some((a: any) => Math.abs((a.weight || 0) - (a.target_weight || a.weight || 0)) > 5),
@@ -243,20 +258,22 @@ export async function POST(request: NextRequest) {
       riskProfile: riskAssessment?.risk_profile ?? "modéré",
       riskAnalysis: riskAssessment?.ai_analysis ?? null,
       riskKeyFactors: (riskAssessment?.key_factors as string[] | null) ?? null,
-      portfolio: selectedPortfolio
+      portfolio: activePortfolio
         ? {
-            name: selectedPortfolio.name,
-            type: selectedPortfolio.type,
-            expectedReturn: selectedPortfolio.expected_return,
-            volatility: selectedPortfolio.volatility,
-            sharpeRatio: (selectedPortfolio as any).sharpe_ratio ?? null,
-            maxDrawdown: (selectedPortfolio as any).max_drawdown ?? null,
-            totalMer: (selectedPortfolio as any).total_mer ?? null,
-            taxStrategy: (selectedPortfolio as any).tax_strategy ?? null,
-            rationale: (selectedPortfolio as any).ai_rationale ?? null,
+            name: activePortfolio.name,
+            type: activePortfolio.type,
+            expectedReturn: activePortfolio.expected_return,
+            volatility: activePortfolio.volatility,
+            sharpeRatio: (activePortfolio as any).sharpe_ratio ?? null,
+            maxDrawdown: (activePortfolio as any).max_drawdown ?? null,
+            totalMer: (activePortfolio as any).total_mer ?? null,
+            taxStrategy: (activePortfolio as any).tax_strategy ?? null,
+            rationale: (activePortfolio as any).ai_rationale ?? null,
             allocations,
             // Inject pre-calculated metrics
             metrics: portfolioAnalysis,
+            // Include all portfolios for comparison
+            allPortfolios: allPortfoliosContext,
           }
         : null,
       goals: (goals ?? []).map((g: any, i: number) => ({
