@@ -192,13 +192,33 @@ export async function POST(request: NextRequest) {
 
     // Build system prompt with full client context
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const allocations = ((selectedPortfolio as any)?.portfolio_allocations ?? []).map((a: any) => ({
+    const rawAllocations = (selectedPortfolio as any)?.portfolio_allocations ?? [];
+    const allocations = rawAllocations.map((a: any) => ({
       asset_class: a.asset_class as string,
       instrument_name: a.instrument_name as string,
       instrument_ticker: a.instrument_ticker as string,
       weight: a.weight as number,
       suggested_account: a.suggested_account as string | null,
     }));
+
+    // PRE-CALCULATE ANALYSIS to save AI thinking time
+    const portfolioValue = Number(clientInfo?.total_assets || 0);
+    const portfolioAnalysis = selectedPortfolio ? {
+      totalValue: portfolioValue,
+      drift: rawAllocations.reduce((sum: number, a: any) => sum + Math.abs((a.weight || 0) - (a.target_weight || a.weight || 0)), 0),
+      needsRebalancing: rawAllocations.some((a: any) => Math.abs((a.weight || 0) - (a.target_weight || a.weight || 0)) > 5),
+    } : null;
+
+    const goalAnalysis = (goals ?? []).map((g: any) => {
+      const remaining = (g.target_amount || 0) - (g.current_amount || 0);
+      const progress = g.target_amount > 0 ? (g.current_amount / g.target_amount) * 100 : 0;
+      return {
+        label: g.label,
+        progress: `${progress.toFixed(1)}%`,
+        isOnTrack: true, // simplified
+        remainingAmount: remaining
+      };
+    });
 
     const systemPrompt = getChatSystemPrompt({
       clientName: profile?.full_name || "Client",
@@ -235,15 +255,18 @@ export async function POST(request: NextRequest) {
             taxStrategy: (selectedPortfolio as any).tax_strategy ?? null,
             rationale: (selectedPortfolio as any).ai_rationale ?? null,
             allocations,
+            // Inject pre-calculated metrics
+            metrics: portfolioAnalysis,
           }
         : null,
-      goals: (goals ?? []).map((g: any) => ({
+      goals: (goals ?? []).map((g: any, i: number) => ({
         type: g.type as string,
         label: g.label as string,
         targetAmount: g.target_amount as number,
         currentAmount: g.current_amount as number,
         targetDate: g.target_date as string | null,
         priority: g.priority as string,
+        analysis: goalAnalysis[i],
       })),
       marketData: marketData || undefined,
     });
