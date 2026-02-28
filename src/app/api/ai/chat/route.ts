@@ -193,16 +193,16 @@ export async function POST(request: NextRequest) {
     const portfolios = (selectedPortfolio as any[] || []);
     const activePortfolio = portfolios.find(p => p.is_selected) || portfolios[0];
     
-    // Process all portfolios for comparison
+    // Process all portfolios for comparison (compact version for tokens)
     const allPortfoliosContext = portfolios.map(p => ({
-      name: p.name,
-      type: p.type,
-      is_active: p.is_selected,
-      expectedReturn: p.expected_return,
-      volatility: p.volatility,
-      allocations: (p.portfolio_allocations || []).map((a: any) => ({
-        ticker: a.instrument_ticker,
-        weight: a.weight
+      n: p.name,
+      t: p.type,
+      active: p.is_selected,
+      r: p.expected_return,
+      v: p.volatility,
+      alloc: (p.portfolio_allocations || []).map((a: any) => ({
+        tk: a.instrument_ticker,
+        w: a.weight
       }))
     }));
 

@@ -140,7 +140,7 @@ export async function chatWithTools(options: {
 
   const callGroq = async (msgs: any[], toolsList: any[]) => {
     let attempts = 0;
-    while (attempts < 2) {
+    while (attempts < 3) {
       try {
         return await groq.chat.completions.create({
           model: AI_MODEL,
@@ -149,12 +149,13 @@ export async function chatWithTools(options: {
           messages: msgs,
           tools: toolsList.length > 0 ? toolsList : undefined,
           tool_choice: toolsList.length > 0 ? "auto" : undefined,
-          stream: false, // will handle stream separately for final
+          stream: false,
         });
       } catch (error: any) {
-        if (error?.status === 429 && attempts < 1) {
+        if (error?.status === 429 && attempts < 2) {
           attempts++;
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Exponential backoff: 1.5s, 3s
+          await new Promise(resolve => setTimeout(resolve, 1500 * attempts));
           continue;
         }
         throw error;
@@ -202,7 +203,7 @@ export async function chatWithTools(options: {
 
   if (streamFinal) {
     let attempts = 0;
-    while (attempts < 2) {
+    while (attempts < 3) {
       try {
         return await groq.chat.completions.create({
           model: AI_MODEL,
@@ -212,9 +213,9 @@ export async function chatWithTools(options: {
           stream: true,
         });
       } catch (error: any) {
-        if (error?.status === 429 && attempts < 1) {
+        if (error?.status === 429 && attempts < 2) {
           attempts++;
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 1500 * attempts));
           continue;
         }
         throw error;
