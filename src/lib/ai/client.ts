@@ -74,6 +74,34 @@ export async function generateChatResponse(options: {
 }
 
 /**
+ * Stream a chat response from Groq.
+ */
+export async function streamChatResponse(options: {
+  systemPrompt: string;
+  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  maxTokens?: number;
+  temperature?: number;
+}) {
+  const { systemPrompt, messages, maxTokens = 2048, temperature = 0.7 } = options;
+
+  const groqMessages: Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }> = [
+      { role: "system", content: systemPrompt },
+      ...messages,
+    ];
+
+  return groq.chat.completions.create({
+    model: AI_MODEL,
+    max_tokens: maxTokens,
+    temperature,
+    messages: groqMessages,
+    stream: true,
+  });
+}
+
+/**
  * Chat with tool use (function calling) support.
  * Groq supports OpenAI-compatible tool calling.
  */

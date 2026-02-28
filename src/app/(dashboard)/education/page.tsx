@@ -695,7 +695,13 @@ export default function EducationPage() {
           }),
         });
 
-        if (!res.ok || !res.body) throw new Error("Erreur serveur");
+        if (!res.ok || !res.body) {
+          if (res.status === 429) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || "Trop de messages. Réessayez plus tard.");
+          }
+          throw new Error("Erreur serveur");
+        }
 
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -726,10 +732,15 @@ export default function EducationPage() {
             }
           }
         }
-      } catch {
+      } catch (error: any) {
         setChatMessages([
           ...messagesWithUser,
-          { role: "assistant", content: "Désolé, une erreur s'est produite. Réessayez." },
+          { 
+            role: "assistant", 
+            content: error?.message === "Erreur serveur" 
+              ? "Désolé, une erreur s'est produite. Réessayez." 
+              : error?.message || "Désolé, une erreur s'est produite. Réessayez." 
+          },
         ]);
       } finally {
         setChatLoading(false);
