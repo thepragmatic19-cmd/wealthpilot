@@ -239,21 +239,20 @@ export async function chatWithTools(options: {
   }
 
   if (streamFinal) {
-    let attempts = 0;
-    while (attempts < 3) {
+    // Try primary model, fall back to fast model on 429
+    for (const model of [AI_MODEL, AI_MODEL_FAST]) {
       try {
         return await groq.chat.completions.create({
-          model: AI_MODEL,
+          model,
           max_tokens: maxTokens,
           temperature,
           messages: groqMessages,
           stream: true,
         });
       } catch (error: any) {
-        if (error?.status === 429 && attempts < 2) {
-          attempts++;
-          await new Promise(resolve => setTimeout(resolve, 1500 * attempts));
-          continue;
+        if (error?.status === 429 && model === AI_MODEL) {
+          console.warn("[AI] Stream 429 sur modèle primaire, bascule sur modèle rapide...");
+          continue; // retry with fast model
         }
         throw error;
       }
