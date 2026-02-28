@@ -1,14 +1,14 @@
 import Groq from "groq-sdk";
 
 // ============================================================
-// AI Provider: Groq (Llama 3.3 70B - free, ultra fast)
+// AI Provider: Groq (Llama 3.1 8B - Instant, High Rate Limit)
 // ============================================================
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY!,
 });
 
-export const AI_MODEL = "llama-3.3-70b-versatile";
+export const AI_MODEL = "llama-3.1-8b-instant";
 
 // ============================================================
 // Unified AI Interface
@@ -165,7 +165,7 @@ export async function chatWithTools(options: {
 
   let response = await callGroq(groqMessages, groqTools);
 
-  let maxIterations = 5;
+  let maxIterations = 10;
 
   // Handle tool calls in a loop
   while (maxIterations > 0) {
