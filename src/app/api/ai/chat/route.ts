@@ -380,7 +380,7 @@ export async function POST(request: NextRequest) {
           if (!closed) {
             try {
               const errorMessage = error?.status === 429
-                ? "Limite de messages atteinte pour ce modèle. Réessayez dans une minute."
+                ? "Service temporairement surchargé. Réessayez dans quelques secondes."
                 : `Désolé, j'ai rencontré une difficulté technique : ${error?.message || "Erreur inconnue"}`;
 
               controller.enqueue(

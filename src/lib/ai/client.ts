@@ -303,20 +303,8 @@ export async function chatWithTools(options: {
   }
 
   if (streamFinal) {
-    if (gemini && geminiAvailable) {
-      try {
-        return await gemini.chat.completions.create({
-          model: GEMINI_MODEL,
-          max_tokens: maxTokens,
-          temperature,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          messages: msgHistory as any,
-          stream: true,
-        });
-      } catch (e: any) {
-        if (e?.status !== 429 && e?.status !== 400 && e?.status !== 503) throw e;
-      }
-    }
+    // Always use Groq for streaming final response (reliable, no quota issues)
+    // Gemini stream will be used only when explicitly enabled AND quota is confirmed available
     return await groq.chat.completions.create({
       model: GROQ_MODEL,
       max_tokens: maxTokens,
