@@ -349,7 +349,7 @@ export async function POST(request: NextRequest) {
             messages: history,
             tools: toolDefs,
             executeTool,
-            maxTokens: 2048,
+            maxTokens: 8192,
             streamFinal: true,
           });
 

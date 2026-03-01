@@ -411,7 +411,7 @@ export function ChatInterface({ initialMessage }: ChatInterfaceProps) {
           <div>
             <h2 className="text-sm font-bold leading-none mb-0.5">Conseiller IA</h2>
             <p className="text-[10px] text-muted-foreground font-medium">
-              Llama 3.3 · 70B · Disponible 24/7
+              Gemini 2.5 · Flash · Disponible 24/7
             </p>
           </div>
         </div>
