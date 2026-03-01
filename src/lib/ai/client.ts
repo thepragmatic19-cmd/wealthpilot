@@ -21,7 +21,7 @@ const gemini = new OpenAI({
   baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
 });
 
-const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_MODEL = "gemini-2.5-flash";
 
 export const AI_MODEL = GEMINI_MODEL;
 export const AI_MODEL_FAST = GEMINI_MODEL;
