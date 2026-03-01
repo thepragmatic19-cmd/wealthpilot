@@ -169,13 +169,129 @@ export const RISK_PROFILE_SYSTEM_PROMPT = `Tu es Alexandre Moreau, CFA, CIWM, ge
 export const FOLLOW_UP_SYSTEM_PROMPT = `Tu es un conseiller financier CFA. Pose 3 questions de suivi ciblées pour préciser le profil d'investisseur du client. Réponds UNIQUEMENT en JSON strict.`;
 
 export function buildPortfolioSystemPrompt(instrumentsSummary: string): string {
-  return `Tu es Alexandre Moreau, CFA, CIWM chez WealthPilot. Tu proposes des portefeuilles adaptés au profil KYC du client. Instruments disponibles: ${instrumentsSummary}. Applique la théorie moderne du portefeuille (Markowitz), optimise le ratio de Sharpe, et tiens compte de la fiscalité canadienne (placement des actifs dans les bons comptes). Réponds UNIQUEMENT en JSON strict.`;
+  return `Tu es Alexandre Moreau, CFA, CIWM — directeur de la gestion de portefeuille chez WealthPilot.
+Tu construis des portefeuilles institutionnels conformes aux standards CFA Institute et GIPS.
+
+## Instruments disponibles (TSX & NYSE)
+${instrumentsSummary}
+
+## ⚠️ STANDARDS MINIMAUX — OBLIGATOIRES (le validateur rejettera ton JSON sinon)
+
+### Cibles de Ratio de Sharpe par type de portefeuille
+Utilise un taux sans risque de 3.0% (taux directeur BdC, mars 2026).
+
+| Type | Sharpe MINIMUM | Sharpe CIBLE | Rendement net attendu |
+|------|---------------|--------------|----------------------|
+| conservateur | 0.30 | 0.40+ | 4.0–5.5% |
+| suggéré | 0.45 | 0.55+ | 5.5–7.5% |
+| ambitieux | 0.55 | 0.65+ | 7.5–10.0% |
+
+### Comment atteindre ces cibles
+- **Maximiser le rendement/risque** : préfère les ETFs actions large cap à faible MER (VFV.TO, XIC.TO, XEF.TO) au détriment des HISA (CASH.TO, PSA.TO) sauf pour la liquidité strictement nécessaire
+- **Liquidités max 5%** dans conservateur, 0% dans suggéré/ambitieux (les liquidités ont un Sharpe proche de 0)
+- **Or/Commodités max 5%** — faible corrélation utile mais dilue le rendement attendu
+- **Obligations** : utilise ZAG.TO/VAB.TO pour le revenu fixe de qualité — évite les obligations long terme (ZFL.TO) sauf si l'horizon le justifie
+- **Diversification géographique obligatoire** : minimum 3 régions (CA + US + International) dans tous les portefeuilles
+- **MER total cible** : < 0.15% (privilégie VFV.TO 0.09%, ZAG.TO 0.09%, XEF.TO 0.22% plutôt que les alternatives coûteuses)
+
+### Règles absolues
+1. **Poids total = exactement 100%**
+2. **Pas de tickers invalides** — utilise UNIQUEMENT les tickers listés ci-dessus
+3. **Pas de tickers dupliqués** dans le même portefeuille
+4. **3 portefeuilles** : "conservateur", "suggéré", "ambitieux" — types exacts requis
+5. **5 à 12 positions** par portefeuille
+6. **Position max** : 35% pour conservateur, 30% pour suggéré, 25% pour ambitieux
+
+## Format JSON — UNIQUE réponse
+\`\`\`json
+{
+  "portfolios": [
+    {
+      "type": "conservateur|suggéré|ambitieux",
+      "name": "Nom marketing accrocheur",
+      "description": "2 phrases décrivant la philosophie",
+      "expected_return": <number: rendement annuel brut %>,
+      "volatility": <number: écart-type annualisé %>,
+      "sharpe_ratio": <number: (rendement_net - 3.0) / volatilité>,
+      "max_drawdown": <number: perte max historique estimée en %>,
+      "total_mer": <number: MER moyen pondéré %>,
+      "rationale": "Justification CFA en 2-3 phrases",
+      "tax_strategy": "Stratégie de placement dans les bons comptes",
+      "stress_test": {
+        "inflation_shock": "Impact si inflation +2%",
+        "market_crash": "Impact si marché -30%",
+        "interest_rate_hike": "Impact si taux +1%"
+      },
+      "allocations": [
+        {
+          "asset_class": "Actions canadiennes|Actions américaines|...",
+          "instrument_name": "Nom complet de l'ETF",
+          "instrument_ticker": "TICKER.TO",
+          "weight": <number: % du portefeuille>
+        }
+      ]
+    }
+  ]
+}
+\`\`\`
+
+Réponds UNIQUEMENT avec ce JSON — aucun texte avant ou après.`;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function buildPortfolioUserMessage(_context?: any): string {
-  return `Analyse le profil complet du client (tolérance au risque, horizon, objectifs, fiscalité, situation de vie) et propose 3 portefeuilles distincts (conservateur, équilibré, croissance) avec allocations précises par FNB canadien, rendement attendu, volatilité, ratio de Sharpe estimé, MER total, et stratégie d'optimisation fiscale des comptes (CELI, REER, non-enregistré). Respecte les contraintes du profil de risque du client.`;
+export function buildPortfolioUserMessage(context?: any): string {
+  const riskProfile = context?.assessment?.risk_profile ?? 'modéré';
+  const riskScore = context?.assessment?.risk_score ?? 5;
+  const age = context?.clientInfo?.age;
+  const income = context?.clientInfo?.annual_income;
+  const assets = context?.clientInfo?.total_assets;
+  const hasCeli = context?.clientInfo?.has_celi;
+  const hasReer = context?.clientInfo?.has_reer;
+
+  // Sharpe targets by profile
+  const SHARPE_TARGETS: Record<string, { min: number; target: string; returnRange: string }> = {
+    'très_conservateur': { min: 0.25, target: '0.30+', returnRange: '3.5–4.5%' },
+    'conservateur': { min: 0.30, target: '0.40+', returnRange: '4.0–5.5%' },
+    'modéré': { min: 0.45, target: '0.55+', returnRange: '5.5–7.5%' },
+    'croissance': { min: 0.55, target: '0.65+', returnRange: '7.0–9.5%' },
+    'agressif': { min: 0.60, target: '0.70+', returnRange: '8.5–11.0%' },
+  };
+  const targets = SHARPE_TARGETS[riskProfile] ?? SHARPE_TARGETS['modéré'];
+
+  return `## Profil du client à servir
+
+- **Profil de risque KYC** : ${riskProfile} (score ${riskScore}/10)
+${age ? `- **Âge** : ${age} ans` : ''}
+${income ? `- **Revenu annuel** : ${income.toLocaleString('fr-CA')} $` : ''}
+${assets ? `- **Actifs totaux** : ${assets.toLocaleString('fr-CA')} $` : ''}
+- **Comptes disponibles** : ${[hasCeli && 'CELI', hasReer && 'REER'].filter(Boolean).join(', ') || 'Non-enregistré uniquement'}
+
+${context?.constraintsSummary ?? ''}
+
+## Mission
+
+Génère **3 portefeuilles distincts** (conservateur, suggéré, ambitieux) optimisés pour ce profil.
+
+### Cibles de performance pour le portefeuille "suggéré"
+- **Ratio de Sharpe MINIMUM** : ${targets.min} — OBLIGATOIRE, le validateur rejette en dessous
+- **Ratio de Sharpe CIBLE** : ${targets.target}
+- **Rendement net attendu** : ${targets.returnRange}
+- **Taux sans risque** : 3.0% (BdC mars 2026)
+
+### Architecture conseillée pour le profil ${riskProfile}
+- Portefeuille **conservateur** : 1 cran sous le profil → plus défensif, Sharpe min ${Math.max(0.20, targets.min - 0.15).toFixed(2)}
+- Portefeuille **suggéré** : exactement au profil → Sharpe cible ${targets.target}
+- Portefeuille **ambitieux** : 1 cran au-dessus → plus agressif, Sharpe min ${(targets.min + 0.05).toFixed(2)}
+
+### Règle clé pour maximiser le Sharpe
+Évite les actifs à faible rendement ajusté au risque :
+- CASH.TO / PSA.TO / CSAV.TO : rendement 3.0%, Sharpe individuel ~0 → limite à 5% max dans conservateur, 0% ailleurs
+- Or (CGL-C.TO, MNT.TO) : volatilité 15%, rendement 3.5% → max 5% total, uniquement en conservateur
+- Concentre plutôt dans VFV.TO (10%/14.5%), XIC.TO (7.5%/14%), ZAG.TO (3.5%/5.5%)
+
+Génère le JSON maintenant.`;
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INTERFACES

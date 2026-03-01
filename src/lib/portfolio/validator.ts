@@ -82,6 +82,14 @@ const FIXED_INCOME_CLASSES = new Set([
 // VALIDATION PIPELINE
 // ============================================================
 
+// Minimum Sharpe ratio floors per portfolio type (risk-free rate 3.0%)
+// Below these values, the portfolio is rejected and fallback is used.
+const SHARPE_MINIMUMS: Record<string, number> = {
+  conservateur: 0.25,
+  suggéré: 0.40,
+  ambitieux: 0.50,
+};
+
 export function validateAndEnrichPortfolios(
   rawData: unknown,
   riskProfile: RiskProfile
@@ -196,6 +204,19 @@ export function validateAndEnrichPortfolios(
 
     // Step 8: Recalculate metrics using correlation-based volatility (CFA Sanity Check)
     const metrics = computePortfolioMetrics(enrichedAllocations);
+
+    // Step 9: Sharpe ratio floor enforcement
+    const sharpeMin = SHARPE_MINIMUMS[portfolio.type] ?? 0.25;
+    if (metrics.sharpe_ratio < sharpeMin) {
+      errors.push(
+        `Portefeuille "${portfolio.type}": Sharpe ${metrics.sharpe_ratio.toFixed(2)} < minimum ${sharpeMin} — allocation sous-optimale, relancez la génération`
+      );
+      console.warn(
+        `[Portfolio] REJECTED "${portfolio.type}": Sharpe=${metrics.sharpe_ratio.toFixed(2)} < floor=${sharpeMin}. ` +
+        `Return=${metrics.expected_return}%, Vol=${metrics.volatility}%`
+      );
+      continue;
+    }
 
     enrichedPortfolios.push({
       type: portfolio.type,
