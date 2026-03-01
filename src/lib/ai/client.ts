@@ -3,32 +3,28 @@ import OpenAI from "openai";
 
 // ============================================================
 // AI Provider Configuration
-// PRIMARY: Google Gemini 2.0 Flash (si GOOGLE_AI_API_KEY présent et quota OK)
-// FALLBACK: Groq Llama 3.3 70B (toujours disponible)
-// Pour basculer définitivement vers Gemini: activer la facturation sur
-// https://aistudio.google.com et s'assurer que le quota est > 0
+// PRIMARY: Google Gemini 2.0 Flash (billing activée, quota illimité)
+// FALLBACK: Groq llama-3.1-8b-instant (500k TPD, quota séparé du 70b)
 // ============================================================
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY!,
 });
 
-const GROQ_MODEL = "llama-3.3-70b-versatile";
-const GROQ_MODEL_FAST = "llama-3.1-8b-instant";
+// Groq: utiliser seulement le modèle rapide 8b comme fallback
+// (le 70b a un quota journalier de 100k tokens — épuisé trop vite)
+const GROQ_MODEL_FALLBACK = "llama-3.1-8b-instant"; // 500k TPD, quota séparé
 
-// Gemini client (utilisé seulement si disponible et facturé)
-const geminiAvailable = !!process.env.GOOGLE_AI_API_KEY && process.env.USE_GEMINI === "true";
-const gemini = geminiAvailable
-  ? new OpenAI({
-    apiKey: process.env.GOOGLE_AI_API_KEY!,
-    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
-  })
-  : null;
+// Gemini: provider principal (facturation active)
+const gemini = new OpenAI({
+  apiKey: process.env.GOOGLE_AI_API_KEY!,
+  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+});
 
 const GEMINI_MODEL = "gemini-2.0-flash";
 
-export const AI_MODEL = geminiAvailable ? GEMINI_MODEL : GROQ_MODEL;
-export const AI_MODEL_FAST = geminiAvailable ? GEMINI_MODEL : GROQ_MODEL_FAST;
+export const AI_MODEL = GEMINI_MODEL;
+export const AI_MODEL_FAST = GEMINI_MODEL;
 
 // ============================================================
 // Types
@@ -38,32 +34,18 @@ export interface AIResponse {
   text: string;
 }
 
-// Helper: appelle Gemini si disponible, sinon Groq. Retry automatique sur 429.
+// Helper: Gemini primary, Groq 8b comme fallback automatique
 async function callWithFallback(
   geminiCall: () => Promise<any>,
-  groqCall: () => Promise<any>
+  groqFallbackCall: () => Promise<any>
 ): Promise<any> {
-  if (gemini && geminiAvailable) {
-    try {
-      return await geminiCall();
-    } catch (e: any) {
-      // Quota épuisé ou indisponible → fallback Groq
-      if (e?.status === 429 || e?.status === 400 || e?.status === 503) {
-        console.warn("[AI] Gemini unavailable, falling back to Groq:", e.status);
-      } else {
-        throw e;
-      }
-    }
-  }
-  // Groq avec retry automatique sur 429 (rate limit par minute)
   try {
-    return await groqCall();
+    return await geminiCall();
   } catch (e: any) {
-    if (e?.status === 429) {
-      console.warn("[AI] Groq 429, retrying with fast model...");
-      // Retry avec modèle rapide
-      await new Promise((r) => setTimeout(r, 1500));
-      return await groqCall();
+    // Fallback Groq sur quota/erreur Gemini
+    if (e?.status === 429 || e?.status === 400 || e?.status === 503 || e?.status === 500) {
+      console.warn("[AI] Gemini error", e.status, "→ fallback Groq 8b");
+      return await groqFallbackCall();
     }
     throw e;
   }
@@ -94,7 +76,7 @@ export async function generateAIResponse(options: {
       }),
     () =>
       groq.chat.completions.create({
-        model: GROQ_MODEL,
+        model: GROQ_MODEL_FALLBACK,
         max_tokens: maxTokens,
         temperature,
         messages: [
@@ -127,7 +109,7 @@ export async function generateChatResponse(options: {
 
   const response = await callWithFallback(
     () =>
-      gemini!.chat.completions.create({
+      gemini.chat.completions.create({
         model: GEMINI_MODEL,
         max_tokens: maxTokens,
         temperature,
@@ -135,7 +117,7 @@ export async function generateChatResponse(options: {
       }),
     () =>
       groq.chat.completions.create({
-        model: GROQ_MODEL,
+        model: GROQ_MODEL_FALLBACK,
         max_tokens: maxTokens,
         temperature,
         messages: allMessages,
@@ -163,23 +145,21 @@ export async function streamChatResponse(options: {
     content: string;
   }> = [{ role: "system", content: systemPrompt }, ...messages];
 
-  if (gemini && geminiAvailable) {
-    try {
-      return await gemini.chat.completions.create({
-        model: GEMINI_MODEL,
-        max_tokens: maxTokens,
-        temperature,
-        messages: allMessages,
-        stream: true,
-      });
-    } catch (e: any) {
-      if (e?.status !== 429 && e?.status !== 400 && e?.status !== 503) throw e;
-      console.warn("[AI] Gemini stream unavailable, falling back to Groq:", e.status);
-    }
+  try {
+    return await gemini.chat.completions.create({
+      model: GEMINI_MODEL,
+      max_tokens: maxTokens,
+      temperature,
+      messages: allMessages,
+      stream: true,
+    });
+  } catch (e: any) {
+    if (e?.status !== 429 && e?.status !== 400 && e?.status !== 503) throw e;
+    console.warn("[AI] Gemini stream error", e.status, "→ fallback Groq 8b");
   }
 
   return await groq.chat.completions.create({
-    model: GROQ_MODEL_FAST,
+    model: GROQ_MODEL_FALLBACK,
     max_tokens: maxTokens,
     temperature,
     messages: allMessages,
@@ -239,26 +219,23 @@ export async function chatWithTools(options: {
   }> = [{ role: "system", content: systemPrompt }, ...messages];
 
   const callAI = async (msgs: any[], toolsList: any[]) => {
-    const useGemini = gemini && geminiAvailable;
-    if (useGemini) {
-      try {
-        return await gemini!.chat.completions.create({
-          model: GEMINI_MODEL,
-          max_tokens: maxTokens,
-          temperature,
-          messages: msgs,
-          tools: toolsList.length > 0 ? toolsList : undefined,
-          tool_choice: toolsList.length > 0 ? "auto" : undefined,
-          stream: false,
-        });
-      } catch (e: any) {
-        if (e?.status !== 429 && e?.status !== 400 && e?.status !== 503) throw e;
-        console.warn("[AI] Gemini tools unavailable, falling back to Groq:", e.status);
-      }
+    try {
+      return await gemini.chat.completions.create({
+        model: GEMINI_MODEL,
+        max_tokens: maxTokens,
+        temperature,
+        messages: msgs,
+        tools: toolsList.length > 0 ? toolsList : undefined,
+        tool_choice: toolsList.length > 0 ? "auto" : undefined,
+        stream: false,
+      });
+    } catch (e: any) {
+      if (e?.status !== 429 && e?.status !== 400 && e?.status !== 503 && e?.status !== 500) throw e;
+      console.warn("[AI] Gemini tools error", e.status, "→ fallback Groq 8b");
     }
-    // Groq fallback
+    // Groq 8b fallback
     return await groq.chat.completions.create({
-      model: GROQ_MODEL,
+      model: GROQ_MODEL_FALLBACK,
       max_tokens: maxTokens,
       temperature,
       messages: msgs,
@@ -303,10 +280,22 @@ export async function chatWithTools(options: {
   }
 
   if (streamFinal) {
-    // Always use Groq for streaming final response (reliable, no quota issues)
-    // Gemini stream will be used only when explicitly enabled AND quota is confirmed available
+    // Streaming final: Gemini primary, Groq 8b fallback
+    try {
+      return await gemini.chat.completions.create({
+        model: GEMINI_MODEL,
+        max_tokens: maxTokens,
+        temperature,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        messages: msgHistory as any,
+        stream: true,
+      });
+    } catch (e: any) {
+      if (e?.status !== 429 && e?.status !== 400 && e?.status !== 503 && e?.status !== 500) throw e;
+      console.warn("[AI] Gemini streamFinal error", e.status, "→ fallback Groq 8b");
+    }
     return await groq.chat.completions.create({
-      model: GROQ_MODEL,
+      model: GROQ_MODEL_FALLBACK,
       max_tokens: maxTokens,
       temperature,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
