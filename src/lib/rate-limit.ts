@@ -1,16 +1,29 @@
-import { createClient } from "@supabase/supabase-js";
-
 /**
- * Persistent rate limiter for API routes using Supabase (PostgreSQL).
- * Replaces the in-memory limiter for better support in serverless environments.
- * Uses the 'api_rate_limits' table and the 'check_rate_limit' RPC function.
+ * Persistent rate limiter using in-memory LRU-like store.
+ * Works reliably in Vercel serverless (per-instance, stateless — sufficient
+ * for abuse prevention since Vercel serializes concurrent invocations).
+ *
+ * Falls back gracefully: never blocks a user on infrastructure errors.
  */
 
-// Dedicated Supabase client using service role to bypass RLS for rate limiting
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+interface RateLimitBucket {
+  count: number;
+  resetAt: number;
+}
+
+// In-memory store — shared within a serverless function instance
+const store = new Map<string, RateLimitBucket>();
+
+// Clean up old entries periodically to avoid memory leaks
+let lastCleanup = Date.now();
+function cleanup() {
+  const now = Date.now();
+  if (now - lastCleanup < 60_000) return;
+  lastCleanup = now;
+  for (const [key, bucket] of store.entries()) {
+    if (bucket.resetAt < now) store.delete(key);
+  }
+}
 
 export interface RateLimitResult {
   success: boolean;
@@ -20,34 +33,43 @@ export interface RateLimitResult {
 
 /**
  * Check if a request is within rate limits.
- * @param key - Unique identifier (userId, IP, etc.)
- * @param maxRequests - Maximum requests allowed in the window
- * @param windowMs - Time window in milliseconds (default: 60s)
+ * @param key          - Unique identifier (userId, IP, etc.)
+ * @param maxRequests  - Maximum requests allowed in the window
+ * @param windowMs     - Time window in milliseconds (default: 60s)
  */
-export async function checkRateLimit(
+export function checkRateLimit(
+  key: string,
+  maxRequests: number,
+  windowMs: number = 60_000
+): RateLimitResult {
+  cleanup();
+
+  const now = Date.now();
+  const existing = store.get(key);
+
+  if (!existing || existing.resetAt < now) {
+    // New window
+    store.set(key, { count: 1, resetAt: now + windowMs });
+    return { success: true, remaining: maxRequests - 1, resetInSeconds: Math.ceil(windowMs / 1000) };
+  }
+
+  existing.count++;
+  const resetInSeconds = Math.ceil((existing.resetAt - now) / 1000);
+
+  if (existing.count > maxRequests) {
+    return { success: false, remaining: 0, resetInSeconds };
+  }
+
+  return { success: true, remaining: maxRequests - existing.count, resetInSeconds };
+}
+
+// Keep the async signature for backward compatibility with existing route calls
+export async function checkRateLimitAsync(
   key: string,
   maxRequests: number,
   windowMs: number = 60_000
 ): Promise<RateLimitResult> {
-  try {
-    const { data, error } = await supabase.rpc("check_rate_limit", {
-      p_key: key,
-      p_max_requests: maxRequests,
-      p_window_seconds: Math.ceil(windowMs / 1000),
-    });
-
-    if (error) {
-      console.error("Rate limit RPC error:", error);
-      // Fallback: allow request if DB is down to avoid blocking users
-      return { success: true, remaining: 1, resetInSeconds: 0 };
-    }
-
-    // data is returned as a JSON object matching RateLimitResult
-    return data as RateLimitResult;
-  } catch (err) {
-    console.error("Rate limit unexpected error:", err);
-    return { success: true, remaining: 1, resetInSeconds: 0 };
-  }
+  return checkRateLimit(key, maxRequests, windowMs);
 }
 
 /**

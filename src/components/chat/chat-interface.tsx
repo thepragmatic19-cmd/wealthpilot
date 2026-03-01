@@ -151,6 +151,7 @@ export function ChatInterface({ initialMessage }: ChatInterfaceProps) {
   const messagesRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const { isFree, isElite, limits } = useSubscription();
 
   useEffect(() => {
@@ -308,6 +309,10 @@ export function ChatInterface({ initialMessage }: ChatInterfaceProps) {
     setStreaming(true);
     setStreamingText("");
 
+    // AbortController so user can cancel or navigate away cleanly
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     const userMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
       user_id: userId,
@@ -324,6 +329,7 @@ export function ChatInterface({ initialMessage }: ChatInterfaceProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: messageText }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -334,8 +340,10 @@ export function ChatInterface({ initialMessage }: ChatInterfaceProps) {
             toast.error("Limite de messages atteinte");
             return;
           }
+          toast.error("Trop de requêtes — attendez quelques secondes.");
+          return;
         }
-        throw new Error("API error");
+        throw new Error(`Erreur serveur (${res.status})`);
       }
 
       const reader = res.body?.getReader();
@@ -361,7 +369,9 @@ export function ChatInterface({ initialMessage }: ChatInterfaceProps) {
                 fullText += parsed.text;
                 setStreamingText(fullText);
               }
-              if (parsed.error) toast.error(parsed.error);
+              if (parsed.error) {
+                toast.error(parsed.error, { duration: 6000 });
+              }
             } catch {
               // skip malformed chunks
             }
@@ -369,21 +379,36 @@ export function ChatInterface({ initialMessage }: ChatInterfaceProps) {
         }
       }
 
-      const assistantMsg: ChatMessage = {
-        id: `temp-${Date.now()}-assistant`,
-        user_id: userId,
-        role: "assistant",
-        content: fullText,
-        metadata: null,
-        created_at: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
+      if (fullText) {
+        const assistantMsg: ChatMessage = {
+          id: `temp-${Date.now()}-assistant`,
+          user_id: userId,
+          role: "assistant",
+          content: fullText,
+          metadata: null,
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+        setFollowUpSuggestions(getContextualSuggestions(fullText));
+      }
       setStreamingText("");
-      setFollowUpSuggestions(getContextualSuggestions(fullText));
-    } catch {
-      toast.error("Erreur lors de l'envoi du message");
+    } catch (err: any) {
+      if (err?.name === "AbortError") {
+        // User navigated away or cancelled — silent
+      } else {
+        const msg = err?.message?.includes("Failed to fetch")
+          ? "Connexion interrompue. Vérifiez votre réseau."
+          : "Une erreur est survenue. Réessayez.";
+        toast.error(msg, { duration: 5000 });
+      }
+      // Remove the optimistic user message if no response came
+      if (!streamingText) {
+        setMessages((prev) => prev.filter(m => m.id !== userMsg.id));
+        setTodayMessageCount((c) => Math.max(0, c - 1));
+      }
     } finally {
       setStreaming(false);
+      abortRef.current = null;
     }
   }
 

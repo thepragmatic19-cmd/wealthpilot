@@ -46,22 +46,40 @@ export interface AIResponse {
   text: string;
 }
 
-// Helper: try gemini, fall back to groq on quota/network errors
+// Timeout wrapper — Vercel functions timeout at 60s, so we abort at 55s
+async function withTimeout<T>(promise: Promise<T>, ms = 55000): Promise<T> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(Object.assign(new Error('AI request timed out'), { status: 504 })), ms)
+  );
+  return Promise.race([promise, timeout]);
+}
+
+// Helper: Gemini primary, Groq 8b fallback. Retries once on transient errors.
 async function callWithFallback(
   geminiCall: () => Promise<any>,
   groqFallbackCall: () => Promise<any>
 ): Promise<any> {
   try {
-    return await geminiCall();
+    return await withTimeout(geminiCall());
   } catch (e: any) {
-    if (
-      e?.status === 429 ||
-      e?.status === 400 ||
-      e?.status === 404 ||
-      e?.status === 500 ||
-      e?.status === 503
-    ) {
-      console.warn("[AI] Gemini error", e.status, "→ fallback Groq 8b");
+    const status = e?.status ?? 0;
+    // Retry once on transient server errors before falling back to Groq
+    if (status === 503 || status === 500 || status === 504) {
+      console.warn(`[AI] Gemini transient error ${status}, retrying in 2s...`);
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        return await withTimeout(geminiCall());
+      } catch (e2: any) {
+        const s2 = e2?.status ?? 0;
+        if (s2 === 429 || s2 === 400 || s2 === 404 || s2 === 500 || s2 === 503 || s2 === 504) {
+          console.warn(`[AI] Gemini retry also failed (${s2}), falling back to Groq 8b`);
+          return await groqFallbackCall();
+        }
+        throw e2;
+      }
+    }
+    if (status === 429 || status === 400 || status === 404) {
+      console.warn(`[AI] Gemini error ${status} → fallback Groq 8b`);
       return await groqFallbackCall();
     }
     throw e;
