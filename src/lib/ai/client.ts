@@ -1,18 +1,34 @@
+import Groq from "groq-sdk";
 import OpenAI from "openai";
 
 // ============================================================
-// AI Provider: Google Gemini 2.0 Flash
-// Via OpenAI-compatible endpoint — aucun changement dans les routes API
-// Limites: 1 500 req/jour, 32 768 TPM gratuit (vs 14 400 sur Groq)
+// AI Provider Configuration
+// PRIMARY: Google Gemini 2.0 Flash (si GOOGLE_AI_API_KEY présent et quota OK)
+// FALLBACK: Groq Llama 3.3 70B (toujours disponible)
+// Pour basculer définitivement vers Gemini: activer la facturation sur
+// https://aistudio.google.com et s'assurer que le quota est > 0
 // ============================================================
 
-const genAI = new OpenAI({
-  apiKey: process.env.GOOGLE_AI_API_KEY!,
-  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY!,
 });
 
-export const AI_MODEL = "gemini-2.0-flash";
-export const AI_MODEL_FAST = "gemini-2.0-flash"; // même modèle — Gemini gère sa propre optimisation
+const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GROQ_MODEL_FAST = "llama-3.1-8b-instant";
+
+// Gemini client (utilisé seulement si disponible et facturé)
+const geminiAvailable = !!process.env.GOOGLE_AI_API_KEY && process.env.USE_GEMINI === "true";
+const gemini = geminiAvailable
+  ? new OpenAI({
+    apiKey: process.env.GOOGLE_AI_API_KEY!,
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+  })
+  : null;
+
+const GEMINI_MODEL = "gemini-2.0-flash";
+
+export const AI_MODEL = geminiAvailable ? GEMINI_MODEL : GROQ_MODEL;
+export const AI_MODEL_FAST = geminiAvailable ? GEMINI_MODEL : GROQ_MODEL_FAST;
 
 // ============================================================
 // Types
@@ -20,6 +36,37 @@ export const AI_MODEL_FAST = "gemini-2.0-flash"; // même modèle — Gemini gè
 
 export interface AIResponse {
   text: string;
+}
+
+// Helper: appelle Gemini si disponible, sinon Groq. Retry automatique sur 429.
+async function callWithFallback(
+  geminiCall: () => Promise<any>,
+  groqCall: () => Promise<any>
+): Promise<any> {
+  if (gemini && geminiAvailable) {
+    try {
+      return await geminiCall();
+    } catch (e: any) {
+      // Quota épuisé ou indisponible → fallback Groq
+      if (e?.status === 429 || e?.status === 400 || e?.status === 503) {
+        console.warn("[AI] Gemini unavailable, falling back to Groq:", e.status);
+      } else {
+        throw e;
+      }
+    }
+  }
+  // Groq avec retry automatique sur 429 (rate limit par minute)
+  try {
+    return await groqCall();
+  } catch (e: any) {
+    if (e?.status === 429) {
+      console.warn("[AI] Groq 429, retrying with fast model...");
+      // Retry avec modèle rapide
+      await new Promise((r) => setTimeout(r, 1500));
+      return await groqCall();
+    }
+    throw e;
+  }
 }
 
 // ============================================================
@@ -34,15 +81,28 @@ export async function generateAIResponse(options: {
 }): Promise<AIResponse> {
   const { systemPrompt, userMessage, maxTokens = 2048, temperature = 0.7 } = options;
 
-  const response = await genAI.chat.completions.create({
-    model: AI_MODEL,
-    max_tokens: maxTokens,
-    temperature,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userMessage },
-    ],
-  });
+  const response = await callWithFallback(
+    () =>
+      gemini!.chat.completions.create({
+        model: GEMINI_MODEL,
+        max_tokens: maxTokens,
+        temperature,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
+      }),
+    () =>
+      groq.chat.completions.create({
+        model: GROQ_MODEL,
+        max_tokens: maxTokens,
+        temperature,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
+      })
+  );
 
   const text = response.choices[0]?.message?.content || "";
   return { text };
@@ -60,20 +120,27 @@ export async function generateChatResponse(options: {
 }): Promise<AIResponse> {
   const { systemPrompt, messages, maxTokens = 2048, temperature = 0.7 } = options;
 
-  const groqMessages: Array<{
+  const allMessages: Array<{
     role: "system" | "user" | "assistant";
     content: string;
-  }> = [
-      { role: "system", content: systemPrompt },
-      ...messages,
-    ];
+  }> = [{ role: "system", content: systemPrompt }, ...messages];
 
-  const response = await genAI.chat.completions.create({
-    model: AI_MODEL,
-    max_tokens: maxTokens,
-    temperature,
-    messages: groqMessages,
-  });
+  const response = await callWithFallback(
+    () =>
+      gemini!.chat.completions.create({
+        model: GEMINI_MODEL,
+        max_tokens: maxTokens,
+        temperature,
+        messages: allMessages,
+      }),
+    () =>
+      groq.chat.completions.create({
+        model: GROQ_MODEL,
+        max_tokens: maxTokens,
+        temperature,
+        messages: allMessages,
+      })
+  );
 
   const text = response.choices[0]?.message?.content || "";
   return { text };
@@ -94,13 +161,25 @@ export async function streamChatResponse(options: {
   const allMessages: Array<{
     role: "system" | "user" | "assistant";
     content: string;
-  }> = [
-      { role: "system", content: systemPrompt },
-      ...messages,
-    ];
+  }> = [{ role: "system", content: systemPrompt }, ...messages];
 
-  return await genAI.chat.completions.create({
-    model: AI_MODEL,
+  if (gemini && geminiAvailable) {
+    try {
+      return await gemini.chat.completions.create({
+        model: GEMINI_MODEL,
+        max_tokens: maxTokens,
+        temperature,
+        messages: allMessages,
+        stream: true,
+      });
+    } catch (e: any) {
+      if (e?.status !== 429 && e?.status !== 400 && e?.status !== 503) throw e;
+      console.warn("[AI] Gemini stream unavailable, falling back to Groq:", e.status);
+    }
+  }
+
+  return await groq.chat.completions.create({
+    model: GROQ_MODEL_FAST,
     max_tokens: maxTokens,
     temperature,
     messages: allMessages,
@@ -141,7 +220,7 @@ export async function chatWithTools(options: {
     onToolCall,
   } = options;
 
-  // Convert tools to OpenAI function calling format
+  // Convert tools to OpenAI/Groq function calling format
   const openAITools = tools.map((tool) => ({
     type: "function" as const,
     function: {
@@ -151,20 +230,35 @@ export async function chatWithTools(options: {
     },
   }));
 
-  const groqMessages: Array<{
+  const msgHistory: Array<{
     role: "system" | "user" | "assistant" | "tool";
     content: string;
     tool_calls?: any[];
     tool_call_id?: string;
     name?: string;
-  }> = [
-      { role: "system", content: systemPrompt },
-      ...messages,
-    ];
+  }> = [{ role: "system", content: systemPrompt }, ...messages];
 
   const callAI = async (msgs: any[], toolsList: any[]) => {
-    return await genAI.chat.completions.create({
-      model: AI_MODEL,
+    const useGemini = gemini && geminiAvailable;
+    if (useGemini) {
+      try {
+        return await gemini!.chat.completions.create({
+          model: GEMINI_MODEL,
+          max_tokens: maxTokens,
+          temperature,
+          messages: msgs,
+          tools: toolsList.length > 0 ? toolsList : undefined,
+          tool_choice: toolsList.length > 0 ? "auto" : undefined,
+          stream: false,
+        });
+      } catch (e: any) {
+        if (e?.status !== 429 && e?.status !== 400 && e?.status !== 503) throw e;
+        console.warn("[AI] Gemini tools unavailable, falling back to Groq:", e.status);
+      }
+    }
+    // Groq fallback
+    return await groq.chat.completions.create({
+      model: GROQ_MODEL,
       max_tokens: maxTokens,
       temperature,
       messages: msgs,
@@ -174,27 +268,20 @@ export async function chatWithTools(options: {
     });
   };
 
-  let response = await callAI(groqMessages, openAITools);
-
+  let response = await callAI(msgHistory, openAITools);
   let maxIterations = 10;
 
-  // Handle tool calls in a loop
   while (maxIterations > 0) {
     const choice = response.choices[0];
-    if (
-      !choice?.message?.tool_calls ||
-      choice.message.tool_calls.length === 0
-    ) {
+    if (!choice?.message?.tool_calls || choice.message.tool_calls.length === 0) {
       break;
     }
 
     maxIterations--;
+    msgHistory.push(choice.message as any);
 
-    // Add the assistant message with tool calls
-    groqMessages.push(choice.message as any);
-
-    // Execute each tool call and add results
-    for (const toolCall of choice.message.tool_calls) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const toolCall of (choice.message.tool_calls as any[])) {
       if (onToolCall) onToolCall(toolCall.function.name);
 
       let args = {};
@@ -205,25 +292,37 @@ export async function chatWithTools(options: {
       }
 
       const result = executeTool(toolCall.function.name, args);
-
-      groqMessages.push({
+      msgHistory.push({
         role: "tool",
         tool_call_id: toolCall.id,
         content: result,
       });
     }
 
-    // Call again with tool results
-    response = await callAI(groqMessages, openAITools);
+    response = await callAI(msgHistory, openAITools);
   }
 
   if (streamFinal) {
-    // Return streaming response
-    return await genAI.chat.completions.create({
-      model: AI_MODEL,
+    if (gemini && geminiAvailable) {
+      try {
+        return await gemini.chat.completions.create({
+          model: GEMINI_MODEL,
+          max_tokens: maxTokens,
+          temperature,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          messages: msgHistory as any,
+          stream: true,
+        });
+      } catch (e: any) {
+        if (e?.status !== 429 && e?.status !== 400 && e?.status !== 503) throw e;
+      }
+    }
+    return await groq.chat.completions.create({
+      model: GROQ_MODEL,
       max_tokens: maxTokens,
       temperature,
-      messages: groqMessages,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      messages: msgHistory as any,
       stream: true,
     });
   }
