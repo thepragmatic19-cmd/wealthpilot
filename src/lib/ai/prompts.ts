@@ -240,58 +240,107 @@ Réponds UNIQUEMENT avec ce JSON — aucun texte avant ou après.`;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function buildPortfolioUserMessage(context?: any): string {
-  const riskProfile = context?.assessment?.risk_profile ?? 'modéré';
-  const riskScore = context?.assessment?.risk_score ?? 5;
-  const age = context?.clientInfo?.age;
-  const income = context?.clientInfo?.annual_income;
-  const assets = context?.clientInfo?.total_assets;
-  const hasCeli = context?.clientInfo?.has_celi;
-  const hasReer = context?.clientInfo?.has_reer;
+  const riskProfile: string = context?.assessment?.risk_profile ?? 'modéré';
+  const riskScore: number = context?.assessment?.risk_score ?? 5;
+  const client = context?.clientInfo ?? {};
+  const goals: any[] = context?.goals ?? [];
 
-  // Sharpe targets by profile
-  const SHARPE_TARGETS: Record<string, { min: number; target: string; returnRange: string }> = {
-    'très_conservateur': { min: 0.25, target: '0.30+', returnRange: '3.5–4.5%' },
-    'conservateur': { min: 0.30, target: '0.40+', returnRange: '4.0–5.5%' },
-    'modéré': { min: 0.45, target: '0.55+', returnRange: '5.5–7.5%' },
-    'croissance': { min: 0.55, target: '0.65+', returnRange: '7.0–9.5%' },
-    'agressif': { min: 0.60, target: '0.70+', returnRange: '8.5–11.0%' },
+  const SHARPE_TARGETS: Record<string, { min: number; target: string; returnRange: string; equityRange: string }> = {
+    'très_conservateur': { min: 0.20, target: '0.30+', returnRange: '3.5–4.5%', equityRange: '15–25% actions' },
+    'conservateur':      { min: 0.30, target: '0.40+', returnRange: '4.0–5.5%', equityRange: '30–45% actions' },
+    'modéré':            { min: 0.40, target: '0.55+', returnRange: '5.5–7.5%', equityRange: '55–65% actions' },
+    'croissance':        { min: 0.50, target: '0.65+', returnRange: '7.0–9.5%', equityRange: '75–85% actions' },
+    'agressif':          { min: 0.55, target: '0.70+', returnRange: '8.5–11.0%', equityRange: '90–100% actions' },
   };
-  const targets = SHARPE_TARGETS[riskProfile] ?? SHARPE_TARGETS['modéré'];
+  const t = SHARPE_TARGETS[riskProfile] ?? SHARPE_TARGETS['modéré'];
 
-  return `## Profil du client à servir
+  // Client narrative
+  const clientLines: string[] = [];
+  if (client.age) clientLines.push('- **Âge** : ' + client.age + ' ans');
+  if (client.profession) clientLines.push('- **Profession** : ' + client.profession);
+  if (client.family_situation) clientLines.push('- **Situation familiale** : ' + client.family_situation);
+  if (client.dependents != null) clientLines.push('- **Personnes à charge** : ' + client.dependents);
+  if (client.annual_income) clientLines.push('- **Revenu annuel** : ' + Number(client.annual_income).toLocaleString('fr-CA') + ' $');
+  if (client.monthly_expenses) clientLines.push('- **Dépenses/mois** : ' + Number(client.monthly_expenses).toLocaleString('fr-CA') + ' $');
+  if (client.monthly_savings) clientLines.push('- **Épargne/mois** : ' + Number(client.monthly_savings).toLocaleString('fr-CA') + ' $');
+  if (client.total_assets) clientLines.push('- **Actifs totaux** : ' + Number(client.total_assets).toLocaleString('fr-CA') + ' $');
+  if (client.total_debts) clientLines.push('- **Dettes totales** : ' + Number(client.total_debts).toLocaleString('fr-CA') + ' $');
+  if (client.tax_bracket) clientLines.push('- **Tranche imposition** : ' + client.tax_bracket + '%');
+  if (client.investment_experience) clientLines.push('- **Expérience** : ' + client.investment_experience);
 
-- **Profil de risque KYC** : ${riskProfile} (score ${riskScore}/10)
-${age ? `- **Âge** : ${age} ans` : ''}
-${income ? `- **Revenu annuel** : ${income.toLocaleString('fr-CA')} $` : ''}
-${assets ? `- **Actifs totaux** : ${assets.toLocaleString('fr-CA')} $` : ''}
-- **Comptes disponibles** : ${[hasCeli && 'CELI', hasReer && 'REER'].filter(Boolean).join(', ') || 'Non-enregistré uniquement'}
+  const accounts: string[] = [];
+  if (client.has_celi)    accounts.push('CELI' + (client.celi_balance ? ' (' + Number(client.celi_balance).toLocaleString('fr-CA') + ' $)' : ''));
+  if (client.has_reer)    accounts.push('REER' + (client.reer_balance ? ' (' + Number(client.reer_balance).toLocaleString('fr-CA') + ' $)' : ''));
+  if (client.has_reee)    accounts.push('REEE' + (client.reee_balance ? ' (' + Number(client.reee_balance).toLocaleString('fr-CA') + ' $)' : ''));
+  if (client.has_celiapp) accounts.push('CELIAPP' + (client.celiapp_balance ? ' (' + Number(client.celiapp_balance).toLocaleString('fr-CA') + ' $)' : ''));
+  if (client.has_cri)     accounts.push('CRI' + (client.cri_balance ? ' (' + Number(client.cri_balance).toLocaleString('fr-CA') + ' $)' : ''));
+  if (client.has_frv)     accounts.push('FRV' + (client.frv_balance ? ' (' + Number(client.frv_balance).toLocaleString('fr-CA') + ' $)' : ''));
+  clientLines.push('- **Comptes enregistrés** : ' + (accounts.length > 0 ? accounts.join(', ') : 'Compte non-enregistré uniquement'));
 
-${context?.constraintsSummary ?? ''}
+  // Goals
+  const goalsLines = goals.map((g: any) => {
+    const progress = g.target_amount > 0 ? Math.round((g.current_amount / g.target_amount) * 100) : 0;
+    const year = g.target_date ? new Date(g.target_date).getFullYear() : null;
+    return '  - **' + g.label + '** (' + g.type + ', priorité: ' + g.priority + '): ' +
+      Number(g.target_amount).toLocaleString('fr-CA') + ' $ — ' + progress + '% atteint' +
+      (year ? ', horizon ' + year : '');
+  });
 
-## Mission
+  // Personalization directives
+  const directives: string[] = [];
+  const age = Number(client.age) || 0;
+  if (age > 0) {
+    if (age < 35)       directives.push('Horizon 30+ ans → maximise actions de croissance, obligations < 15%');
+    else if (age < 50)  directives.push('Horizon 20-30 ans → équilibre croissance/protection, actions majoritaires');
+    else if (age < 60)  directives.push('Horizon 10-20 ans → transition vers préservation, augmenter obligations');
+    else                directives.push('Retraite proche → protection capital, revenu fixe + REITs pour revenus passifs');
+  }
 
-Génère **3 portefeuilles distincts** (conservateur, suggéré, ambitieux) optimisés pour ce profil.
+  if (client.has_celi && !client.has_reer) {
+    directives.push('CELI uniquement → actions TSX larges cap au CELI pour gains exonérés');
+  } else if (client.has_reer && !client.has_celi) {
+    directives.push('REER uniquement → priorise ETFs USD (VOO, VTI) pour exonérer la retenue 15%');
+  } else if (client.has_celi && client.has_reer) {
+    directives.push('CELI + REER → Asset Location: actions CA au CELI, ETFs USD au REER, obligations au REER');
+  }
 
-### Cibles de performance pour le portefeuille "suggéré"
-- **Ratio de Sharpe MINIMUM** : ${targets.min} — OBLIGATOIRE, le validateur rejette en dessous
-- **Ratio de Sharpe CIBLE** : ${targets.target}
-- **Rendement net attendu** : ${targets.returnRange}
-- **Taux sans risque** : 3.0% (BdC mars 2026)
+  if (client.has_celiapp && age < 40) directives.push('CELIAPP actif → prévoir poche obligataire/liquide pour objectif immobilier');
 
-### Architecture conseillée pour le profil ${riskProfile}
-- Portefeuille **conservateur** : 1 cran sous le profil → plus défensif, Sharpe min ${Math.max(0.20, targets.min - 0.15).toFixed(2)}
-- Portefeuille **suggéré** : exactement au profil → Sharpe cible ${targets.target}
-- Portefeuille **ambitieux** : 1 cran au-dessus → plus agressif, Sharpe min ${(targets.min + 0.05).toFixed(2)}
+  const expLow = ['débutant', 'aucune', 'none', 'beginner'].includes((client.investment_experience || '').toLowerCase());
+  if (expLow) directives.push('Débutant → ETFs indiciels simples uniquement (VFV.TO, ZAG.TO, XEF.TO)');
 
-### Règle clé pour maximiser le Sharpe
-Évite les actifs à faible rendement ajusté au risque :
-- CASH.TO / PSA.TO / CSAV.TO : rendement 3.0%, Sharpe individuel ~0 → limite à 5% max dans conservateur, 0% ailleurs
-- Or (CGL-C.TO, MNT.TO) : volatilité 15%, rendement 3.5% → max 5% total, uniquement en conservateur
-- Concentre plutôt dans VFV.TO (10%/14.5%), XIC.TO (7.5%/14%), ZAG.TO (3.5%/5.5%)
+  const hasRetirement = goals.some((g: any) => ['retirement', 'retraite'].includes(g.type));
+  const hasRealEstate  = goals.some((g: any) => ['house', 'real_estate', 'immobilier'].includes(g.type));
+  const urgentGoal     = goals.find((g: any) => ['haute', 'high', 'urgent'].includes(g.priority));
+  if (hasRetirement) directives.push('Objectif retraite → REER prioritaire, actions mondiales diversifiées');
+  if (hasRealEstate)  directives.push('Objectif immobilier → maintenir 10-15% obligations CT pour liquidité');
+  if (urgentGoal)     directives.push('Objectif urgent (' + urgentGoal.label + ') → poche obligataire CT pour flexibilité');
 
-Génère le JSON maintenant.`;
+  const keyFactors: string[] = context?.assessment?.key_factors as string[] ?? [];
+
+  return '## Dossier Client — Brief de Gestion de Portefeuille\n\n' +
+    '### Profil de Risque KYC\n' +
+    '- **Score** : ' + riskScore + '/10 — **Profil : ' + riskProfile.toUpperCase() + '**\n' +
+    '- **Exposition actions cible** : ' + t.equityRange + '\n' +
+    (keyFactors.length > 0 ? '- **Facteurs clés** : ' + keyFactors.join(' | ') + '\n' : '') +
+    '\n### Situation Financière\n' +
+    (clientLines.length > 0 ? clientLines.join('\n') : '- Profil client minimal') +
+    '\n\n### Objectifs d\'Investissement\n' +
+    (goalsLines.length > 0 ? goalsLines.join('\n') : '- Croissance patrimoniale générale long terme') +
+    '\n\n### Directives de Personnalisation (OBLIGATOIRES)\n' +
+    (directives.length > 0 ? directives.map(d => '- ' + d).join('\n') : '- Appliquer contraintes CFA standard') +
+    '\n\n' + (context?.constraintsSummary ?? '') +
+    '\n\n---\n\n## Mission\n\n' +
+    'Génère **3 portefeuilles ETFs** (types: "conservateur", "suggéré", "ambitieux") réellement personnalisés pour CE client.\n\n' +
+    '### Cibles Sharpe (Rf = 3.0%)\n' +
+    '| Type | Sharpe min | Cible | Rendement net |\n' +
+    '|------|-----------|-------|---------------|\n' +
+    '| conservateur | ' + Math.max(0.15, t.min - 0.15).toFixed(2) + ' | ' + t.min.toFixed(2) + '+ | ~' + t.returnRange.split('–')[0] + '% |\n' +
+    '| suggéré | ' + t.min.toFixed(2) + ' | ' + t.target + ' | ' + t.returnRange + ' |\n' +
+    '| ambitieux | ' + (t.min + 0.05).toFixed(2) + ' | ' + (t.min + 0.15).toFixed(2) + '+ | ' + t.returnRange.split('–')[1] + '%+ |\n\n' +
+    'CRITIQUE : validateur rejette sous Sharpe min. Favorise VFV.TO (10%/vol14.5%), XIC.TO (7.5%/vol14%), ZAG.TO (3.5%/vol5.5%). Évite CASH.TO sauf conservateur.\n\n' +
+    'Génère le JSON maintenant.';
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INTERFACES

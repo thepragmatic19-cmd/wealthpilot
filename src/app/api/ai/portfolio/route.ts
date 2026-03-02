@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateAIResponse } from "@/lib/ai/client";
 import { buildPortfolioSystemPrompt, buildPortfolioUserMessage } from "@/lib/ai/prompts";
-import { getInstrumentsSummaryForPrompt } from "@/lib/data/instruments";
+import { getInstrumentsSummaryCompact } from "@/lib/data/instruments";
 import { getConstraintsSummaryForPrompt } from "@/lib/portfolio/constraints";
-import { validateAndEnrichPortfolios } from "@/lib/portfolio/validator";
+import { validateAndEnrichPortfolios, cleanAndParsePortfolioJSON } from "@/lib/portfolio/validator";
 import { generateFallbackPortfolios } from "@/lib/portfolio/fallback";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import type { RiskProfile } from "@/types/database";
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     try {
       // Build dynamic prompts with user data
-      const instrumentsSummary = getInstrumentsSummaryForPrompt();
+      const instrumentsSummary = getInstrumentsSummaryCompact();
       const systemPrompt = buildPortfolioSystemPrompt(instrumentsSummary);
 
       const constraintsSummary = getConstraintsSummaryForPrompt(riskProfile);
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
           tax_bracket: null,
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        goals: (goals || []).map((g: any) => ({  // Supabase returns untyped rows
+        goals: (goals || []).map((g: any) => ({
           type: g.type as string,
           label: g.label as string,
           target_amount: g.target_amount as number,
@@ -109,16 +109,15 @@ export async function POST(request: NextRequest) {
       const aiResponse = await generateAIResponse({
         systemPrompt,
         userMessage,
-        maxTokens: 8000,
-        temperature: 0.3,
+        maxTokens: 12000,
+        temperature: 0.2,
       });
 
       const text = aiResponse.text;
       if (!text) {
         throw new Error("AI returned no text content");
       }
-      const cleanedText = text.replace(/```json\n ? /g, "").replace(/```\n?/g, "").trim();
-      const parsed = JSON.parse(cleanedText);
+      const parsed = cleanAndParsePortfolioJSON(text);
 
       // Validate and enrich AI response
       const validation = validateAndEnrichPortfolios(parsed, riskProfile);

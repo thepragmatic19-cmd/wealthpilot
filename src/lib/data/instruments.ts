@@ -1116,3 +1116,47 @@ export function getInstrumentsSummaryForPrompt(): string {
   }
   return summary;
 }
+
+/**
+ * Compact summary — top 2-3 ETFs per asset class (lowest MER + best return).
+ * Reduces prompt size from ~3000 → ~600 tokens, leaving more room for AI JSON output.
+ */
+export function getInstrumentsSummaryCompact(): string {
+  // Curated "best-in-class" ETFs per asset class: MER-optimized, broad market exposure
+  const CURATED: Record<string, string[]> = {
+    'Actions canadiennes': ['XIC.TO', 'VCN.TO', 'ZCN.TO'],
+    'Actions américaines': ['VFV.TO', 'ZSP.TO', 'QQC.TO', 'VTI', 'VOO'],
+    'Actions internationales': ['XEF.TO', 'VIU.TO', 'XAW.TO'],
+    'Actions marchés émergents': ['XEC.TO', 'VEE.TO', 'VWO'],
+    'Obligations canadiennes': ['ZAG.TO', 'VAB.TO', 'XSB.TO', 'ZFL.TO'],
+    'Obligations mondiales': ['VGAB.TO', 'ZGB.TO'],
+    'Immobilier (REITs)': ['ZRE.TO', 'VRE.TO'],
+    'Or / Commodités': ['CGL-C.TO', 'MNT.TO'],
+    'Liquidités': ['CASH.TO', 'PSA.TO'],
+  };
+
+  const grouped: Record<string, Instrument[]> = {};
+  for (const inst of INSTRUMENTS) {
+    if (!grouped[inst.asset_class]) grouped[inst.asset_class] = [];
+    grouped[inst.asset_class].push(inst);
+  }
+
+  let summary = '';
+  for (const [assetClass, tickers] of Object.entries(CURATED)) {
+    const instruments = grouped[assetClass] || [];
+    // Filter to only the curated tickers, preserving the curated order
+    const selected = tickers
+      .map(t => instruments.find(i => i.ticker === t))
+      .filter((i): i is Instrument => i !== undefined);
+    if (selected.length === 0) continue;
+
+    summary += `\n**${assetClass}**\n`;
+    summary += '| Ticker | MER | Rend.att. | Vol. | Devise | Compte |\n';
+    summary += '|--------|-----|-----------|------|--------|--------|\n';
+    for (const inst of selected) {
+      summary += `| ${inst.ticker} | ${inst.mer}% | ${inst.expected_return}% | ${inst.volatility}% | ${inst.currency} | ${inst.preferred_account} |\n`;
+    }
+  }
+  return summary;
+}
+

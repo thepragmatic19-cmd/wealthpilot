@@ -22,7 +22,14 @@ const AllocationSchema = z.object({
 });
 
 const PortfolioSchema = z.object({
-  type: z.enum(['conservateur', 'suggéré', 'ambitieux']),
+  type: z.string().transform((val) => {
+    // Normalize AI type aliases to our canonical values
+    const normalized = val.toLowerCase().trim();
+    if (['suggest', 'suggested', 'equilibre', 'balanced', 'suggere', 'suggéré'].some(a => normalized.includes(a))) return 'suggéré';
+    if (['conserv', 'prudent', 'defensive'].some(a => normalized.includes(a))) return 'conservateur';
+    if (['ambitieux', 'ambitiou', 'aggressive', 'growth', 'croissanc', 'agressif'].some(a => normalized.includes(a))) return 'ambitieux';
+    return val;
+  }).pipe(z.enum(['conservateur', 'suggéré', 'ambitieux'])),
   name: z.string(),
   description: z.string().optional(),
   expected_return: z.number(),
@@ -239,135 +246,168 @@ export function validateAndEnrichPortfolios(
   };
 }
 
+/**
+ * Normalise le JSON brut de l'IA :
+ * - Supprime les blocs markdown code
+ * - Corrige les virgules trailing
+ * - Extrait le premier objet JSON valide
+ */
+export function cleanAndParsePortfolioJSON(raw: string): unknown {
+  let text = raw
+    // Strip markdown code fences
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/g, '')
+    .trim();
+
+  // Remove trailing commas before } or ] (common AI mistake)
+  text = text.replace(/,\s*([}\]])/g, '$1');
+
+  // Try direct parse first
+  try {
+    return JSON.parse(text);
+  } catch {
+    // Try extracting first JSON object
+    const match = text.match(/(\{[\s\S]*\})/);
+    if (match) {
+      try {
+        return JSON.parse(match[1].replace(/,\s*([}\]])/g, '$1'));
+      } catch {
+        // pass
+      }
+    }
+    throw new Error('Cannot parse AI JSON response');
+  }
+}
+
 // ============================================================
 // HELPERS
-// ============================================================
+  // ============================================================
 
-function normalizeWeights(
-  allocations: z.infer<typeof AllocationSchema>[]
-): z.infer<typeof AllocationSchema>[] {
-  const total = allocations.reduce((sum, a) => sum + a.weight, 0);
-  if (total === 0) return allocations;
+  function normalizeWeights(
+    allocations: z.infer<typeof AllocationSchema>[]
+  ): z.infer<typeof AllocationSchema>[] {
+    const total = allocations.reduce((sum, a) => sum + a.weight, 0);
+    if (total === 0) return allocations;
 
-  const factor = 100 / total;
-  const normalized = allocations.map((a) => ({
-    ...a,
-    weight: Math.round(a.weight * factor * 10) / 10,
-  }));
+    const factor = 100 / total;
+    const normalized = allocations.map((a) => ({
+      ...a,
+      weight: Math.round(a.weight * factor * 10) / 10,
+    }));
 
-  // Fix rounding: adjust the largest position
-  const newTotal = normalized.reduce((sum, a) => sum + a.weight, 0);
-  const diff = Math.round((100 - newTotal) * 10) / 10;
-  if (diff !== 0) {
-    const largest = normalized.reduce((max, a) =>
-      a.weight > max.weight ? a : max
-    );
-    largest.weight = Math.round((largest.weight + diff) * 10) / 10;
+    // Fix rounding: adjust the largest position
+    const newTotal = normalized.reduce((sum, a) => sum + a.weight, 0);
+    const diff = Math.round((100 - newTotal) * 10) / 10;
+    if (diff !== 0) {
+      const largest = normalized.reduce((max, a) =>
+        a.weight > max.weight ? a : max
+      );
+      largest.weight = Math.round((largest.weight + diff) * 10) / 10;
+    }
+
+    return normalized;
   }
 
-  return normalized;
-}
+  function checkConstraints(
+    portfolioType: string,
+    allocations: z.infer<typeof AllocationSchema>[],
+    riskProfile: RiskProfile,
+    warnings: ValidationWarning[]
+  ): void {
+    // Map portfolio type to the profile it should match
+    const profiles: RiskProfile[] = [
+      'très_conservateur',
+      'conservateur',
+      'modéré',
+      'croissance',
+      'agressif',
+    ];
+    const currentIdx = profiles.indexOf(riskProfile);
 
-function checkConstraints(
-  portfolioType: string,
-  allocations: z.infer<typeof AllocationSchema>[],
-  riskProfile: RiskProfile,
-  warnings: ValidationWarning[]
-): void {
-  // Map portfolio type to the profile it should match
-  const profiles: RiskProfile[] = [
-    'très_conservateur',
-    'conservateur',
-    'modéré',
-    'croissance',
-    'agressif',
-  ];
-  const currentIdx = profiles.indexOf(riskProfile);
+    let targetProfile: RiskProfile;
+    if (portfolioType === 'conservateur') {
+      targetProfile = profiles[Math.max(0, currentIdx - 1)];
+    } else if (portfolioType === 'ambitieux') {
+      targetProfile = profiles[Math.min(profiles.length - 1, currentIdx + 1)];
+    } else {
+      targetProfile = riskProfile;
+    }
 
-  let targetProfile: RiskProfile;
-  if (portfolioType === 'conservateur') {
-    targetProfile = profiles[Math.max(0, currentIdx - 1)];
-  } else if (portfolioType === 'ambitieux') {
-    targetProfile = profiles[Math.min(profiles.length - 1, currentIdx + 1)];
-  } else {
-    targetProfile = riskProfile;
-  }
+    const constraints = getConstraintsForProfile(targetProfile);
 
-  const constraints = getConstraintsForProfile(targetProfile);
+    // Group weights by asset class
+    const classTotals: Record<string, number> = {};
+    for (const alloc of allocations) {
+      const instrument = getInstrumentByTicker(alloc.instrument_ticker);
+      const assetClass = instrument?.asset_class || alloc.asset_class;
+      classTotals[assetClass] = (classTotals[assetClass] || 0) + alloc.weight;
+    }
 
-  // Group weights by asset class
-  const classTotals: Record<string, number> = {};
-  for (const alloc of allocations) {
-    const instrument = getInstrumentByTicker(alloc.instrument_ticker);
-    const assetClass = instrument?.asset_class || alloc.asset_class;
-    classTotals[assetClass] = (classTotals[assetClass] || 0) + alloc.weight;
-  }
-
-  // Check equity max
-  let equityTotal = 0;
-  for (const [cls, weight] of Object.entries(classTotals)) {
-    if (EQUITY_CLASSES.has(cls)) equityTotal += weight;
-  }
-  if (equityTotal > constraints.equity_max) {
-    warnings.push({
-      portfolio_type: portfolioType,
-      message: `Équité ${equityTotal}% dépasse le max ${constraints.equity_max}%`,
-    });
-  }
-
-  // Check fixed income min
-  let fixedIncomeTotal = 0;
-  for (const [cls, weight] of Object.entries(classTotals)) {
-    if (FIXED_INCOME_CLASSES.has(cls)) fixedIncomeTotal += weight;
-  }
-  if (fixedIncomeTotal < constraints.fixed_income_min) {
-    warnings.push({
-      portfolio_type: portfolioType,
-      message: `Revenu fixe ${fixedIncomeTotal}% sous le min ${constraints.fixed_income_min}%`,
-    });
-  }
-
-  // Check holdings count
-  if (allocations.length < constraints.holdings_min) {
-    warnings.push({
-      portfolio_type: portfolioType,
-      message: `${allocations.length} positions, minimum ${constraints.holdings_min}`,
-    });
-  }
-  if (allocations.length > constraints.holdings_max) {
-    warnings.push({
-      portfolio_type: portfolioType,
-      message: `${allocations.length} positions, maximum ${constraints.holdings_max}`,
-    });
-  }
-
-  // Check position max
-  for (const alloc of allocations) {
-    if (alloc.weight > constraints.position_max) {
+    // Check equity max
+    let equityTotal = 0;
+    for (const [cls, weight] of Object.entries(classTotals)) {
+      if (EQUITY_CLASSES.has(cls)) equityTotal += weight;
+    }
+    if (equityTotal > constraints.equity_max) {
       warnings.push({
         portfolio_type: portfolioType,
-        message: `${alloc.instrument_ticker} à ${alloc.weight}% dépasse le max ${constraints.position_max}%`,
+        message: `Équité ${equityTotal}% dépasse le max ${constraints.equity_max}%`,
       });
     }
-  }
 
-  // Check asset class ranges
-  for (const [assetClass, range] of Object.entries(
-    constraints.asset_class_ranges
-  )) {
-    const actual = classTotals[assetClass] || 0;
-    const { min, max } = range as AssetClassRange;
-    if (actual < min) {
+    // Check fixed income min
+    let fixedIncomeTotal = 0;
+    for (const [cls, weight] of Object.entries(classTotals)) {
+      if (FIXED_INCOME_CLASSES.has(cls)) fixedIncomeTotal += weight;
+    }
+    if (fixedIncomeTotal < constraints.fixed_income_min) {
       warnings.push({
         portfolio_type: portfolioType,
-        message: `${assetClass}: ${actual}% sous le min ${min}%`,
+        message: `Revenu fixe ${fixedIncomeTotal}% sous le min ${constraints.fixed_income_min}%`,
       });
     }
-    if (actual > max) {
+
+    // Check holdings count
+    if (allocations.length < constraints.holdings_min) {
       warnings.push({
         portfolio_type: portfolioType,
-        message: `${assetClass}: ${actual}% dépasse le max ${max}%`,
+        message: `${allocations.length} positions, minimum ${constraints.holdings_min}`,
       });
+    }
+    if (allocations.length > constraints.holdings_max) {
+      warnings.push({
+        portfolio_type: portfolioType,
+        message: `${allocations.length} positions, maximum ${constraints.holdings_max}`,
+      });
+    }
+
+    // Check position max
+    for (const alloc of allocations) {
+      if (alloc.weight > constraints.position_max) {
+        warnings.push({
+          portfolio_type: portfolioType,
+          message: `${alloc.instrument_ticker} à ${alloc.weight}% dépasse le max ${constraints.position_max}%`,
+        });
+      }
+    }
+
+    // Check asset class ranges
+    for (const [assetClass, range] of Object.entries(
+      constraints.asset_class_ranges
+    )) {
+      const actual = classTotals[assetClass] || 0;
+      const { min, max } = range as AssetClassRange;
+      if (actual < min) {
+        warnings.push({
+          portfolio_type: portfolioType,
+          message: `${assetClass}: ${actual}% sous le min ${min}%`,
+        });
+      }
+      if (actual > max) {
+        warnings.push({
+          portfolio_type: portfolioType,
+          message: `${assetClass}: ${actual}% dépasse le max ${max}%`,
+        });
+      }
     }
   }
-}
