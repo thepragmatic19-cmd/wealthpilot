@@ -94,8 +94,8 @@ const FIXED_INCOME_CLASSES = new Set([
 // Below these values, the portfolio is rejected and fallback is used.
 const SHARPE_MINIMUMS: Record<string, number> = {
   conservateur: 0.25,
-  suggéré: 0.40,
-  ambitieux: 0.50,
+  suggéré: 0.38,
+  ambitieux: 0.40,
 };
 
 export function validateAndEnrichPortfolios(

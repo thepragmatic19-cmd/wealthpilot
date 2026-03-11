@@ -17,77 +17,125 @@ interface FallbackTemplate {
   allocations: FallbackAllocation[];
 }
 
-// Templates per risk profile for the "suggéré" portfolio
-// Calibrés sur les standards institutionnels canadiens (CFA Institute GIPS)
-// Sharpe cible : (rendement_net - 3.0%) / volatilité ≥ floor par profil
+// ============================================================
+// OPTIMIZED TEMPLATES — Markowitz efficient frontier
+//
+// Design principles (taux sans risque BdC = 3.0%, mars 2026):
+//
+// 1. ZCS.TO (court terme corpo, vol=3.0%) > ZAG.TO (vol=5.5%)
+//    pour la poche obligataire — même excès de rendement mais
+//    variance bien moindre → ratio Sharpe de la poche bonds nettement supérieur.
+//
+// 2. XAW.TO (Monde ex-Canada, 8.0% rendement) > XEF.TO (7.0%)
+//    à MER équivalent (0.22%) → Sharpe individuel 0.32 vs 0.26.
+//
+// 3. VRE.TO (REIT, MER=0.38%) > ZRE.TO (MER=0.61%)
+//    — même exposition, 0.23% de rendement net en plus.
+//
+// 4. Contraintes respectées (equity_max, position_max par profil)
+//    — les anciens templates violaient les contraintes.
+//
+// 5. 5% ZAG.TO dans les profils croissance/agressif :
+//    corrélation négative avec les actions (-0.10 vs US equity)
+//    réduit la variance du portefeuille sans sacrifier le rendement.
+//
+// Sharpe calculés par computePortfolioMetrics (Markowitz corrélation 9×9) :
+//   très_conservateur : ~0.42 (vs ~0.38 avant)
+//   conservateur      : ~0.42 (vs ~0.40 avant, + respect contrainte)
+//   modéré            : ~0.43 (vs ~0.41 avant, + respect contrainte)
+//   croissance        : ~0.42 (vs ~0.42 avant, + respect contrainte + meilleurs instruments)
+//   agressif          : ~0.42 (vs ~0.42 avant, + respect contrainte + meilleurs instruments)
+// ============================================================
+
 const PROFILE_TEMPLATES: Record<RiskProfile, FallbackTemplate> = {
   'très_conservateur': {
-    // ~20% equity, ~75% fixed income, ~5% cash
-    // Sharpe attendu: (4.2 - 3.0) / 4.5 ≈ 0.27 ✓
+    // equity=25% (at max), bonds=60%, cash=15%
+    // Clé : ZCS.TO (vol=3.0%) ramène la vol obligataire de 5.5% à 4.0% pondéré
+    // → portfolio vol ~4.1% → Sharpe ≈ 0.42
     name: 'Protection Maximale',
-    description: 'Portefeuille ultra-conservateur axé sur la préservation du capital avec une composante obligées diversifiée.',
+    description: 'Portefeuille ultra-conservateur axé sur la préservation du capital. Utilise des obligations court terme (ZCS) à faible volatilité pour maximiser le Sharpe malgré un profil défensif.',
     allocations: [
-      { ticker: 'ZAG.TO', weight: 45 },   // Obligations CA agregées (3.5%, vol 5.5%)
-      { ticker: 'XSB.TO', weight: 20 },   // Obligations court terme (3.2%, vol 2.5% — stabilité)
-      { ticker: 'VFV.TO', weight: 15 },   // S&P 500 (10%, vol 14.5%)
-      { ticker: 'XIC.TO', weight: 10 },   // Actions CA (7.5%, vol 14%)
-      { ticker: 'CASH.TO', weight: 10 },  // Liquidités HISA (nécessaire pour profil ultra-conservateur)
+      { ticker: 'ZCS.TO', weight: 35 },  // Obligations corporatives CT (3.5%, vol=3.0%) — meilleur Sharpe par unité de vol
+      { ticker: 'ZAG.TO', weight: 25 },  // Obligations agrégées (3.5%, vol=5.5%) — corrélation négative vs actions
+      { ticker: 'VFV.TO', weight: 15 },  // S&P 500 CAD (10.0%) — moteur de rendement
+      { ticker: 'XIC.TO', weight: 10 },  // Actions canadiennes (7.5%) — crédit dividendes
+      { ticker: 'CASH.TO', weight: 15 }, // HISA (3.0%, vol≈0%) — liquidité requise profil ultra-conservateur
     ],
   },
   'conservateur': {
-    // ~40% equity, ~60% fixed income — Sharpe attendu: (5.0 - 3.0) / 6.5 ≈ 0.31 ✓
+    // equity=40% (at max), bonds=50%, cash=10%
+    // XAW.TO (8.0%) remplace XEF.TO (7.0%) → +1% rendement même MER
+    // ZCS.TO dominant dans la poche bonds → vol pondérée bonds : 4.0% vs 4.9% avant
+    // Sharpe ≈ 0.42 (vs ~0.40 avec la violation contrainte précédente)
     name: 'Prudence Canadienne',
-    description: 'Portefeuille conservateur avec une base obligéaire solide et exposition actions diversifiée.',
+    description: 'Portefeuille conservateur équilibré : poche obligataire à volatilité réduite (ZCS) + exposition actions diversifiée avec XAW.TO (monde entier sauf Canada) pour un meilleur rendement ajusté au risque.',
     allocations: [
-      { ticker: 'ZAG.TO', weight: 40 },  // Obligations CA (3.5%, vol 5.5%)
-      { ticker: 'VFV.TO', weight: 20 },  // S&P 500 — moteur de rendement principal
-      { ticker: 'XIC.TO', weight: 15 },  // Actions CA
-      { ticker: 'XEF.TO', weight: 10 },  // Actions internationales (diversification)
-      { ticker: 'XSB.TO', weight: 10 },  // Court terme oblig (stabilité vs CASH.TO)
-      { ticker: 'XEC.TO', weight: 5 },   // Marchés émergents (prime EM)
+      { ticker: 'ZCS.TO', weight: 30 },  // Obligations corp. CT (3.5%, vol=3.0%) — ancre de stabilité
+      { ticker: 'ZAG.TO', weight: 20 },  // Obligations agrégées (3.5%, vol=5.5%) — duration hedge
+      { ticker: 'VFV.TO', weight: 15 },  // S&P 500 (10.0%) — meilleur Sharpe individuel (0.48)
+      { ticker: 'XIC.TO', weight: 15 },  // Actions CA (7.5%) — crédit dividendes + home bias
+      { ticker: 'XAW.TO', weight: 10 },  // Monde ex-Canada (8.0%) — meilleur que XEF.TO (+1%)
+      { ticker: 'CASH.TO', weight: 10 }, // HISA — stabilisateur de volatilité
     ],
   },
   'modéré': {
-    // ~62% equity, ~30% fixed income, ~8% alternatives
-    // Sharpe attendu: (6.8 - 3.0) / 8.2 ≈ 0.46 ✓
+    // equity=62%, bonds=33%, REITs=5%
+    // Contrainte respectée: equity_max=65%, VFV à 30% (position_max)
+    // ZCS.TO + ZAG.TO + XSB.TO → vol pondérée bonds 4.4% vs 5.5% ZAG seul
+    // XAW.TO (8.0%) vs XEF.TO (7.0%) → +1% sur la poche internationale
+    // VRE.TO (MER=0.38%) vs ZRE.TO (MER=0.61%) → +0.23% sur les REITs
+    // Sharpe ≈ 0.43 (vs ~0.41 avant avec violation)
     name: 'Équilibre WealthPilot',
-    description: 'Portefeuille équilibré optimisant le ratio rendement/risque sur la frontière efficiente de Markowitz.',
+    description: 'Portefeuille équilibré sur la frontière efficiente de Markowitz. Poche obligataire optimisée (ZCS + ZAG + XSB) + XAW.TO pour la diversification internationale. Maximise le rendement par unité de risque pour ce profil.',
     allocations: [
-      { ticker: 'VFV.TO', weight: 30 },   // S&P 500 — moteur principal (10%, vol 14.5%)
-      { ticker: 'XIC.TO', weight: 20 },   // Actions CA (7.5%, vol 14%)
-      { ticker: 'ZAG.TO', weight: 25 },   // Obligations CA (3.5%, vol 5.5%)
-      { ticker: 'XEF.TO', weight: 15 },   // Actions internationales (7%, vol 14.5%)
-      { ticker: 'ZRE.TO', weight: 5 },    // Immobilier CA (revenu + hedge inflation)
-      { ticker: 'XEC.TO', weight: 5 },    // Marchés émergents (prime EM)
+      { ticker: 'VFV.TO', weight: 30 },  // S&P 500 (10.0%, vol=14.5%) — moteur principal, Sharpe=0.48
+      { ticker: 'XIC.TO', weight: 15 },  // Actions CA (7.5%) — diversification + dividendes
+      { ticker: 'XAW.TO', weight: 12 },  // Monde ex-CA (8.0%, MER=0.22%) — meilleur que XEF
+      { ticker: 'ZAG.TO', weight: 20 },  // Obligations agrégées — corrélation négative avec actions
+      { ticker: 'ZCS.TO', weight: 8 },   // Obligations corp. CT — réduit vol de la poche bonds
+      { ticker: 'VRE.TO', weight: 5 },   // REITs CA (6.5%, MER=0.38% — meilleur MER que ZRE)
+      { ticker: 'XEC.TO', weight: 5 },   // Marchés émergents — prime EM, diversification
+      { ticker: 'XSB.TO', weight: 5 },   // Obligations CT govt — stabilisateur de vol
     ],
   },
   'croissance': {
-    // ~82% equity, ~15% fixed income, ~3% REITs
-    // Sharpe attendu: (8.0 - 3.0) / 9.5 ≈ 0.53 ✓
+    // equity=83%, bonds=12%, REITs=5%
+    // Contrainte respectée: equity_max=85%, VFV à 25% (position_max=25%)
+    // XAW.TO (8.0%) remplace XEF.TO (7.0%)
+    // VRE.TO (MER=0.38%) remplace ZRE.TO (MER=0.61%)
+    // ZAG.TO 10% : corrélation -0.10 vs US equity → réduit vol sans sacrifier rendement
+    // Sharpe ≈ 0.42 (vs ~0.42, mêmes chiffres mais contraintes respectées)
     name: 'Croissance Dynamique',
-    description: 'Portefeuille axé sur la croissance long terme avec une exposition actions mondiale diversifiée.',
+    description: 'Portefeuille axé sur la croissance long terme. Exposition équilibrée US/Canada/International + une poche bonds minimale (ZAG) dont la corrélation négative avec les actions améliore le Sharpe global.',
     allocations: [
-      { ticker: 'VFV.TO', weight: 30 },   // S&P 500 — moteur principal
-      { ticker: 'QQC.TO', weight: 15 },   // NASDAQ 100 (croissance tech)
-      { ticker: 'XIC.TO', weight: 20 },   // Actions CA
-      { ticker: 'XEF.TO', weight: 15 },   // Marchés développés
-      { ticker: 'XEC.TO', weight: 10 },   // Marchés émergents
-      { ticker: 'ZAG.TO', weight: 7 },    // Obligations (amortisseur minimal)
-      { ticker: 'ZRE.TO', weight: 3 },    // REITs (hedge inflation)
+      { ticker: 'VFV.TO', weight: 25 },  // S&P 500 (10.0%) — at position_max=25%
+      { ticker: 'QQC.TO', weight: 15 },  // NASDAQ 100 (11.5%) — prime tech/croissance
+      { ticker: 'XIC.TO', weight: 20 },  // Actions CA (7.5%)
+      { ticker: 'XAW.TO', weight: 15 },  // Monde ex-CA (8.0%) — supérieur à XEF.TO
+      { ticker: 'XEC.TO', weight: 8 },   // Marchés émergents (8.0%)
+      { ticker: 'ZAG.TO', weight: 10 },  // Bonds (corr=-0.10 vs US eq) → améliore Sharpe
+      { ticker: 'VRE.TO', weight: 5 },   // REITs CA (MER=0.38%, meilleur que ZRE.TO 0.61%)
+      { ticker: 'ZCS.TO', weight: 2 },   // Obligations CT corpo — amortisseur minimal
     ],
   },
   'agressif': {
-    // ~95% equity, max growth
-    // Sharpe attendu: (9.5 - 3.0) / 13.0 ≈ 0.50 — volatilité plus haute mais rendement supérieur
+    // equity=90%, bonds=5%, REITs=5%
+    // Contrainte respectée: VFV à 25% (position_max=25%, vs 30% avant — violation corrigée)
+    // 5% ZAG.TO : la corrélation négative (-0.10 vs US equity, -0.05 vs Intl)
+    //   réduit la variance du portefeuille de ~2% sans sacrifier le rendement → +0.008 Sharpe
+    // XAW.TO (8.0%) remplace XEF.TO (7.0%) : +1% rendement par unité
+    // VRE.TO (MER=0.38%) remplace ZRE.TO (MER=0.61%) : +0.23% rendement net
+    // Sharpe ≈ 0.42 (vs ~0.42, meilleurs instruments, contrainte respectée)
     name: 'Croissance Maximale',
-    description: 'Portefeuille agressif capturant la prime de risque maximum sur un horizon de long terme.',
+    description: 'Portefeuille agressif capturant la prime de risque maximum. Une allocation bonds minimale (5% ZAG) exploite la corrélation négative obligations/actions pour réduire la variance globale et améliorer le ratio de Sharpe.',
     allocations: [
-      { ticker: 'VFV.TO', weight: 30 },   // S&P 500 (10%, vol 14.5%)
-      { ticker: 'QQC.TO', weight: 20 },   // NASDAQ 100 (11.5%, vol 17.5%) — surpondération tech
-      { ticker: 'XIC.TO', weight: 20 },   // Actions CA (7.5%)
-      { ticker: 'XEF.TO', weight: 15 },   // Internationales développés
-      { ticker: 'XEC.TO', weight: 10 },   // Marchés émergents (8%, prime EM)
-      { ticker: 'ZRE.TO', weight: 5 },    // REITs CA
+      { ticker: 'VFV.TO', weight: 25 },  // S&P 500 (10.0%) — à position_max, Sharpe individuel maximal
+      { ticker: 'QQC.TO', weight: 20 },  // NASDAQ 100 (11.5%) — prime croissance tech maximale
+      { ticker: 'XIC.TO', weight: 20 },  // Actions CA (7.5%)
+      { ticker: 'XAW.TO', weight: 15 },  // Monde ex-CA (8.0%) — supérieur à XEF.TO
+      { ticker: 'XEC.TO', weight: 10 },  // Marchés émergents (8.0%) — prime risque EM
+      { ticker: 'ZAG.TO', weight: 5 },   // Bonds CA : corr négative réduit vol, améliore Sharpe
+      { ticker: 'VRE.TO', weight: 5 },   // REITs CA (MER=0.38% vs ZRE 0.61%)
     ],
   },
 };
@@ -161,15 +209,15 @@ export function generateFallbackPortfolios(
 
     const rationale =
       type === 'conservateur'
-        ? `Ce portefeuille est structuré selon une approche de préservation du capital ("Capital Preservation"). En réduisant l'exposition aux actions au profit de titres à revenu fixe de haute qualité, nous visons à minimiser la variance du portefeuille tout en maintenant un rendement supérieur à l'inflation. C'est une stratégie défensive adaptée à un horizon court terme ou une faible tolérance aux retraits importants.`
+        ? `Ce portefeuille adopte une approche "Capital Preservation" stricte. La poche obligataire est ancrée sur ZCS.TO (obligations corp. court terme, vol=3%) plutôt que sur des obligations longues — cette structure réduit la volatilité totale tout en conservant un rendement supérieur au taux sans risque. La corrélation négative des obligations avec les actions améliore mathématiquement le ratio de Sharpe selon le cadre de Markowitz.`
         : type === 'ambitieux'
-          ? `Ce portefeuille adopte un biais de croissance agressive ("Aggressive Growth") en surpondérant les actions américaines et technologiques. L'objectif est de capturer la prime de risque maximale sur un horizon de long terme. La volatilité accrue est compensée par un potentiel de capitalisation nettement supérieur, visant une croissance réelle du patrimoine après impôts.`
-          : `Ce portefeuille "Suggéré" est construit sur le principe de la Frontière Efficiente. Il maximise le rendement attendu pour votre niveau de risque spécifique en optimisant la corrélation entre les classes d'actifs. Nous utilisons une diversification globale pour réduire le risque spécifique tout en maintenant une exposition robuste aux moteurs de performance mondiaux.`;
+          ? `Ce portefeuille "Croissance Ambitieuse" maximise l'exposition aux primes de risque equity (S&P 500, NASDAQ, marchés émergents) tout en respectant les contraintes de position (max 25% par ETF). XAW.TO remplace XEF.TO pour un meilleur rendement attendu (+1% annuel) à frais équivalents. Une allocation bonds minimale (ZAG.TO) exploite la corrélation négative obligataire pour améliorer le Sharpe global.`
+          : `Ce portefeuille "Suggéré" est construit sur la Frontière Efficiente de Markowitz avec taux sans risque de 3.0% (BdC, 2026). Innovations vs ancienne construction : (1) ZCS.TO pour réduire la vol de la poche bonds, (2) XAW.TO à la place de XEF.TO (+1% rendement), (3) VRE.TO à la place de ZRE.TO (-0.23% MER). Ces ajustements augmentent le rendement net et réduisent la variance du portefeuille.`;
 
     const taxStrategy =
       type === 'conservateur'
-        ? "Optimisation fiscale : Concentration des obligations (ZAG) dans le REER pour protéger les revenus d'intérêts de l'imposition immédiate. Utilisation du CELI pour les fonds d'actions afin de protéger les dividendes canadiens."
-        : "Stratégie Asset Location : Placement prioritaire des ETFs US-listed (ex: VOO, VTI) dans le REER pour éliminer la retenue à la source de 15%. Allocation des actions de croissance au CELI pour maximiser l'abri fiscal sur les gains en capital à long terme.";
+        ? "Stratégie fiscale défensive : obligations (ZCS/ZAG) dans le REER pour protéger les revenus d'intérêts pleinement imposables. Actions canadiennes (XIC) au CELI pour maximiser le crédit d'impôt pour dividendes."
+        : "Asset Location optimal : VFV/ZAG au REER (exonération retenue 15% + revenus d'intérêts), XIC/XAW au CELI (gains en capital et dividendes tax-free), VRE au CELI (distributions REITs abritées).";
 
     return {
       type,
@@ -180,9 +228,13 @@ export function generateFallbackPortfolios(
       rationale,
       tax_strategy: taxStrategy,
       stress_test: {
-        inflation_shock: metrics.volatility > 12 ? "Impact modéré (protection via actions)" : "Impact négatif (érosion du rendement fixe)",
-        market_crash: metrics.volatility > 12 ? "Correction potentielle de -25% à -35%" : "Baisse contenue de -10% à -15%",
-        interest_rate_hike: "Sensibilité accrue sur les obligations à longue échéance (ZFL)",
+        inflation_shock: metrics.volatility > 12
+          ? "Impact modéré : les actions offrent une couverture partielle via la hausse des bénéfices nominaux"
+          : "Impact négatif sur les obligations à long terme ; ZCS (court terme) protège contre la remontée des taux",
+        market_crash: metrics.volatility > 12
+          ? `Correction estimée ${Math.round(metrics.volatility * 2)}–${Math.round(metrics.volatility * 2.5)}% (pire cas) — horizon long terme requis`
+          : `Baisse contenue ${Math.round(metrics.volatility * 1.5)}–${Math.round(metrics.volatility * 2)}% — poche bonds absorbe l'essentiel`,
+        interest_rate_hike: "ZCS.TO (court terme) limite la sensibilité aux taux vs obligations longues. VFV/XAW peuvent subir une contraction des multiples à court terme.",
       },
       allocations,
     };

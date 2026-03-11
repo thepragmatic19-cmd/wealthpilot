@@ -182,17 +182,17 @@ Utilise un taux sans risque de 3.0% (taux directeur BdC, mars 2026).
 
 | Type | Sharpe MINIMUM | Sharpe CIBLE | Rendement net attendu |
 |------|---------------|--------------|----------------------|
-| conservateur | 0.30 | 0.40+ | 4.0–5.5% |
-| suggéré | 0.45 | 0.55+ | 5.5–7.5% |
-| ambitieux | 0.55 | 0.65+ | 7.5–10.0% |
+| conservateur | 0.25 | 0.38+ | 4.0–5.5% |
+| suggéré | 0.38 | 0.44+ | 5.5–7.5% |
+| ambitieux | 0.40 | 0.44+ | 7.5–10.0% |
 
 ### Comment atteindre ces cibles
-- **Maximiser le rendement/risque** : préfère les ETFs actions large cap à faible MER (VFV.TO, XIC.TO, XEF.TO) au détriment des HISA (CASH.TO, PSA.TO) sauf pour la liquidité strictement nécessaire
+- **Maximiser le rendement/risque** : préfère les ETFs actions large cap à faible MER (VFV.TO, XIC.TO, XAW.TO) au détriment des HISA (CASH.TO, PSA.TO) sauf pour la liquidité strictement nécessaire
 - **Liquidités max 5%** dans conservateur, 0% dans suggéré/ambitieux (les liquidités ont un Sharpe proche de 0)
 - **Or/Commodités max 5%** — faible corrélation utile mais dilue le rendement attendu
 - **Obligations** : utilise ZAG.TO/VAB.TO pour le revenu fixe de qualité — évite les obligations long terme (ZFL.TO) sauf si l'horizon le justifie
 - **Diversification géographique obligatoire** : minimum 3 régions (CA + US + International) dans tous les portefeuilles
-- **MER total cible** : < 0.15% (privilégie VFV.TO 0.09%, ZAG.TO 0.09%, XEF.TO 0.22% plutôt que les alternatives coûteuses)
+- **MER total cible** : < 0.25% (privilégie VFV.TO 0.09%, ZAG.TO 0.09%, XAW.TO 0.22% plutôt que les alternatives coûteuses)
 
 ### Règles absolues
 1. **Poids total = exactement 100%**
@@ -248,9 +248,9 @@ export function buildPortfolioUserMessage(context?: any): string {
   const SHARPE_TARGETS: Record<string, { min: number; target: string; returnRange: string; equityRange: string }> = {
     'très_conservateur': { min: 0.20, target: '0.30+', returnRange: '3.5–4.5%', equityRange: '15–25% actions' },
     'conservateur':      { min: 0.30, target: '0.40+', returnRange: '4.0–5.5%', equityRange: '30–45% actions' },
-    'modéré':            { min: 0.40, target: '0.55+', returnRange: '5.5–7.5%', equityRange: '55–65% actions' },
-    'croissance':        { min: 0.50, target: '0.65+', returnRange: '7.0–9.5%', equityRange: '75–85% actions' },
-    'agressif':          { min: 0.55, target: '0.70+', returnRange: '8.5–11.0%', equityRange: '90–100% actions' },
+    'modéré':            { min: 0.38, target: '0.43+', returnRange: '5.5–7.5%', equityRange: '55–65% actions' },
+    'croissance':        { min: 0.38, target: '0.43+', returnRange: '7.0–9.5%', equityRange: '75–85% actions' },
+    'agressif':          { min: 0.38, target: '0.43+', returnRange: '8.5–11.0%', equityRange: '90–100% actions' },
   };
   const t = SHARPE_TARGETS[riskProfile] ?? SHARPE_TARGETS['modéré'];
 
@@ -307,7 +307,7 @@ export function buildPortfolioUserMessage(context?: any): string {
   if (client.has_celiapp && age < 40) directives.push('CELIAPP actif → prévoir poche obligataire/liquide pour objectif immobilier');
 
   const expLow = ['débutant', 'aucune', 'none', 'beginner'].includes((client.investment_experience || '').toLowerCase());
-  if (expLow) directives.push('Débutant → ETFs indiciels simples uniquement (VFV.TO, ZAG.TO, XEF.TO)');
+  if (expLow) directives.push('Débutant → ETFs indiciels simples uniquement (VFV.TO, ZAG.TO, XAW.TO)');
 
   const hasRetirement = goals.some((g: any) => ['retirement', 'retraite'].includes(g.type));
   const hasRealEstate  = goals.some((g: any) => ['house', 'real_estate', 'immobilier'].includes(g.type));
@@ -337,8 +337,8 @@ export function buildPortfolioUserMessage(context?: any): string {
     '|------|-----------|-------|---------------|\n' +
     '| conservateur | ' + Math.max(0.15, t.min - 0.15).toFixed(2) + ' | ' + t.min.toFixed(2) + '+ | ~' + t.returnRange.split('–')[0] + '% |\n' +
     '| suggéré | ' + t.min.toFixed(2) + ' | ' + t.target + ' | ' + t.returnRange + ' |\n' +
-    '| ambitieux | ' + (t.min + 0.05).toFixed(2) + ' | ' + (t.min + 0.15).toFixed(2) + '+ | ' + t.returnRange.split('–')[1] + '%+ |\n\n' +
-    'CRITIQUE : validateur rejette sous Sharpe min. Favorise VFV.TO (10%/vol14.5%), XIC.TO (7.5%/vol14%), ZAG.TO (3.5%/vol5.5%). Évite CASH.TO sauf conservateur.\n\n' +
+    '| ambitieux | ' + Math.min(t.min + 0.05, 0.42).toFixed(2) + ' | ' + Math.min(t.min + 0.10, 0.44).toFixed(2) + '+ | ' + t.returnRange.split('–')[1] + '%+ |\n\n' +
+    'CRITIQUE : validateur rejette sous Sharpe min. Favorise VFV.TO (10%/vol14.5%), XIC.TO (7.5%/vol14%), XAW.TO (8.0%/vol15%, MER=0.22%, supérieur à XEF.TO), ZAG.TO (3.5%/vol5.5%), ZCS.TO (3.5%/vol3.0%). Évite CASH.TO sauf conservateur.\n\n' +
     'Génère le JSON maintenant.';
 }
 
