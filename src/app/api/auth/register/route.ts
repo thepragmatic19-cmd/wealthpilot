@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { getServerEnv } from "@/env";
+import { logger } from "@/lib/logger";
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const env = getServerEnv();
+const supabaseAdmin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 
 export async function POST(request: Request) {
   try {
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       user: { id: data.user.id, email: data.user.email },
     });
   } catch (err) {
-    console.error("Register API error:", err);
+    logger.error("Register API error:", err);
     return NextResponse.json(
       { error: "Une erreur interne est survenue." },
       { status: 500 }

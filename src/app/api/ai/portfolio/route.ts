@@ -7,6 +7,7 @@ import { getConstraintsSummaryForPrompt } from "@/lib/portfolio/constraints";
 import { validateAndEnrichPortfolios, cleanAndParsePortfolioJSON } from "@/lib/portfolio/validator";
 import { generateFallbackPortfolios } from "@/lib/portfolio/fallback";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 import type { RiskProfile } from "@/types/database";
 import type { EnrichedPortfolio } from "@/lib/portfolio/validator";
 
@@ -125,16 +126,16 @@ export async function POST(request: NextRequest) {
       if (validation.valid) {
         enrichedPortfolios = validation.portfolios;
         if (validation.warnings.length > 0) {
-          console.warn("Portfolio validation warnings:", validation.warnings);
+          logger.warn("Portfolio validation warnings:", validation.warnings);
         }
       } else {
-        console.error("AI portfolio validation failed:", validation.errors);
-        console.warn("Falling back to deterministic portfolios");
+        logger.error("AI portfolio validation failed:", validation.errors);
+        logger.warn("Falling back to deterministic portfolios");
         enrichedPortfolios = generateFallbackPortfolios(riskProfile);
         fallbackUsed = true;
       }
     } catch (aiError: unknown) {
-      console.error("AI Error in Portfolio (using fallback):", aiError instanceof Error ? aiError.message : aiError);
+      logger.error("AI Error in Portfolio (using fallback):", aiError instanceof Error ? aiError.message : aiError);
       enrichedPortfolios = generateFallbackPortfolios(riskProfile);
       fallbackUsed = true;
     }
@@ -169,7 +170,7 @@ export async function POST(request: NextRequest) {
       if (fullError) {
         // If columns don't exist yet, retry with base schema only
         if (fullError.message?.includes('column') || fullError.code === 'PGRST204' || fullError.code === '42703') {
-          console.warn(`Extended columns not available, using base schema for ${portfolio.type}`);
+          logger.warn(`Extended columns not available, using base schema for ${portfolio.type}`);
           const { data: basicData, error: basicError } = await supabase
             .from("portfolios")
             .insert({
@@ -188,12 +189,12 @@ export async function POST(request: NextRequest) {
             .single();
 
           if (basicError) {
-            console.error(`Error saving portfolio ${portfolio.type} (basic): `, basicError);
+            logger.error(`Error saving portfolio ${portfolio.type} (basic): `, basicError);
             continue;
           }
           savedPortfolio = basicData;
         } else {
-          console.error(`Error saving portfolio ${portfolio.type}: `, fullError);
+          logger.error(`Error saving portfolio ${portfolio.type}: `, fullError);
           continue;
         }
       } else {
@@ -225,7 +226,7 @@ export async function POST(request: NextRequest) {
         const { error: allocError } = await supabase.from("portfolio_allocations").insert(allocations);
 
         if (allocError) {
-          console.error(`Error saving allocations for ${portfolio.type}: `, allocError);
+          logger.error(`Error saving allocations for ${portfolio.type}: `, allocError);
           if (allocError.message?.includes('column') || allocError.code === '42703') {
             // New columns don't exist yet, insert without them
             const basicAllocations = portfolio.allocations.map((a) => ({
@@ -240,13 +241,13 @@ export async function POST(request: NextRequest) {
             }));
             const { error: basicError } = await supabase.from("portfolio_allocations").insert(basicAllocations);
             if (basicError) {
-              console.error(`Basic allocation insert also failed for ${portfolio.type}, deleting orphan portfolio: `, basicError);
+              logger.error(`Basic allocation insert also failed for ${portfolio.type}, deleting orphan portfolio: `, basicError);
               await supabase.from("portfolios").delete().eq("id", savedPortfolio.id);
               finalPortfolios.pop();
             }
           } else {
             // Other allocation error - delete orphan portfolio
-            console.error(`Non - schema allocation error for ${portfolio.type}, deleting orphan portfolio`);
+            logger.error(`Non - schema allocation error for ${portfolio.type}, deleting orphan portfolio`);
             await supabase.from("portfolios").delete().eq("id", savedPortfolio.id);
             finalPortfolios.pop();
           }
@@ -268,7 +269,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ portfolios: finalPortfolios, fallbackUsed });
   } catch (error: unknown) {
-    console.error("Portfolio API error:", error);
+    logger.error("Portfolio API error:", error);
     return NextResponse.json(
       { error: "Erreur lors de la génération des portefeuilles" },
       { status: 500 }

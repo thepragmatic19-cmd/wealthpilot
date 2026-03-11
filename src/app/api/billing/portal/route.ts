@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 export async function POST() {
   try {
@@ -40,7 +41,7 @@ export async function POST() {
 
     return NextResponse.json({ url: session.url });
   } catch (error) {
-    console.error("Portal API error:", error);
+    logger.error("Portal API error:", error);
     return NextResponse.json(
       { error: "Erreur lors de la création du portail" },
       { status: 500 }

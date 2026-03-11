@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateAIResponse } from "@/lib/ai/client";
 import { FOLLOW_UP_SYSTEM_PROMPT } from "@/lib/ai/prompts";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 const followUpBodySchema = z.object({
   answers: z.record(z.string(), z.unknown()),
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
       const cleanedText = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       parsed = JSON.parse(cleanedText);
     } catch (aiError: unknown) {
-      console.error("AI Error (using fallback):", aiError instanceof Error ? aiError.message : aiError);
+      logger.error("AI Error (using fallback):", aiError instanceof Error ? aiError.message : aiError);
       parsed = {
         questions: [
           "Quels sont vos objectifs financiers principaux pour les 5 prochaines années ?",
@@ -77,13 +78,13 @@ export async function POST(request: NextRequest) {
         .eq("id", assessment.id);
 
       if (updateError) {
-        console.error("Error updating follow-up questions:", updateError);
+        logger.error("Error updating follow-up questions:", updateError);
       }
     }
 
     return NextResponse.json(parsed);
   } catch (error: unknown) {
-    console.error("Follow-up API error:", error);
+    logger.error("Follow-up API error:", error);
     return NextResponse.json(
       { error: "Erreur lors de la génération des questions" },
       { status: 500 }

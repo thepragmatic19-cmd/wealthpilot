@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { logger } from "@/lib/logger";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -107,7 +108,7 @@ export default function FiscalPage() {
                     transactions: (txData as Transaction[]) || [],
                 });
             } catch (err) {
-                console.error("Error loading fiscal data:", err);
+                logger.error("Error loading fiscal data:", err);
             } finally {
                 setLoading(false);
             }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { logger } from "@/lib/logger";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -405,7 +406,7 @@ export default function DashboardPage() {
           chatMessages: (chatMsgs as ChatMessage[]) || [],
         }));
       }).catch((err) => {
-        console.error("Dashboard load error (batch 1):", err);
+        logger.error("Dashboard load error (batch 1):", err);
         setError(true);
       }).finally(() => {
         setLoadingMain(false);
@@ -438,7 +439,7 @@ export default function DashboardPage() {
           snapshots: snapshotsData.snapshots || [],
         }));
       }).catch((err) => {
-        console.error("Dashboard load error (batch 2):", err);
+        logger.error("Dashboard load error (batch 2):", err);
       }).finally(() => {
         setLoadingSecondary(false);
       });

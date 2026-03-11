@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { logger } from "@/lib/logger";
 import { Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -33,7 +34,7 @@ export function ExportPdfButton({ portfolio }: Props) {
       await generatePortfolioPDF(portfolio);
       toast.success("PDF téléchargé avec succès");
     } catch (err) {
-      console.error("PDF export error:", err);
+      logger.error("PDF export error:", err);
       toast.error("Erreur lors de la génération du PDF");
     } finally {
       setLoading(false);

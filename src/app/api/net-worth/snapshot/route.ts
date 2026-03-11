@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 
 export async function GET() {
   try {
@@ -17,7 +18,7 @@ export async function GET() {
     if (error) throw error;
     return NextResponse.json({ snapshots: data || [] });
   } catch (err) {
-    console.error("Net worth GET error:", err);
+    logger.error("Net worth GET error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("Net worth POST error:", err);
+    logger.error("Net worth POST error:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

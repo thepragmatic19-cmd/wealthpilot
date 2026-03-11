@@ -1,62 +1,135 @@
-import { checkRateLimit } from '../rate-limit';
+/**
+ * Tests for rate-limit.ts
+ *
+ * Uses a shared mock Supabase instance so the module-level singleton
+ * always references the same object — allowing per-test RPC control.
+ */
 
-describe('checkRateLimit', () => {
-    it('should allow requests under the limit', () => {
-        const key = `test-allow-${Date.now()}`;
+// Shared mock instance — same reference across all tests
+const mockRpc = jest.fn();
+const mockSupabaseInstance = { rpc: mockRpc } as any;
 
-        const r1 = checkRateLimit(key, 3, 60_000);
-        expect(r1.success).toBe(true);
-        expect(r1.remaining).toBe(2);
+jest.mock("@supabase/supabase-js", () => ({
+  createClient: jest.fn(() => mockSupabaseInstance),
+}));
 
-        const r2 = checkRateLimit(key, 3, 60_000);
-        expect(r2.success).toBe(true);
-        expect(r2.remaining).toBe(1);
+// Import after mock setup
+import { checkRateLimit } from "../rate-limit";
 
-        const r3 = checkRateLimit(key, 3, 60_000);
-        expect(r3.success).toBe(true);
-        expect(r3.remaining).toBe(0);
-    });
+describe("checkRateLimit — Supabase distributed path", () => {
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
+  });
 
-    it('should reject requests over the limit', () => {
-        const key = `test-reject-${Date.now()}`;
+  afterEach(() => {
+    jest.clearAllMocks();
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  });
 
-        checkRateLimit(key, 2, 60_000);
-        checkRateLimit(key, 2, 60_000);
+  it("returns success when RPC returns true", async () => {
+    mockRpc.mockResolvedValue({ data: true, error: null });
 
-        const result = checkRateLimit(key, 2, 60_000);
-        expect(result.success).toBe(false);
-        expect(result.remaining).toBe(0);
-        expect(result.resetInSeconds).toBeGreaterThan(0);
-    });
+    const result = await checkRateLimit("test-allow", 10, 60_000);
+    expect(result.success).toBe(true);
+    expect(result.remaining).toBe(9);
+    expect(mockRpc).toHaveBeenCalledWith("check_rate_limit", expect.objectContaining({ p_key: "test-allow", p_max_requests: 10 }));
+  });
 
-    it('should track different keys independently', () => {
-        const keyA = `test-indep-A-${Date.now()}`;
-        const keyB = `test-indep-B-${Date.now()}`;
+  it("returns denied when RPC returns false", async () => {
+    mockRpc.mockResolvedValue({ data: false, error: null });
 
-        checkRateLimit(keyA, 1, 60_000);
-        expect(checkRateLimit(keyA, 1, 60_000).success).toBe(false);
-        expect(checkRateLimit(keyB, 1, 60_000).success).toBe(true);
-    });
+    const result = await checkRateLimit("test-deny", 10, 60_000);
+    expect(result.success).toBe(false);
+    expect(result.remaining).toBe(0);
+  });
 
-    it('should reset after the window expires', async () => {
-        const key = `test-reset-${Date.now()}`;
+  it("falls back to in-memory when RPC throws", async () => {
+    mockRpc.mockRejectedValue(new Error("Supabase unavailable"));
 
-        checkRateLimit(key, 1, 100);
-        expect(checkRateLimit(key, 1, 100).success).toBe(false);
+    const key = `fallback-throw-${Date.now()}`;
+    const result = await checkRateLimit(key, 5, 60_000);
+    // In-memory fallback: first request succeeds
+    expect(result.success).toBe(true);
+  });
 
-        await new Promise((resolve) => setTimeout(resolve, 150));
+  it("falls back to in-memory when RPC returns an error object", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "rpc error" } });
 
-        expect(checkRateLimit(key, 1, 100).success).toBe(true);
-    });
+    const key = `fallback-error-${Date.now()}`;
+    const result = await checkRateLimit(key, 5, 60_000);
+    // data is null → falls through to in-memory
+    expect(result.success).toBe(true);
+  });
+});
 
-    it('should return correct resetInSeconds', () => {
-        const key = `test-reset-seconds-${Date.now()}`;
+describe("checkRateLimit — in-memory fallback (Supabase throwing)", () => {
+  beforeEach(() => {
+    // Force in-memory path by making Supabase RPC always throw
+    mockRpc.mockRejectedValue(new Error("forced failure"));
+  });
 
-        checkRateLimit(key, 1, 30_000);
-        const result = checkRateLimit(key, 1, 30_000);
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
 
-        expect(result.success).toBe(false);
-        expect(result.resetInSeconds).toBeGreaterThan(0);
-        expect(result.resetInSeconds).toBeLessThanOrEqual(30);
-    });
+  it("allows requests under the limit", async () => {
+    const key = `mem-allow-${Date.now()}`;
+
+    const r1 = await checkRateLimit(key, 3, 60_000);
+    expect(r1.success).toBe(true);
+    expect(r1.remaining).toBe(2);
+
+    const r2 = await checkRateLimit(key, 3, 60_000);
+    expect(r2.success).toBe(true);
+    expect(r2.remaining).toBe(1);
+
+    const r3 = await checkRateLimit(key, 3, 60_000);
+    expect(r3.success).toBe(true);
+    expect(r3.remaining).toBe(0);
+  });
+
+  it("rejects requests over the limit", async () => {
+    const key = `mem-reject-${Date.now()}`;
+
+    await checkRateLimit(key, 2, 60_000);
+    await checkRateLimit(key, 2, 60_000);
+
+    const result = await checkRateLimit(key, 2, 60_000);
+    expect(result.success).toBe(false);
+    expect(result.remaining).toBe(0);
+    expect(result.resetInSeconds).toBeGreaterThan(0);
+  });
+
+  it("tracks different keys independently", async () => {
+    const keyA = `mem-indep-A-${Date.now()}`;
+    const keyB = `mem-indep-B-${Date.now()}`;
+
+    await checkRateLimit(keyA, 1, 60_000);
+    expect((await checkRateLimit(keyA, 1, 60_000)).success).toBe(false);
+    expect((await checkRateLimit(keyB, 1, 60_000)).success).toBe(true);
+  });
+
+  it("resets after the window expires", async () => {
+    const key = `mem-reset-${Date.now()}`;
+
+    await checkRateLimit(key, 1, 100);
+    expect((await checkRateLimit(key, 1, 100)).success).toBe(false);
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect((await checkRateLimit(key, 1, 100)).success).toBe(true);
+  });
+
+  it("returns correct resetInSeconds", async () => {
+    const key = `mem-reset-secs-${Date.now()}`;
+
+    await checkRateLimit(key, 1, 30_000);
+    const result = await checkRateLimit(key, 1, 30_000);
+
+    expect(result.success).toBe(false);
+    expect(result.resetInSeconds).toBeGreaterThan(0);
+    expect(result.resetInSeconds).toBeLessThanOrEqual(30);
+  });
 });

@@ -1,22 +1,23 @@
 /**
- * Persistent rate limiter using in-memory LRU-like store.
- * Works reliably in Vercel serverless (per-instance, stateless — sufficient
- * for abuse prevention since Vercel serializes concurrent invocations).
- *
- * Falls back gracefully: never blocks a user on infrastructure errors.
+ * Distributed rate limiter backed by Supabase (api_rate_limits table + check_rate_limit RPC).
+ * Falls back to in-memory if Supabase is unavailable.
  */
+
+import { createClient } from "@supabase/supabase-js";
+
+// ============================================================
+// In-memory fallback store
+// ============================================================
 
 interface RateLimitBucket {
   count: number;
   resetAt: number;
 }
 
-// In-memory store — shared within a serverless function instance
 const store = new Map<string, RateLimitBucket>();
-
-// Clean up old entries periodically to avoid memory leaks
 let lastCleanup = Date.now();
-function cleanup() {
+
+function cleanupMemory() {
   const now = Date.now();
   if (now - lastCleanup < 60_000) return;
   lastCleanup = now;
@@ -25,30 +26,16 @@ function cleanup() {
   }
 }
 
-export interface RateLimitResult {
-  success: boolean;
-  remaining: number;
-  resetInSeconds: number;
-}
-
-/**
- * Check if a request is within rate limits.
- * @param key          - Unique identifier (userId, IP, etc.)
- * @param maxRequests  - Maximum requests allowed in the window
- * @param windowMs     - Time window in milliseconds (default: 60s)
- */
-export function checkRateLimit(
+function checkMemoryRateLimit(
   key: string,
   maxRequests: number,
-  windowMs: number = 60_000
+  windowMs: number
 ): RateLimitResult {
-  cleanup();
-
+  cleanupMemory();
   const now = Date.now();
   const existing = store.get(key);
 
   if (!existing || existing.resetAt < now) {
-    // New window
     store.set(key, { count: 1, resetAt: now + windowMs });
     return { success: true, remaining: maxRequests - 1, resetInSeconds: Math.ceil(windowMs / 1000) };
   }
@@ -63,7 +50,69 @@ export function checkRateLimit(
   return { success: true, remaining: maxRequests - existing.count, resetInSeconds };
 }
 
-// Keep the async signature for backward compatibility with existing route calls
+// ============================================================
+// Supabase service-role client (lazy, no cookies needed)
+// ============================================================
+
+let _supabase: ReturnType<typeof createClient> | null = null;
+
+function getSupabaseClient() {
+  if (_supabase) return _supabase;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  _supabase = createClient(url, key, { auth: { persistSession: false } });
+  return _supabase;
+}
+
+// ============================================================
+// Public API
+// ============================================================
+
+export interface RateLimitResult {
+  success: boolean;
+  remaining: number;
+  resetInSeconds: number;
+}
+
+/**
+ * Check rate limit using Supabase distributed store.
+ * Falls back to in-memory on any Supabase error.
+ */
+export async function checkRateLimit(
+  key: string,
+  maxRequests: number,
+  windowMs: number = 60_000
+): Promise<RateLimitResult> {
+  const supabase = getSupabaseClient();
+
+  if (supabase) {
+    try {
+      const windowSeconds = Math.ceil(windowMs / 1000);
+      const { data, error } = await supabase.rpc("check_rate_limit" as string, {
+        p_key: key,
+        p_max_requests: maxRequests,
+        p_window_seconds: windowSeconds,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+
+      if (!error && data !== null) {
+        const allowed = data as boolean;
+        if (allowed) {
+          return { success: true, remaining: maxRequests - 1, resetInSeconds: windowSeconds };
+        } else {
+          return { success: false, remaining: 0, resetInSeconds: windowSeconds };
+        }
+      }
+    } catch {
+      // Fall through to in-memory fallback
+    }
+  }
+
+  return checkMemoryRateLimit(key, maxRequests, windowMs);
+}
+
+// Alias for backward compatibility
 export async function checkRateLimitAsync(
   key: string,
   maxRequests: number,

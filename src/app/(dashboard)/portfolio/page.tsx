@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { logger } from "@/lib/logger";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -171,7 +172,7 @@ export default function PortfolioPage() {
         }
         if (clientData) setClientInfo(clientData as ClientInfo);
       } catch (err) {
-        console.error("Portfolio load error:", err);
+        logger.error("Portfolio load error:", err);
         setError(true);
       } finally {
         setLoading(false);
@@ -215,7 +216,7 @@ export default function PortfolioPage() {
         duration: 6000,
       });
     } catch (err) {
-      console.error("Portfolio selection error:", err);
+      logger.error("Portfolio selection error:", err);
       toast.error("Erreur lors de la sélection du portefeuille");
     } finally {
       setSelecting(false);

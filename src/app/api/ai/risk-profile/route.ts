@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateAIResponse } from "@/lib/ai/client";
 import { RISK_PROFILE_SYSTEM_PROMPT } from "@/lib/ai/prompts";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 const riskProfileBodySchema = z.object({
   followUpAnswers: z.record(z.string(), z.string()).optional().default({}),
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       const cleanedText = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       parsed = JSON.parse(cleanedText);
     } catch (aiError: unknown) {
-      console.error("AI Error in Risk Profile (using fallback):", aiError instanceof Error ? aiError.message : aiError);
+      logger.error("AI Error in Risk Profile (using fallback):", aiError instanceof Error ? aiError.message : aiError);
       parsed = {
         risk_score: 6,
         risk_profile: "modéré",
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
         .eq("id", assessment.id);
 
       if (updateError) {
-        console.error("Error updating risk assessment:", updateError);
+        logger.error("Error updating risk assessment:", updateError);
       }
     } else {
       // No assessment exists yet - create one
@@ -105,13 +106,13 @@ export async function POST(request: NextRequest) {
         });
 
       if (insertError) {
-        console.error("Error inserting risk assessment:", insertError);
+        logger.error("Error inserting risk assessment:", insertError);
       }
     }
 
     return NextResponse.json(parsed);
   } catch (error) {
-    console.error("Risk profile API error:", error);
+    logger.error("Risk profile API error:", error);
     return NextResponse.json(
       { error: "Erreur lors de l'analyse du profil" },
       { status: 500 }

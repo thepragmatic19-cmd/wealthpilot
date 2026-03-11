@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
+import { logger } from "@/lib/logger";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createClient } from "@/lib/supabase/client";
 import { goalSchema, type GoalInput } from "@/lib/validations/onboarding";
@@ -99,7 +100,7 @@ export function GoalsStep({ userId, onNext, onPrev }: Props) {
     const supabase = createClient();
     const { error } = await supabase.from("goals").delete().eq("id", id);
     if (error) {
-      console.error("Error deleting goal:", error);
+      logger.error("Error deleting goal:", error);
       toast.error("Erreur lors de la suppression de l'objectif");
       return;
     }

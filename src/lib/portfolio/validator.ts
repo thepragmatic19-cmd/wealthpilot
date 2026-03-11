@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { RiskProfile } from '@/types/database';
+import { logger } from '@/lib/logger';
 import { getInstrumentByTicker, getValidTickers } from '@/lib/data/instruments';
 import { getConstraintsForProfile, type AssetClassRange } from '@/lib/portfolio/constraints';
 import { computePortfolioMetrics, type EnrichedAllocation, type EnrichedPortfolio } from '@/lib/portfolio/metrics';
@@ -218,7 +219,7 @@ export function validateAndEnrichPortfolios(
       errors.push(
         `Portefeuille "${portfolio.type}": Sharpe ${metrics.sharpe_ratio.toFixed(2)} < minimum ${sharpeMin} — allocation sous-optimale, relancez la génération`
       );
-      console.warn(
+      logger.warn(
         `[Portfolio] REJECTED "${portfolio.type}": Sharpe=${metrics.sharpe_ratio.toFixed(2)} < floor=${sharpeMin}. ` +
         `Return=${metrics.expected_return}%, Vol=${metrics.volatility}%`
       );

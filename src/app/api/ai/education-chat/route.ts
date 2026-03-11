@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { streamChatResponse } from "@/lib/ai/client";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 const SYSTEM_PROMPT = `Tu es Alex, le conseiller IA de WealthPilot, spécialisé en finance personnelle canadienne.
 L'utilisateur lit un article éducatif et te pose une question dessus.
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         } catch (error) {
-          console.error("Education chat stream error:", error);
+          logger.error("Education chat stream error:", error);
           try {
             controller.enqueue(
               encoder.encode(
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error("Education chat API error:", error);
+    logger.error("Education chat API error:", error);
     
     // Handle Groq rate limits specifically
     if (error?.status === 429) {

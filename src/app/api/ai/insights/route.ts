@@ -5,6 +5,7 @@ import { getInsightSystemPrompt } from "@/lib/ai/prompts";
 import { detectClientMilestones } from "@/lib/ai/persona";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { canAccess } from "@/lib/subscription";
+import { logger } from "@/lib/logger";
 import type { SubscriptionPlan } from "@/types/database";
 
 
@@ -253,7 +254,7 @@ Génère 3-4 insights personnalisés pour ce client, triés du plus urgent au mo
                 insights.insights = [...milestoneInsights, ...(insights.insights || [])];
             }
         } catch (aiError) {
-            console.error("AI Error in Insights (using fallback):", aiError);
+            logger.error("AI Error in Insights (using fallback):", aiError);
             // Generate deterministic fallback insights
             insights = generateFallbackInsights(clientInfo, goals, selectedPortfolio);
         }
@@ -283,7 +284,7 @@ Génère 3-4 insights personnalisés pour ce client, triés du plus urgent au mo
                 .insert(insightsToSave);
 
             if (insertError) {
-                console.error("Error saving insights:", insertError);
+                logger.error("Error saving insights:", insertError);
             }
         }
 
@@ -292,7 +293,7 @@ Génère 3-4 insights personnalisés pour ce client, triés du plus urgent au mo
             generated_at: new Date().toISOString(),
         });
     } catch (error) {
-        console.error("Insights API error:", error);
+        logger.error("Insights API error:", error);
         return NextResponse.json(
             { error: "Erreur lors de la génération des insights" },
             { status: 500 }

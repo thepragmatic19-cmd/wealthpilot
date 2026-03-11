@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { logger } from "@/lib/logger";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,11 +53,9 @@ export function AIFollowUpStep({ userId, onNext, onPrev }: Props) {
         body: JSON.stringify({ answers: assessment?.answers || {} }),
       });
 
-      console.log("Response status:", res.status);
-
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        console.error("Follow-up API error:", errData);
+        logger.error("Follow-up API error:", errData);
         throw new Error(errData.error || "API error");
       }
 
@@ -67,7 +66,7 @@ export function AIFollowUpStep({ userId, onNext, onPrev }: Props) {
         throw new Error("No questions returned");
       }
     } catch (err) {
-      console.error("Failed to generate follow-up questions:", err);
+      logger.error("Failed to generate follow-up questions:", err);
       setError(true);
       toast.error("Erreur lors de la génération des questions IA");
     }

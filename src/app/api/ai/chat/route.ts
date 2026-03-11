@@ -7,6 +7,7 @@ import { AI_TOOLS, executeTool } from "@/lib/ai/tools";
 import { buildClientPersonaContext, detectClientMilestones } from "@/lib/ai/persona";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { getChatLimit } from "@/lib/subscription";
+import { logger } from "@/lib/logger";
 import type { SubscriptionPlan } from "@/types/database";
 
 const chatBodySchema = z.object({
@@ -376,7 +377,7 @@ export async function POST(request: NextRequest) {
           controller.close();
           closed = true;
         } catch (error: any) {
-          console.error("Chat stream error:", error);
+          logger.error("Chat stream error:", error);
           if (!closed) {
             try {
               const errorMessage = error?.status === 429
@@ -407,7 +408,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Chat API error:", error);
+    logger.error("Chat API error:", error);
     return new Response(JSON.stringify({ error: "Erreur serveur" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

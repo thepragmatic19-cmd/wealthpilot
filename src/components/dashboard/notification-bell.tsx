@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { logger } from "@/lib/logger";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -64,7 +65,7 @@ export function NotificationBell() {
                 setUnreadCount(data.filter((n) => !n.is_read).length);
             }
         } catch (err) {
-            console.error("Error loading notifications:", err);
+            logger.error("Error loading notifications:", err);
         }
     }, []);
 
@@ -98,7 +99,7 @@ export function NotificationBell() {
             setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
             setUnreadCount(0);
         } catch (err) {
-            console.error("Error marking notifications read:", err);
+            logger.error("Error marking notifications read:", err);
         }
     }
 

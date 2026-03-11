@@ -1,5 +1,7 @@
 import Groq from "groq-sdk";
 import OpenAI from "openai";
+import { getServerEnv } from "@/env";
+import { logger } from "@/lib/logger";
 
 // ============================================================
 // AI Provider Configuration
@@ -17,14 +19,16 @@ import OpenAI from "openai";
 //   and perfect for conversational use.
 // ============================================================
 
+const env = getServerEnv();
+
 const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY!,
+  apiKey: env.GROQ_API_KEY,
 });
 
 const GROQ_MODEL_FALLBACK = "llama-3.1-8b-instant"; // 500k TPD, no thinking overhead
 
 const gemini = new OpenAI({
-  apiKey: process.env.GOOGLE_AI_API_KEY!,
+  apiKey: env.GOOGLE_AI_API_KEY,
   baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
 });
 
@@ -65,21 +69,21 @@ async function callWithFallback(
     const status = e?.status ?? 0;
     // Retry once on transient server errors before falling back to Groq
     if (status === 503 || status === 500 || status === 504) {
-      console.warn(`[AI] Gemini transient error ${status}, retrying in 2s...`);
+      logger.warn(`[AI] Gemini transient error ${status}, retrying in 2s...`);
       await new Promise(r => setTimeout(r, 2000));
       try {
         return await withTimeout(geminiCall());
       } catch (e2: any) {
         const s2 = e2?.status ?? 0;
         if (s2 === 429 || s2 === 400 || s2 === 404 || s2 === 500 || s2 === 503 || s2 === 504) {
-          console.warn(`[AI] Gemini retry also failed (${s2}), falling back to Groq 8b`);
+          logger.warn(`[AI] Gemini retry also failed (${s2}), falling back to Groq 8b`);
           return await groqFallbackCall();
         }
         throw e2;
       }
     }
     if (status === 429 || status === 400 || status === 404) {
-      console.warn(`[AI] Gemini error ${status} → fallback Groq 8b`);
+      logger.warn(`[AI] Gemini error ${status} → fallback Groq 8b`);
       return await groqFallbackCall();
     }
     throw e;
@@ -127,7 +131,7 @@ export async function generateAIResponse(options: {
 
   // Warn if response was cut off due to token limit
   if (choice?.finish_reason === "length") {
-    console.warn("[AI] Response truncated (finish_reason=length). Consider increasing maxTokens.");
+    logger.warn("[AI] Response truncated (finish_reason=length). Consider increasing maxTokens.");
   }
 
   return { text };
@@ -170,7 +174,7 @@ export async function generateChatResponse(options: {
 
   const choice = response.choices[0];
   if (choice?.finish_reason === "length") {
-    console.warn("[AI] Chat response truncated. Increase maxTokens.");
+    logger.warn("[AI] Chat response truncated. Increase maxTokens.");
   }
 
   return { text: choice?.message?.content || "" };
@@ -211,7 +215,7 @@ export async function streamChatResponse(options: {
       e?.status !== 503
     )
       throw e;
-    console.warn("[AI] Gemini stream error", e.status, "→ fallback Groq 8b");
+    logger.warn("[AI] Gemini stream error", e.status, "→ fallback Groq 8b");
   }
 
   return await groq.chat.completions.create({
@@ -299,7 +303,7 @@ export async function chatWithTools(options: {
         e?.status !== 500
       )
         throw e;
-      console.warn("[AI] Gemini tools error", e.status, "→ fallback Groq 8b");
+      logger.warn("[AI] Gemini tools error", e.status, "→ fallback Groq 8b");
     }
     return await groq.chat.completions.create({
       model: GROQ_MODEL_FALLBACK,
@@ -332,7 +336,7 @@ export async function chatWithTools(options: {
       try {
         args = JSON.parse(toolCall.function.arguments || "{}");
       } catch (e) {
-        console.warn(
+        logger.warn(
           `Failed to parse tool arguments for ${toolCall.function.name}:`,
           toolCall.function.arguments
         );
@@ -370,7 +374,7 @@ export async function chatWithTools(options: {
         e?.status !== 500
       )
         throw e;
-      console.warn("[AI] Gemini streamFinal error", e.status, "→ fallback Groq 8b");
+      logger.warn("[AI] Gemini streamFinal error", e.status, "→ fallback Groq 8b");
     }
     return await groq.chat.completions.create({
       model: GROQ_MODEL_FALLBACK,

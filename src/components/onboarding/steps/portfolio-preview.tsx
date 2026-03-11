@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { logger } from "@/lib/logger";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -199,7 +200,7 @@ export function PortfolioPreviewStep({ userId }: Props) {
 
       if (!res.ok) {
         const errorBody = await res.text();
-        console.error("Portfolio API error:", res.status, errorBody);
+        logger.error("Portfolio API error:", res.status, errorBody);
         throw new Error(`API error ${res.status}`);
       }
 
@@ -228,7 +229,7 @@ export function PortfolioPreviewStep({ userId }: Props) {
         setPortfolios(mapped);
       }
     } catch (err) {
-      console.error("Portfolio generation failed:", err);
+      logger.error("Portfolio generation failed:", err);
       toast.error("Erreur lors de la génération des portefeuilles");
     }
     generatingRef.current = false;
@@ -310,7 +311,7 @@ export function PortfolioPreviewStep({ userId }: Props) {
         setShowUpsell(true);
       }, 1800);
     } catch (err) {
-      console.error("Selection error:", err);
+      logger.error("Selection error:", err);
       toast.error("Erreur lors de la sélection du portefeuille");
     } finally {
       setSelecting(false);

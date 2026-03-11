@@ -3,15 +3,12 @@ import { z } from "zod";
 import { stripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { getServerEnv } from "@/env";
+import { logger } from "@/lib/logger";
 
 const checkoutSchema = z.object({
   plan: z.enum(["pro", "elite"]),
 });
-
-const PRICE_IDS: Record<string, string> = {
-  pro: process.env.STRIPE_PRO_PRICE_ID!,
-  elite: process.env.STRIPE_ELITE_PRICE_ID!,
-};
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,6 +35,11 @@ export async function POST(request: NextRequest) {
     }
 
     const { plan } = parseResult.data;
+    const env = getServerEnv();
+    const PRICE_IDS: Record<string, string> = {
+      pro: env.STRIPE_PRO_PRICE_ID,
+      elite: env.STRIPE_ELITE_PRICE_ID,
+    };
 
     // Get or create Stripe customer
     const { data: subscription } = await supabase
@@ -61,7 +63,7 @@ export async function POST(request: NextRequest) {
         .eq("user_id", user.id);
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const baseUrl = env.NEXT_PUBLIC_SITE_URL;
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -83,7 +85,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url: session.url });
   } catch (error) {
-    console.error("Checkout API error:", error);
+    logger.error("Checkout API error:", error);
     return NextResponse.json(
       { error: "Erreur lors de la création de la session" },
       { status: 500 }

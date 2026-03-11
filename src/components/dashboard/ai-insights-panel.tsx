@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { logger } from "@/lib/logger";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -172,7 +173,7 @@ export function AiInsightsPanel() {
                 await fetchInsights();
             }
         } catch (error) {
-            console.error("Error generating insights:", error);
+            logger.error("Error generating insights:", error);
         } finally {
             setGenerating(false);
         }

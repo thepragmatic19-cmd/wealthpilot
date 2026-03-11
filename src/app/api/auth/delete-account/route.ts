@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
+import { getServerEnv } from "@/env";
+import { logger } from "@/lib/logger";
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const env = getServerEnv();
+const supabaseAdmin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 
 export async function DELETE() {
   try {
@@ -24,7 +24,7 @@ export async function DELETE() {
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("Delete account error:", err);
+    logger.error("Delete account error:", err);
     return NextResponse.json({ error: "Erreur interne" }, { status: 500 });
   }
 }

@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { createClient } from "@supabase/supabase-js";
+import { getServerEnv } from "@/env";
+import { logger } from "@/lib/logger";
 import type Stripe from "stripe";
 
 // Use service role client to bypass RLS
 function getServiceClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const env = getServerEnv();
+  return createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
-function getPlanFromPriceId(priceId: string): "pro" | "elite" | "free" {
-  if (priceId === process.env.STRIPE_PRO_PRICE_ID) return "pro";
-  if (priceId === process.env.STRIPE_ELITE_PRICE_ID) return "elite";
+export function getPlanFromPriceId(priceId: string): "pro" | "elite" | "free" {
+  const env = getServerEnv();
+  if (priceId === env.STRIPE_PRO_PRICE_ID) return "pro";
+  if (priceId === env.STRIPE_ELITE_PRICE_ID) return "elite";
   return "free";
 }
 
@@ -50,7 +51,7 @@ async function upsertSubscription(
     .eq("stripe_customer_id", customerId);
 
   if (error) {
-    console.error("Error upserting subscription:", error);
+    logger.error("Error upserting subscription:", error);
   }
 }
 
@@ -70,10 +71,10 @@ export async function POST(request: NextRequest) {
     event = stripe.webhooks.constructEvent(
       body,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      getServerEnv().STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    console.error("Webhook signature verification failed:", err);
+    logger.error("Webhook signature verification failed:", err);
     return NextResponse.json(
       { error: "Invalid signature" },
       { status: 400 }
@@ -163,7 +164,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error("Webhook handler error:", error);
+    logger.error("Webhook handler error:", error);
     return NextResponse.json(
       { error: "Webhook handler failed" },
       { status: 500 }
