@@ -474,34 +474,38 @@ export function ChatInterface({ initialMessage }: ChatInterfaceProps) {
               </div>
             )}
 
-            {/* Empty state */}
+            {/* Empty state — Alex opens the conversation */}
             {messages.length === 0 && !streaming && (
-              <div className="flex flex-col items-center justify-center py-14 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="relative mb-7">
-                  <div className="absolute inset-0 rounded-full bg-primary/20 blur-3xl scale-[2] animate-pulse" />
-                  <div className="relative h-20 w-20 rounded-3xl bg-gradient-to-br from-primary via-primary to-primary/70 flex items-center justify-center shadow-2xl shadow-primary/30">
-                    <Sparkles className="h-9 w-9 text-white" />
+              <div className="flex flex-col py-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {/* Alex's opening bubble */}
+                <div className="flex items-start gap-3 mb-5">
+                  <div className="h-9 w-9 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shrink-0 shadow-lg shadow-primary/20 mt-5">
+                    <Sparkles className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[11px] font-bold text-muted-foreground mb-1.5">Alex · Conseiller IA</p>
+                    <div className="rounded-2xl rounded-tl-sm bg-muted/60 px-4 py-3 text-sm leading-relaxed max-w-[340px]">
+                      Bonjour&nbsp;!&nbsp;👋 Je suis <strong>Alex</strong>, votre conseiller financier IA.
+                      <br /><br />
+                      Posez-moi n&apos;importe quelle question sur vos finances — aucune n&apos;est trop simple.
+                      <br /><br />
+                      Par où voulez-vous commencer&nbsp;?
+                    </div>
                   </div>
                 </div>
 
-                <h3 className="text-lg font-bold mb-1.5 tracking-tight">
-                  Bonjour, je suis votre conseiller IA
-                </h3>
-                <p className="text-sm text-muted-foreground text-center max-w-[280px] mb-9 leading-relaxed">
-                  Posez-moi n&apos;importe quelle question sur votre situation financière
-                </p>
-
-                <div className="grid grid-cols-2 gap-2.5 w-full max-w-[420px] px-1">
+                {/* Suggestion cards — single column, aligned with bubble */}
+                <div className="flex flex-col gap-2 w-full max-w-[380px] ml-12">
                   {suggestions.map((s, i) => {
                     const Icon = SUGGESTION_ICONS[i] ?? Sparkles;
                     return (
                       <button
                         key={i}
                         onClick={() => sendMessage(s)}
-                        className="group flex flex-col items-start gap-2 p-3 sm:gap-2.5 sm:p-4 rounded-2xl bg-background/70 border border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 text-left shadow-sm hover:shadow-md"
+                        className="group flex items-center gap-3 px-4 py-3 rounded-xl bg-background/70 border border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 text-left shadow-sm hover:shadow-md"
                       >
-                        <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center transition-colors">
-                          <Icon className="h-4 w-4 text-primary" />
+                        <div className="h-7 w-7 rounded-lg bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center transition-colors shrink-0">
+                          <Icon className="h-3.5 w-3.5 text-primary" />
                         </div>
                         <span className="text-xs font-medium leading-snug text-foreground/80 group-hover:text-foreground transition-colors">
                           {s}

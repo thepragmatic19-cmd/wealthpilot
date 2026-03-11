@@ -110,7 +110,7 @@ const EDUCATION_CONTENT: Article[] = [
     categoryColor: "emerald",
     difficulty: "Débutant",
     title: "CELI vs REER : lequel choisir ?",
-    summary: "Comprendre les différences fondamentales entre le CELI et le REER pour optimiser votre stratégie fiscale canadienne.",
+    summary: "En 4 min, vous saurez dans quel compte mettre votre prochain dollar — et éviterez des milliers $ d'impôts.",
     readTime: 4,
     takeaways: [
       "REER : déduction immédiate, imposition au retrait",
@@ -137,7 +137,7 @@ const EDUCATION_CONTENT: Article[] = [
     categoryColor: "emerald",
     difficulty: "Intermédiaire",
     title: "REEE — guide complet",
-    summary: "Maximisez la Subvention canadienne pour l'épargne-études (SCEE) et faites fructifier l'éducation de vos enfants.",
+    summary: "Le gouvernement vous donne 500 $/an par enfant — gratuitement. Voici comment ne pas laisser cet argent sur la table.",
     readTime: 5,
     takeaways: [
       "SCEE : 20% sur 2 500$/an = 500$ de subvention gratuite",
@@ -164,7 +164,7 @@ const EDUCATION_CONTENT: Article[] = [
     categoryColor: "emerald",
     difficulty: "Débutant",
     title: "CELIAPP — premier achat immobilier",
-    summary: "Le Compte d'épargne libre d'impôt pour l'achat d'une première propriété combine les avantages du CELI et du REER.",
+    summary: "Achat d'une première maison ? Ce compte vous donne déduction d'impôt ET retraits libres d'impôt. 8 000 $/an à ne pas manquer.",
     readTime: 3,
     takeaways: [
       "Cotisations déductibles + retraits libres d'impôt",
@@ -192,7 +192,7 @@ const EDUCATION_CONTENT: Article[] = [
     categoryColor: "blue",
     difficulty: "Débutant",
     title: "C'est quoi un ETF ?",
-    summary: "Les fonds négociés en bourse offrent une diversification instantanée à faible coût — la base d'un portefeuille moderne.",
+    summary: "Un seul achat, 10 000 actions mondiales, 0,20 % de frais. Voici pourquoi la plupart des investisseurs n'ont besoin de rien d'autre.",
     readTime: 4,
     takeaways: [
       "Diversification instantanée à très faible coût (RFG ~0,20%)",

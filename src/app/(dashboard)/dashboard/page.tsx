@@ -53,7 +53,10 @@ import {
   CheckCircle2,
   Circle,
   User,
+  X,
+  AlertCircle,
 } from "lucide-react";
+import { WelcomeModal } from "@/components/dashboard/welcome-modal";
 import type {
   Profile,
   ClientInfo,
@@ -250,24 +253,28 @@ function HealthScoreCard({ data }: { data: DashboardData }) {
       done: !!(data.clientInfo?.annual_income && data.clientInfo?.monthly_savings),
       href: "/profile",
       Icon: User,
+      hint: "Nos analyses seront 3× plus précises avec votre revenu et épargne",
     },
     {
       label: "Comptes enregistrés",
       done: !!(data.clientInfo?.has_celi || data.clientInfo?.has_reer),
       href: "/fiscal",
       Icon: Shield,
+      hint: "Un CELI bien utilisé peut vous faire économiser des milliers $ d'impôts",
     },
     {
       label: "Objectif de vie",
       done: data.goals.length > 0,
       href: "/goals",
       Icon: Target,
+      hint: "Se fixer un objectif augmente vos chances de l'atteindre de 42 %",
     },
     {
       label: "Épargne saine (≥10%)",
       done: savingsRate >= 10,
       href: "/profile",
       Icon: TrendingUp,
+      hint: "Épargner 10 % de votre revenu vous met sur la voie de la liberté financière",
     },
   ];
 
@@ -312,12 +319,15 @@ function HealthScoreCard({ data }: { data: DashboardData }) {
             }
             return (
               <Link key={i} href={pillar.href}>
-                <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-muted/10 border border-dashed hover:border-primary/50 hover:bg-muted/30 transition-colors cursor-pointer">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Circle className="h-4 w-4 shrink-0 text-muted-foreground/40" />
-                    <span className="text-xs font-medium truncate">{pillar.label}</span>
+                <div className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-muted/10 border border-dashed hover:border-primary/50 hover:bg-muted/30 transition-colors cursor-pointer">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Circle className="h-4 w-4 shrink-0 text-muted-foreground/40" />
+                      <span className="text-xs font-medium truncate">{pillar.label}</span>
+                    </div>
+                    <Badge className="text-[9px] h-4 px-1.5 bg-primary/10 text-primary border-none font-bold shrink-0">À faire</Badge>
                   </div>
-                  <Badge className="text-[9px] h-4 px-1.5 bg-primary/10 text-primary border-none font-bold shrink-0">À faire</Badge>
+                  <p className="text-[10px] text-muted-foreground leading-snug pl-6">{pillar.hint}</p>
                 </div>
               </Link>
             );
@@ -358,6 +368,13 @@ export default function DashboardPage() {
   const [loadingMain, setLoadingMain] = useState(true);
   const [loadingSecondary, setLoadingSecondary] = useState(true);
   const [error, setError] = useState(false);
+  const [celiBannerDismissed, setCeliBannerDismissed] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && localStorage.getItem("wp_celi_banner_dismissed")) {
+      setCeliBannerDismissed(true);
+    }
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -565,8 +582,11 @@ export default function DashboardPage() {
       : computeWeightedMer(data.selectedPortfolio.allocations)
     : null;
 
+  const showCeliBanner = !celiBannerDismissed && !data.clientInfo?.has_celi;
+
   return (
     <div className="space-y-6 pb-10">
+      <WelcomeModal />
       <div className="rounded-3xl border bg-gradient-to-br from-primary/5 via-background to-muted/20 p-6 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -608,6 +628,34 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* CELI banner — shown when user has no CELI account */}
+      {showCeliBanner && (
+        <div className="flex items-start gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-3.5">
+          <AlertCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+              Vous n&apos;utilisez pas votre CELI
+            </p>
+            <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80 mt-0.5">
+              Les Canadiens ont en moyenne <strong>30 000 $</strong> de droits CELI inutilisés — c&apos;est de la croissance imposable que vous payez inutilement.{" "}
+              <Link href="/fiscal" className="underline underline-offset-2 font-semibold hover:opacity-80">
+                Ouvrir un CELI →
+              </Link>
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              localStorage.setItem("wp_celi_banner_dismissed", "1");
+              setCeliBannerDismissed(true);
+            }}
+            className="p-1 rounded-full hover:bg-emerald-200/60 dark:hover:bg-emerald-800/40 transition-colors shrink-0"
+            aria-label="Fermer"
+          >
+            <X className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+          </button>
+        </div>
+      )}
 
       {/* Health Score Card — simple mode only */}
       {isSimple && <HealthScoreCard data={data} />}
@@ -885,10 +933,14 @@ export default function DashboardPage() {
                   ? current * Math.pow(1 + r, horizon * 12) + monthly * ((Math.pow(1 + r, horizon * 12) - 1) / r)
                   : current + monthly * horizon * 12;
                 const merAmt = merDisplay ? Math.round((parseFloat(merDisplay) / 100) * current) : null;
+                // Cost of waiting 6 months: difference between starting now vs starting in 6 months
+                const costOfDelay = r > 0
+                  ? Math.round(monthly * ((Math.pow(1 + r, horizon * 12) - Math.pow(1 + r, horizon * 12 - 6)) / r))
+                  : Math.round(monthly * 6);
                 return (
                   <div className="mt-4 pt-4 border-t">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-3">Ce que ça veut dire pour vous</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 p-3">
                         <p className="text-xs text-muted-foreground">Dans 20 ans (avec {monthly > 0 ? `${formatCurrency(monthly)}/mois` : "vos actifs actuels"})</p>
                         <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{formatCurrency(Math.round(projected20))}</p>
@@ -899,6 +951,13 @@ export default function DashboardPage() {
                           <p className="text-xs text-muted-foreground">Frais de gestion (RFG) estimés</p>
                           <p className="text-xl font-black text-orange-600 dark:text-orange-400 mt-1">{formatCurrency(merAmt)}/an</p>
                           <p className="text-[10px] text-muted-foreground mt-0.5">sur vos {formatCurrency(current)} actuels</p>
+                        </div>
+                      )}
+                      {monthly > 0 && costOfDelay > 0 && (
+                        <div className="rounded-xl bg-red-500/5 border border-red-500/20 p-3">
+                          <p className="text-xs text-muted-foreground">Coût d&apos;attendre 6 mois</p>
+                          <p className="text-xl font-black text-red-600 dark:text-red-400 mt-1">−{formatCurrency(costOfDelay)}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">manqués sur 20 ans si vous commencez plus tard</p>
                         </div>
                       )}
                     </div>

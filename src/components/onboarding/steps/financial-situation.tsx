@@ -34,8 +34,34 @@ interface Props {
   onPrev: () => void;
 }
 
+// Range → numeric midpoint mappings for estimation mode
+const ASSET_RANGES = [
+  { label: "Moins de 5 000 $", value: 2500 },
+  { label: "5 000 – 25 000 $", value: 15000 },
+  { label: "25 000 – 75 000 $", value: 50000 },
+  { label: "75 000 – 150 000 $", value: 112500 },
+  { label: "150 000 – 300 000 $", value: 225000 },
+  { label: "Plus de 300 000 $", value: 400000 },
+];
+const DEBT_RANGES = [
+  { label: "Aucune dette", value: 0 },
+  { label: "Moins de 5 000 $", value: 2500 },
+  { label: "5 000 – 20 000 $", value: 12500 },
+  { label: "20 000 – 50 000 $", value: 35000 },
+  { label: "Plus de 50 000 $", value: 75000 },
+];
+const SAVINGS_RANGES = [
+  { label: "Je n'épargne pas encore", value: 0 },
+  { label: "Moins de 200 $/mois", value: 100 },
+  { label: "200 – 500 $/mois", value: 350 },
+  { label: "500 – 1 000 $/mois", value: 750 },
+  { label: "1 000 – 2 000 $/mois", value: 1500 },
+  { label: "Plus de 2 000 $/mois", value: 2500 },
+];
+
 export function FinancialSituationStep({ userId, onNext, onPrev }: Props) {
   const [loading, setLoading] = useState(false);
+  const [estimateMode, setEstimateMode] = useState(true);
 
   const form = useForm<FinancialSituationInput>({
     // Zod v4 coerce produces `unknown` input — cast needed for react-hook-form compat
@@ -164,47 +190,134 @@ export function FinancialSituationStep({ userId, onNext, onPrev }: Props) {
               />
             </div>
 
-            {/* Assets & Debts */}
-            <div className="grid gap-4 sm:grid-cols-3">
-              <FormField
-                control={form.control}
-                name="total_assets"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Actifs totaux ($)</FormLabel>
-                    <FormControl>
-                      <Input type="number" min={0} placeholder="100000" {...field} value={field.value ?? ""} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="total_debts"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Dettes totales ($)</FormLabel>
-                    <FormControl>
-                      <Input type="number" min={0} placeholder="20000" {...field} value={field.value ?? ""} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="monthly_savings"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Épargne mensuelle ($)</FormLabel>
-                    <FormControl>
-                      <Input type="number" min={0} placeholder="1000" {...field} value={field.value ?? ""} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            {/* Assets, Debts & Savings — estimation mode toggle */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Actifs, dettes &amp; épargne</p>
+                <button
+                  type="button"
+                  onClick={() => setEstimateMode((v) => !v)}
+                  className="text-xs text-primary underline underline-offset-2 hover:opacity-80"
+                >
+                  {estimateMode ? "Entrer des montants précis" : "Utiliser des fourchettes"}
+                </button>
+              </div>
+
+              {estimateMode ? (
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <FormField
+                    control={form.control}
+                    name="total_assets"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Mes actifs totaux</FormLabel>
+                        <Select
+                          onValueChange={(v) => field.onChange(Number(v))}
+                          value={field.value != null ? String(ASSET_RANGES.find((r) => r.value === field.value)?.value ?? "") : ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Environ..." /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {ASSET_RANGES.map((r) => (
+                              <SelectItem key={r.value} value={String(r.value)}>{r.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="total_debts"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Mes dettes totales</FormLabel>
+                        <Select
+                          onValueChange={(v) => field.onChange(Number(v))}
+                          value={field.value != null ? String(DEBT_RANGES.find((r) => r.value === field.value)?.value ?? "") : ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Environ..." /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {DEBT_RANGES.map((r) => (
+                              <SelectItem key={r.value} value={String(r.value)}>{r.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="monthly_savings"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>J&apos;épargne chaque mois</FormLabel>
+                        <Select
+                          onValueChange={(v) => field.onChange(Number(v))}
+                          value={field.value != null ? String(SAVINGS_RANGES.find((r) => r.value === field.value)?.value ?? "") : ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Environ..." /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {SAVINGS_RANGES.map((r) => (
+                              <SelectItem key={r.value} value={String(r.value)}>{r.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <FormField
+                    control={form.control}
+                    name="total_assets"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Actifs totaux ($)</FormLabel>
+                        <FormControl>
+                          <Input type="number" min={0} placeholder="100000" {...field} value={field.value ?? ""} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="total_debts"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Dettes totales ($)</FormLabel>
+                        <FormControl>
+                          <Input type="number" min={0} placeholder="20000" {...field} value={field.value ?? ""} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="monthly_savings"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Épargne mensuelle ($)</FormLabel>
+                        <FormControl>
+                          <Input type="number" min={0} placeholder="1000" {...field} value={field.value ?? ""} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Investment experience & Tax bracket */}
