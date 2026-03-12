@@ -489,6 +489,14 @@ export function PortfolioPreviewStep({ userId }: Props) {
                   {portfolio.type === "suggéré" && (
                     <Badge>Recommandé</Badge>
                   )}
+                  {fallbackUsed
+                    ? <Badge variant="outline" className="gap-1 text-xs text-muted-foreground">
+                        <Shield className="h-3 w-3"/>Modèle standard
+                      </Badge>
+                    : <Badge className="gap-1 text-xs bg-primary/10 text-primary border-primary/20">
+                        <Sparkles className="h-3 w-3"/>IA personnalisée
+                      </Badge>
+                  }
                 </div>
 
                 {/* Metrics */}

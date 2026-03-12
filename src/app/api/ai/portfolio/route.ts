@@ -68,74 +68,84 @@ export async function POST(request: NextRequest) {
 
     const riskProfile: RiskProfile = (assessment?.risk_profile as RiskProfile) || 'modéré';
 
-    let enrichedPortfolios: EnrichedPortfolio[];
+    // Build dynamic prompts with user data
+    const instrumentsSummary = getInstrumentsSummaryCompact();
+    const systemPrompt = buildPortfolioSystemPrompt(instrumentsSummary);
+
+    const constraintsSummary = getConstraintsSummaryForPrompt(riskProfile);
+    const userMessage = buildPortfolioUserMessage({
+      clientInfo: clientInfo || {
+        age: null, profession: null, family_situation: null, dependents: null,
+        annual_income: null, monthly_expenses: null, total_assets: null,
+        total_debts: null, monthly_savings: null, investment_experience: null,
+        has_celi: false, has_reer: false, has_reee: false,
+        celi_balance: null, reer_balance: null, reee_balance: null,
+        has_celiapp: false, celiapp_balance: null,
+        has_cri: false, cri_balance: null,
+        has_frv: false, frv_balance: null,
+        tax_bracket: null,
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      goals: (goals || []).map((g: any) => ({
+        type: g.type as string,
+        label: g.label as string,
+        target_amount: g.target_amount as number,
+        current_amount: g.current_amount as number,
+        target_date: g.target_date as string | null,
+        priority: g.priority as string,
+      })),
+      assessment: {
+        risk_score: assessment?.risk_score ?? null,
+        risk_profile: assessment?.risk_profile ?? null,
+        ai_analysis: assessment?.ai_analysis ?? null,
+        key_factors: assessment?.key_factors as string[] ?? null,
+      },
+      constraintsSummary,
+    });
+
+    let enrichedPortfolios: EnrichedPortfolio[] | null = null;
     let fallbackUsed = false;
+    let aiGenerated = false;
+    let lastErrors: string[] = [];
 
-    try {
-      // Build dynamic prompts with user data
-      const instrumentsSummary = getInstrumentsSummaryCompact();
-      const systemPrompt = buildPortfolioSystemPrompt(instrumentsSummary);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const feedbackSuffix = lastErrors.length > 0
+          ? `\n\n⚠️ TENTATIVE PRÉCÉDENTE REJETÉE. Erreurs:\n${lastErrors.map(e => `- ${e}`).join('\n')}\nCorrige TOUTES ces erreurs.`
+          : '';
 
-      const constraintsSummary = getConstraintsSummaryForPrompt(riskProfile);
-      const userMessage = buildPortfolioUserMessage({
-        clientInfo: clientInfo || {
-          age: null, profession: null, family_situation: null, dependents: null,
-          annual_income: null, monthly_expenses: null, total_assets: null,
-          total_debts: null, monthly_savings: null, investment_experience: null,
-          has_celi: false, has_reer: false, has_reee: false,
-          celi_balance: null, reer_balance: null, reee_balance: null,
-          has_celiapp: false, celiapp_balance: null,
-          has_cri: false, cri_balance: null,
-          has_frv: false, frv_balance: null,
-          tax_bracket: null,
-        },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        goals: (goals || []).map((g: any) => ({
-          type: g.type as string,
-          label: g.label as string,
-          target_amount: g.target_amount as number,
-          current_amount: g.current_amount as number,
-          target_date: g.target_date as string | null,
-          priority: g.priority as string,
-        })),
-        assessment: {
-          risk_score: assessment?.risk_score ?? null,
-          risk_profile: assessment?.risk_profile ?? null,
-          ai_analysis: assessment?.ai_analysis ?? null,
-          key_factors: assessment?.key_factors as string[] ?? null,
-        },
-        constraintsSummary,
-      });
+        const aiResponse = await generateAIResponse({
+          systemPrompt,
+          userMessage: userMessage + feedbackSuffix,
+          maxTokens: 12000,
+          temperature: attempt === 0 ? 0.2 : 0.1,
+        });
 
-      const aiResponse = await generateAIResponse({
-        systemPrompt,
-        userMessage,
-        maxTokens: 12000,
-        temperature: 0.2,
-      });
+        const text = aiResponse.text;
+        if (!text) throw new Error("AI returned no text content");
 
-      const text = aiResponse.text;
-      if (!text) {
-        throw new Error("AI returned no text content");
-      }
-      const parsed = cleanAndParsePortfolioJSON(text);
+        const parsed = cleanAndParsePortfolioJSON(text);
+        const validation = validateAndEnrichPortfolios(parsed, riskProfile);
 
-      // Validate and enrich AI response
-      const validation = validateAndEnrichPortfolios(parsed, riskProfile);
-
-      if (validation.valid) {
-        enrichedPortfolios = validation.portfolios;
-        if (validation.warnings.length > 0) {
-          logger.warn("Portfolio validation warnings:", validation.warnings);
+        if (validation.valid) {
+          enrichedPortfolios = validation.portfolios;
+          aiGenerated = true;
+          if (validation.warnings.length > 0) {
+            logger.warn("Portfolio validation warnings:", validation.warnings);
+          }
+          break;
+        } else {
+          lastErrors = validation.errors;
+          logger.warn(`[Portfolio] Attempt ${attempt + 1} failed:`, validation.errors);
         }
-      } else {
-        logger.error("AI portfolio validation failed:", validation.errors);
-        logger.warn("Falling back to deterministic portfolios");
-        enrichedPortfolios = generateFallbackPortfolios(riskProfile);
-        fallbackUsed = true;
+      } catch (err) {
+        lastErrors = [err instanceof Error ? err.message : 'AI error'];
+        logger.warn(`[Portfolio] Attempt ${attempt + 1} threw:`, lastErrors);
       }
-    } catch (aiError: unknown) {
-      logger.error("AI Error in Portfolio (using fallback):", aiError instanceof Error ? aiError.message : aiError);
+    }
+
+    if (!enrichedPortfolios) {
+      logger.warn('[Portfolio] Both AI attempts failed, using fallback');
       enrichedPortfolios = generateFallbackPortfolios(riskProfile);
       fallbackUsed = true;
     }
@@ -163,6 +173,8 @@ export async function POST(request: NextRequest) {
           ai_rationale: portfolio.rationale,
           tax_strategy: portfolio.tax_strategy,
           stress_test: portfolio.stress_test,
+          ai_generated: aiGenerated,
+          risk_profile_at_generation: riskProfile,
         })
         .select("id")
         .single();
@@ -267,7 +279,7 @@ export async function POST(request: NextRequest) {
       await supabase.from("portfolios").delete().in("id", existingIds);
     }
 
-    return NextResponse.json({ portfolios: finalPortfolios, fallbackUsed });
+    return NextResponse.json({ portfolios: finalPortfolios, fallbackUsed, aiGenerated });
   } catch (error: unknown) {
     logger.error("Portfolio API error:", error);
     return NextResponse.json(

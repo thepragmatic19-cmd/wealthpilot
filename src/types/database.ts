@@ -113,6 +113,8 @@ export interface Portfolio {
   max_drawdown: number | null;
   total_mer: number | null;
   is_selected: boolean;
+  ai_generated: boolean;
+  risk_profile_at_generation: string | null;
   ai_rationale: string | null;
   tax_strategy: string | null;
   stress_test: {

@@ -36,7 +36,7 @@ import { FloatingHelpButton } from "@/components/ui/floating-help-button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FINANCIAL_TERMS } from "@/lib/financial-terms";
 import { toast } from "sonner";
-import { CheckCircle, TrendingUp, Shield, BarChart3, Star, Info, RefreshCw, Loader2, Download, Scale, FileBarChart2, LayoutGrid } from "lucide-react";
+import { CheckCircle, TrendingUp, Shield, BarChart3, Star, Info, RefreshCw, Loader2, Download, Scale, FileBarChart2, LayoutGrid, Sparkles } from "lucide-react";
 import { computeWeightedMer, computeAccountSummary } from "@/lib/portfolio/helpers";
 import type { Portfolio, PortfolioAllocation, ClientInfo, Transaction } from "@/types/database";
 import { Input } from "@/components/ui/input";
@@ -122,6 +122,7 @@ export default function PortfolioPage() {
   const [savingRebalance, setSavingRebalance] = useState<string | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
+  const [currentRiskProfile, setCurrentRiskProfile] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -130,7 +131,7 @@ export default function PortfolioPage() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const [{ data: portfolioData }, { data: clientData }] = await Promise.all([
+        const [{ data: portfolioData }, { data: clientData }, { data: riskData }] = await Promise.all([
           supabase
             .from("portfolios")
             .select("*, portfolio_allocations(*)")
@@ -140,7 +141,16 @@ export default function PortfolioPage() {
             .select("*")
             .eq("user_id", user.id)
             .maybeSingle(),
+          supabase
+            .from("risk_assessments")
+            .select("risk_profile")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
         ]);
+
+        if (riskData) setCurrentRiskProfile(riskData.risk_profile);
 
         if (portfolioData) {
           const mapped = portfolioData.map((p) => ({
@@ -240,7 +250,11 @@ export default function PortfolioPage() {
           allocations: p.allocations || [],
         })) as PortfolioWithAllocations[];
         setPortfolios(mapped);
-        toast.success("Portefeuilles régénérés avec succès");
+        if (data.aiGenerated) {
+          toast.success("Portefeuilles régénérés par l'IA ✓");
+        } else {
+          toast.warning("Modèles standard utilisés — complétez votre profil pour activer l'IA");
+        }
       }
     } catch {
       toast.error("Erreur lors de la régénération");
@@ -591,6 +605,19 @@ export default function PortfolioPage() {
         </div>
       </div>
 
+      {/* Drift banner — shown if risk profile changed since last generation */}
+      {currentRiskProfile && portfolios.length > 0 && currentRiskProfile !== portfolios[0]?.risk_profile_at_generation && (
+        <div className="rounded-xl border border-amber-300/40 bg-amber-50/40 dark:bg-amber-900/10 px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-300">
+            <RefreshCw className="h-4 w-4 shrink-0" />
+            <span>Votre profil de risque a changé depuis la dernière génération. Régénérez pour des portefeuilles alignés.</span>
+          </div>
+          <Button size="sm" variant="outline" onClick={regeneratePortfolios} disabled={regenerating} className="shrink-0">
+            Régénérer
+          </Button>
+        </div>
+      )}
+
       {/* Inline comparison table */}
       {compareMode && (
         <div className="overflow-x-auto rounded-xl border">
@@ -740,6 +767,14 @@ export default function PortfolioPage() {
                           Sélectionné
                         </Badge>
                       )}
+                      {portfolio.ai_generated
+                        ? <Badge className="gap-1 bg-primary/10 text-primary border-primary/20 text-xs">
+                            <Sparkles className="h-3 w-3"/>Généré par IA
+                          </Badge>
+                        : <Badge variant="outline" className="gap-1 text-muted-foreground text-xs">
+                            <Shield className="h-3 w-3"/>Modèle standard
+                          </Badge>
+                      }
                       <ExportPdfButton portfolio={portfolio} />
                       <Button
                         variant="outline"
