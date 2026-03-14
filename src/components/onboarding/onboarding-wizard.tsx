@@ -4,54 +4,57 @@ import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { Progress } from "@/components/ui/progress";
-import { PersonalInfoStep } from "./steps/personal-info";
-import { FinancialSituationStep } from "./steps/financial-situation";
-import { GoalsStep } from "./steps/goals";
-import { RiskQuestionnaireStep } from "./steps/risk-questionnaire";
-import { AIFollowUpStep } from "./steps/ai-follow-up";
-import { RiskResultStep } from "./steps/risk-result";
-import { PortfolioPreviewStep } from "./steps/portfolio-preview";
+import { SimpleStep1 } from "./steps/simple-step1";
+import { SimpleStep2 } from "./steps/simple-step2";
+import { SimpleStep3 } from "./steps/simple-step3";
 import type { OnboardingStep } from "@/types/database";
 
-const STEPS: OnboardingStep[] = [
+const SIMPLE_STEPS: OnboardingStep[] = [
   "personal_info",
   "financial_situation",
-  "goals",
-  "risk_questionnaire",
-  "ai_follow_up",
-  "risk_result",
   "portfolio_preview",
   "completed",
 ];
 
-const STEP_LABELS: Record<string, string> = {
-  personal_info: "Informations personnelles",
-  financial_situation: "Situation financière",
-  goals: "Objectifs d'investissement",
-  risk_questionnaire: "Questionnaire de risque",
-  ai_follow_up: "Questions de suivi IA",
-  risk_result: "Votre profil de risque",
-  portfolio_preview: "Aperçu portefeuille",
+const STEP_TITLES: Partial<Record<OnboardingStep, string>> = {
+  personal_info: "Parlons de toi",
+  financial_situation: "Tes comptes & ton objectif",
+  portfolio_preview: "Ton style d'investisseur",
 };
+
+function mapToSimpleStep(step: OnboardingStep): OnboardingStep {
+  if (SIMPLE_STEPS.includes(step)) return step;
+  // Map old flow steps to closest simple step
+  if (step === "goals") return "financial_situation";
+  return "personal_info";
+}
 
 export function OnboardingWizard() {
   const [currentStep, setCurrentStep] = useState<OnboardingStep>("personal_info");
   const [userId, setUserId] = useState<string>("");
+  const [firstName, setFirstName] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadStep() {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
         const { data: profile } = await supabase
           .from("profiles")
-          .select("onboarding_step")
+          .select("onboarding_step, full_name")
           .eq("id", user.id)
           .single();
         if (profile && profile.onboarding_step !== "completed") {
-          setCurrentStep(profile.onboarding_step as OnboardingStep);
+          setCurrentStep(mapToSimpleStep(profile.onboarding_step as OnboardingStep));
+        }
+        if (profile?.full_name) {
+          setFirstName(profile.full_name.split(" ")[0]);
+        } else if (user.email) {
+          setFirstName(user.email.split("@")[0]);
         }
       }
       setLoading(false);
@@ -59,26 +62,29 @@ export function OnboardingWizard() {
     loadStep();
   }, []);
 
-  const goToStep = useCallback(async (step: OnboardingStep) => {
-    const supabase = createClient();
-    await supabase
-      .from("profiles")
-      .update({ onboarding_step: step })
-      .eq("id", userId);
-    setCurrentStep(step);
-  }, [userId]);
+  const goToStep = useCallback(
+    async (step: OnboardingStep) => {
+      const supabase = createClient();
+      await supabase
+        .from("profiles")
+        .update({ onboarding_step: step })
+        .eq("id", userId);
+      setCurrentStep(step);
+    },
+    [userId]
+  );
 
   const nextStep = useCallback(() => {
-    const currentIndex = STEPS.indexOf(currentStep);
-    if (currentIndex < STEPS.length - 1) {
-      goToStep(STEPS[currentIndex + 1]);
+    const currentIndex = SIMPLE_STEPS.indexOf(currentStep);
+    if (currentIndex < SIMPLE_STEPS.length - 1) {
+      goToStep(SIMPLE_STEPS[currentIndex + 1]);
     }
   }, [currentStep, goToStep]);
 
   const prevStep = useCallback(() => {
-    const currentIndex = STEPS.indexOf(currentStep);
+    const currentIndex = SIMPLE_STEPS.indexOf(currentStep);
     if (currentIndex > 0) {
-      goToStep(STEPS[currentIndex - 1]);
+      goToStep(SIMPLE_STEPS[currentIndex - 1]);
     }
   }, [currentStep, goToStep]);
 
@@ -90,36 +96,31 @@ export function OnboardingWizard() {
     );
   }
 
-  const stepIndex = STEPS.indexOf(currentStep);
-  const maxIndex = Math.max(STEPS.length - 2, 1);
-  const progress = (stepIndex / maxIndex) * 100;
+  const stepIndex = SIMPLE_STEPS.indexOf(currentStep);
+  const displayStep = Math.min(stepIndex + 1, 3);
+  const progress = (stepIndex / 3) * 100;
 
   return (
-    <div className="mx-auto max-w-3xl">
-      {/* Progress */}
-      <div className="mb-8">
-        <div className="mb-2 flex items-center justify-between text-sm">
-          <span className="font-medium">{STEP_LABELS[currentStep]}</span>
-          <span className="text-muted-foreground">
-            Étape {stepIndex + 1} / {STEPS.length - 1}
-          </span>
+    <div className="mx-auto max-w-2xl">
+      {/* Progress header */}
+      {currentStep !== "completed" && (
+        <div className="mb-8 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-base">
+              {STEP_TITLES[currentStep] ?? ""}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              Étape {displayStep} sur 3
+            </span>
+          </div>
+          <Progress value={progress} className="h-2" />
+          {currentStep === "personal_info" && firstName && (
+            <p className="text-sm text-muted-foreground pt-1">
+              Bonjour {firstName} 👋 — ça ne prend que 3 minutes
+            </p>
+          )}
         </div>
-        <Progress value={progress} className="h-2" />
-        <div className="mt-3 flex justify-between">
-          {STEPS.slice(0, -1).map((step, i) => (
-            <div
-              key={step}
-              className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${
-                i <= stepIndex
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {i + 1}
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
 
       {/* Step content */}
       <AnimatePresence mode="wait">
@@ -131,25 +132,13 @@ export function OnboardingWizard() {
           transition={{ duration: 0.3 }}
         >
           {currentStep === "personal_info" && (
-            <PersonalInfoStep userId={userId} onNext={nextStep} />
+            <SimpleStep1 userId={userId} onNext={nextStep} />
           )}
           {currentStep === "financial_situation" && (
-            <FinancialSituationStep userId={userId} onNext={nextStep} onPrev={prevStep} />
-          )}
-          {currentStep === "goals" && (
-            <GoalsStep userId={userId} onNext={nextStep} onPrev={prevStep} />
-          )}
-          {currentStep === "risk_questionnaire" && (
-            <RiskQuestionnaireStep userId={userId} onNext={nextStep} onPrev={prevStep} />
-          )}
-          {currentStep === "ai_follow_up" && (
-            <AIFollowUpStep userId={userId} onNext={nextStep} onPrev={prevStep} />
-          )}
-          {currentStep === "risk_result" && (
-            <RiskResultStep userId={userId} onNext={nextStep} />
+            <SimpleStep2 userId={userId} onNext={nextStep} onPrev={prevStep} />
           )}
           {currentStep === "portfolio_preview" && (
-            <PortfolioPreviewStep userId={userId} />
+            <SimpleStep3 userId={userId} onPrev={prevStep} />
           )}
         </motion.div>
       </AnimatePresence>
