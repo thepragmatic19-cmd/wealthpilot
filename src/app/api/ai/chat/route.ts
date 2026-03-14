@@ -319,6 +319,7 @@ export async function POST(request: NextRequest) {
       marketData: marketData || undefined,
       persona,
       milestones,
+      chatMemory: (profile as { chat_memory?: string | null })?.chat_memory ?? null,
     });
 
     // Build conversation history

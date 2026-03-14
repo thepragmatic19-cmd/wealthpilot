@@ -39,6 +39,7 @@ export interface Profile {
   onboarding_step: OnboardingStep;
   onboarding_completed: boolean;
   preferred_language: string;
+  chat_memory: string | null;
   created_at: string;
   updated_at: string;
 }

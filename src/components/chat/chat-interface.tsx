@@ -390,6 +390,9 @@ export function ChatInterface({ initialMessage }: ChatInterfaceProps) {
         };
         setMessages((prev) => [...prev, assistantMsg]);
         setFollowUpSuggestions(getContextualSuggestions(fullText));
+
+        // Fire-and-forget memory update — updates Alex's cross-session memory
+        fetch("/api/ai/update-memory", { method: "POST" }).catch(() => {});
       }
       setStreamingText("");
     } catch (err: any) {

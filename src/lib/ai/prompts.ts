@@ -426,6 +426,7 @@ export function getChatSystemPrompt(context: {
   marketData?: string;
   persona?: PersonaContext;
   milestones?: Milestone[];
+  chatMemory?: string | null;
 }) {
   const fmt = (v: number | null, suffix = '$') =>
     v != null ? `${v.toLocaleString('fr-CA')} ${suffix}` : 'N/A';
@@ -539,6 +540,11 @@ export function getChatSystemPrompt(context: {
     ? `\n## Contexte de marché (temps réel)\n${context.marketData}\n`
     : '';
 
+  // ── Mémoire des sessions précédentes ──────────────────────────────────────
+  const memorySection = context.chatMemory
+    ? `\n## 🧠 Mémoire des échanges précédents\n${context.chatMemory}\n`
+    : '';
+
   // ── Contexte de vie du client ──────────────────────────────────────────────
   const personaSection = context.persona ? `\n## Profil de vie et style de communication
 - Phase de vie : ${context.persona.stageLabel}
@@ -557,7 +563,7 @@ ${buildAdvisorIdentity()}
 
 # Ton client aujourd'hui
 **${context.clientName}**, ${context.clientAge ?? 'âge non renseigné'} ans
-
+${memorySection}
 ${financialSection}
 ${riskSection}
 ${portfolioSection}
