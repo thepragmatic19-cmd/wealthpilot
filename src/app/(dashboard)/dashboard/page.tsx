@@ -243,57 +243,67 @@ function ChecklistWidget({ data }: { data: DashboardData }) {
 // ─── Health Score Card ────────────────────────────────────────────────────────
 
 function HealthScoreCard({ data }: { data: DashboardData }) {
-  const annualIncome = Number(data.clientInfo?.annual_income || 0);
-  const monthlySavings = Number(data.clientInfo?.monthly_savings || 0);
-  const savingsRate = annualIncome > 0 ? Math.round((monthlySavings * 12 / annualIncome) * 100) : 0;
+  const ci = data.clientInfo;
+  const annualIncome = Number(ci?.annual_income || 0);
+  const monthlySavings = Number(ci?.monthly_savings || 0);
+  const totalAssets = Number(ci?.total_assets || 0);
+  const totalDebts = Number(ci?.total_debts || 0);
+  const monthlyExpenses = Number(ci?.monthly_expenses || 0);
 
-  const pillars = [
-    {
-      label: "Profil complet",
-      done: !!(data.clientInfo?.annual_income && data.clientInfo?.monthly_savings),
-      href: "/profile",
-      Icon: User,
-      hint: "Nos analyses seront 3× plus précises avec votre revenu et épargne",
-    },
-    {
-      label: "Comptes enregistrés",
-      done: !!(data.clientInfo?.has_celi || data.clientInfo?.has_reer),
-      href: "/fiscal",
-      Icon: Shield,
-      hint: "Un CELI bien utilisé peut vous faire économiser des milliers $ d'impôts",
-    },
-    {
-      label: "Objectif de vie",
-      done: data.goals.length > 0,
-      href: "/goals",
-      Icon: Target,
-      hint: "Se fixer un objectif augmente vos chances de l'atteindre de 42 %",
-    },
-    {
-      label: "Épargne saine (≥10%)",
-      done: savingsRate >= 10,
-      href: "/profile",
-      Icon: TrendingUp,
-      hint: "Épargner 10 % de votre revenu vous met sur la voie de la liberté financière",
-    },
-  ];
+  // ── Dimension scores ──────────────────────────────────────────────────────
+  // 1. Savings rate (max 25)
+  const savingsRate = annualIncome > 0 ? (monthlySavings * 12) / annualIncome : 0;
+  const savingsScore =
+    savingsRate >= 0.15 ? 25 : savingsRate >= 0.10 ? 18 : savingsRate >= 0.05 ? 10 : 0;
 
-  const doneCount = pillars.filter((p) => p.done).length;
-  const score = doneCount * 25;
+  // 2. Registered accounts (max 20)
+  const hasCeli = !!(ci?.has_celi && Number(ci?.celi_balance || 0) > 0);
+  const hasReer = !!(ci?.has_reer && Number(ci?.reer_balance || 0) > 0);
+  const registeredScore = hasCeli && hasReer ? 20 : hasCeli || hasReer || ci?.has_celi || ci?.has_reer ? 10 : 0;
+
+  // 3. Emergency fund (max 20)
+  const emergencyMonths = monthlyExpenses > 0 ? totalAssets / monthlyExpenses : 0;
+  const emergencyScore =
+    emergencyMonths >= 6 ? 20 : emergencyMonths >= 3 ? 12 : emergencyMonths >= 1 ? 5 : 0;
+
+  // 4. Debt ratio (max 15)
+  const debtRatio = annualIncome > 0 ? totalDebts / annualIncome : totalDebts > 0 ? 1 : 0;
+  const debtScore =
+    debtRatio === 0 ? 15 : debtRatio <= 0.25 ? 12 : debtRatio <= 0.5 ? 8 : debtRatio <= 1 ? 4 : 0;
+
+  // 5. Goals defined (max 10)
+  const goalsScore = Math.min(data.goals.length * 5, 10);
+
+  // 6. Profile complete (max 10)
+  const profileScore = (annualIncome > 0 ? 5 : 0) + (monthlySavings > 0 ? 5 : 0);
+
+  const score = savingsScore + registeredScore + emergencyScore + debtScore + goalsScore + profileScore;
 
   const { grade, gradeColor, gradeBorder, gradeBg, message } =
-    score === 100
-      ? { grade: "A+", gradeColor: "text-emerald-600 dark:text-emerald-400", gradeBorder: "border-emerald-500", gradeBg: "bg-emerald-500/10", message: "Votre situation financière est excellente 🎉" }
-      : score >= 75
-      ? { grade: "B", gradeColor: "text-green-600 dark:text-green-400", gradeBorder: "border-green-500", gradeBg: "bg-green-500/10", message: "Bonne situation, quelques points à améliorer" }
-      : score >= 50
+    score >= 85
+      ? { grade: "A+", gradeColor: "text-emerald-600 dark:text-emerald-400", gradeBorder: "border-emerald-500", gradeBg: "bg-emerald-500/10", message: "Situation financière excellente" }
+      : score >= 70
+      ? { grade: "A", gradeColor: "text-green-600 dark:text-green-400", gradeBorder: "border-green-500", gradeBg: "bg-green-500/10", message: "Très bonne santé financière" }
+      : score >= 55
+      ? { grade: "B", gradeColor: "text-teal-600 dark:text-teal-400", gradeBorder: "border-teal-500", gradeBg: "bg-teal-500/10", message: "Bonne situation, des points à améliorer" }
+      : score >= 40
       ? { grade: "C", gradeColor: "text-amber-600 dark:text-amber-400", gradeBorder: "border-amber-500", gradeBg: "bg-amber-500/10", message: "Des actions importantes vous attendent" }
       : { grade: "D", gradeColor: "text-orange-600 dark:text-orange-400", gradeBorder: "border-orange-500", gradeBg: "bg-orange-500/10", message: "Commençons par les bases" };
 
+  const dimensions: { label: string; pts: number; max: number; href: string; missing: boolean }[] = [
+    { label: "Taux d'épargne", pts: savingsScore, max: 25, href: "/profile", missing: annualIncome === 0 },
+    { label: "Comptes enregistrés", pts: registeredScore, max: 20, href: "/fiscal", missing: false },
+    { label: "Fonds d'urgence", pts: emergencyScore, max: 20, href: "/profile", missing: monthlyExpenses === 0 && totalAssets === 0 },
+    { label: "Ratio d'endettement", pts: debtScore, max: 15, href: "/profile", missing: annualIncome === 0 },
+    { label: "Objectifs définis", pts: goalsScore, max: 10, href: "/goals", missing: false },
+    { label: "Profil complet", pts: profileScore, max: 10, href: "/profile", missing: false },
+  ];
+
   return (
     <Card>
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between mb-4">
+      <CardContent className="p-5 space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className={`h-12 w-12 rounded-xl flex items-center justify-center font-black text-2xl border-2 ${gradeBorder} ${gradeBg} ${gradeColor}`}>
               {grade}
@@ -303,35 +313,36 @@ function HealthScoreCard({ data }: { data: DashboardData }) {
               <p className={`text-sm font-semibold ${gradeColor}`}>{message}</p>
             </div>
           </div>
-          <Badge variant="outline" className="text-xs shrink-0">
-            {doneCount}/4 piliers
+          <Badge variant="outline" className="text-xs shrink-0 tabular-nums">
+            {score}/100
           </Badge>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          {pillars.map((pillar, i) => {
-            if (pillar.done) {
-              return (
-                <div key={i} className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/30">
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
-                  <span className="text-xs text-muted-foreground line-through">{pillar.label}</span>
+
+        {/* Global score bar */}
+        <div className="space-y-1">
+          <Progress value={score} className="h-2" />
+        </div>
+
+        {/* 6 dimension rows */}
+        <div className="space-y-2.5">
+          {dimensions.map((dim) => (
+            <div key={dim.label} className="space-y-1">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-muted-foreground">{dim.label}</span>
+                <div className="flex items-center gap-2">
+                  <span className={`font-semibold tabular-nums ${dim.pts === dim.max ? "text-emerald-600 dark:text-emerald-400" : dim.pts > 0 ? "text-primary" : "text-muted-foreground/60"}`}>
+                    {dim.pts}/{dim.max} pts
+                  </span>
+                  {dim.pts < dim.max && (
+                    <Link href={dim.href} className="text-primary/70 hover:text-primary text-[10px] underline underline-offset-2">
+                      Compléter →
+                    </Link>
+                  )}
                 </div>
-              );
-            }
-            return (
-              <Link key={i} href={pillar.href}>
-                <div className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-muted/10 border border-dashed hover:border-primary/50 hover:bg-muted/30 transition-colors cursor-pointer">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Circle className="h-4 w-4 shrink-0 text-muted-foreground/40" />
-                      <span className="text-xs font-medium truncate">{pillar.label}</span>
-                    </div>
-                    <Badge className="text-[9px] h-4 px-1.5 bg-primary/10 text-primary border-none font-bold shrink-0">À faire</Badge>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground leading-snug pl-6">{pillar.hint}</p>
-                </div>
-              </Link>
-            );
-          })}
+              </div>
+              <Progress value={(dim.pts / dim.max) * 100} className="h-1.5" />
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>

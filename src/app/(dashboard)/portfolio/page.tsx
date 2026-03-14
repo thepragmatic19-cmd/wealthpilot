@@ -30,6 +30,10 @@ const ExportPdfButton = dynamic(
   () => import("@/components/portfolio/export-pdf-button").then((m) => ({ default: m.ExportPdfButton })),
   { ssr: false, loading: () => null }
 );
+const EtfPricesTable = dynamic(
+  () => import("@/components/portfolio/etf-prices-table").then((m) => ({ default: m.EtfPricesTable })),
+  { ssr: false, loading: () => null }
+);
 import { formatPercent, formatCurrency, ASSET_CLASS_COLORS } from "@/lib/utils";
 import { useSimpleMode } from "@/contexts/simple-mode-context";
 import { FloatingHelpButton } from "@/components/ui/floating-help-button";
@@ -920,6 +924,9 @@ export default function PortfolioPage() {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* ETF live prices */}
+              <EtfPricesTable tickers={portfolio.allocations.map((a) => a.instrument_ticker)} />
 
               {/* Rebalancing Engine */}
               {(() => {

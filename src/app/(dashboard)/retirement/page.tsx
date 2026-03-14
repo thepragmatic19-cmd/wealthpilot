@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     Calculator,
     TrendingUp,
@@ -17,6 +18,7 @@ import {
     Sparkles,
     ChevronDown,
     ChevronUp,
+    Zap,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
@@ -245,6 +247,16 @@ export default function RetirementPage() {
                 </p>
             </div>
 
+            <Tabs defaultValue="simulateur">
+                <TabsList>
+                    <TabsTrigger value="simulateur">Simulateur</TabsTrigger>
+                    <TabsTrigger value="scenarios" className="flex items-center gap-1.5">
+                        <Zap className="h-3.5 w-3.5" />
+                        Scénarios rapides
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="simulateur" className="mt-4">
             <div className="grid gap-4 lg:grid-cols-3">
                 {/* Input Panel */}
                 <Card className="lg:col-span-1">
@@ -583,8 +595,284 @@ export default function RetirementPage() {
                     </Card>
                     </>)}
                 </div>
-            </div>
+                </div>
+                </TabsContent>
+
+                <TabsContent value="scenarios" className="mt-4">
+                    <ScenariosTab params={params} />
+                </TabsContent>
+            </Tabs>
+
             <FloatingHelpButton question="Explique-moi ma situation de retraite en termes simples" />
+        </div>
+    );
+}
+
+// ─── Scénarios rapides ───────────────────────────────────────────────────────
+
+interface ScenarioDelta {
+    monthlySavings: number;
+    retirementAge: number;
+    expectedReturn: number;
+}
+
+const PRESETS: { label: string; delta: Partial<ScenarioDelta> }[] = [
+    { label: "+200$/mois", delta: { monthlySavings: 200 } },
+    { label: "Retraite à 60 ans", delta: { retirementAge: -5 } }, // relative to default 65
+    { label: "Retraite à 70 ans", delta: { retirementAge: 5 } },
+    { label: "Rendement +2%", delta: { expectedReturn: 2 } },
+];
+
+function ScenariosTab({ params }: { params: typeof DEFAULT_PARAMS }) {
+    const [delta, setDelta] = useState<ScenarioDelta>({ monthlySavings: 0, retirementAge: 0, expectedReturn: 0 });
+    const [activePreset, setActivePreset] = useState<number | null>(null);
+
+    const applyPreset = (i: number) => {
+        if (activePreset === i) {
+            setActivePreset(null);
+            setDelta({ monthlySavings: 0, retirementAge: 0, expectedReturn: 0 });
+        } else {
+            setActivePreset(i);
+            const p = PRESETS[i].delta;
+            setDelta({
+                monthlySavings: p.monthlySavings ?? 0,
+                retirementAge: p.retirementAge ?? 0,
+                expectedReturn: p.expectedReturn ?? 0,
+            });
+        }
+    };
+
+    const modifiedParams = {
+        ...params,
+        monthlyContribution: Math.max(0, params.monthlyContribution + delta.monthlySavings),
+        retirementAge: Math.min(75, Math.max(50, params.retirementAge + delta.retirementAge)),
+        expectedReturn: Math.min(15, Math.max(1, params.expectedReturn + delta.expectedReturn)),
+    };
+
+    const baseResults = useMemo(() => runMonteCarlo(params, 300), [params]);
+    const modResults = useMemo(() => runMonteCarlo(modifiedParams, 300), [modifiedParams]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const baseFinal = baseResults[baseResults.length - 1];
+    const modFinal = modResults[modResults.length - 1];
+
+    const baseCapital = baseFinal?.p50 || 0;
+    const modCapital = modFinal?.p50 || 0;
+
+    const baseYearsRetirement = params.lifeExpectancy - params.retirementAge;
+    const modYearsRetirement = params.lifeExpectancy - modifiedParams.retirementAge;
+
+    const baseMonthlyGross = (baseYearsRetirement > 0 ? baseCapital / baseYearsRetirement : 0) / 12 + params.governmentPension / 12;
+    const modMonthlyGross = (modYearsRetirement > 0 ? modCapital / modYearsRetirement : 0) / 12 + params.governmentPension / 12;
+
+    const baseMonthlyNet = baseMonthlyGross * (1 - params.withdrawalTaxRate / 100);
+    const modMonthlyNet = modMonthlyGross * (1 - params.withdrawalTaxRate / 100);
+
+    const baseCovered = baseMonthlyNet >= params.monthlyExpenses;
+    const modCovered = modMonthlyNet >= params.monthlyExpenses;
+
+    // Chart data: align by year index (base may have different length than mod if retirementAge changed)
+    const chartLen = Math.max(baseResults.length, modResults.length);
+    const chartData = Array.from({ length: chartLen }, (_, i) => ({
+        age: params.currentAge + i,
+        base: baseResults[i]?.p50 ?? null,
+        mod: modResults[i]?.p50 ?? null,
+    }));
+
+    const hasChange = delta.monthlySavings !== 0 || delta.retirementAge !== 0 || delta.expectedReturn !== 0;
+
+    return (
+        <div className="space-y-6">
+            {/* Preset buttons */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <Zap className="h-4 w-4 text-primary" />
+                        Scénarios prédéfinis
+                    </CardTitle>
+                    <CardDescription>Cliquez sur un scénario pour voir l&apos;impact immédiat</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-2">
+                    {PRESETS.map((preset, i) => (
+                        <Button
+                            key={i}
+                            variant={activePreset === i ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => applyPreset(i)}
+                        >
+                            {preset.label}
+                        </Button>
+                    ))}
+                </CardContent>
+            </Card>
+
+            {/* Custom sliders */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-base">Ajustements personnalisés</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                    <div className="space-y-2">
+                        <Label>
+                            Épargne mensuelle :&nbsp;
+                            <span className={delta.monthlySavings > 0 ? "text-emerald-600" : delta.monthlySavings < 0 ? "text-red-500" : ""}>
+                                {delta.monthlySavings >= 0 ? "+" : ""}{delta.monthlySavings}$/mois
+                            </span>
+                        </Label>
+                        <Slider
+                            value={[delta.monthlySavings]}
+                            onValueChange={([v]: number[]) => { setActivePreset(null); setDelta((d) => ({ ...d, monthlySavings: v })); }}
+                            min={-500} max={1000} step={50}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>
+                            Âge de retraite :&nbsp;
+                            <span className={delta.retirementAge !== 0 ? "text-amber-600" : ""}>
+                                {delta.retirementAge >= 0 ? "+" : ""}{delta.retirementAge} ans ({modifiedParams.retirementAge} ans)
+                            </span>
+                        </Label>
+                        <Slider
+                            value={[delta.retirementAge]}
+                            onValueChange={([v]: number[]) => { setActivePreset(null); setDelta((d) => ({ ...d, retirementAge: v })); }}
+                            min={-10} max={10} step={1}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>
+                            Rendement attendu :&nbsp;
+                            <span className={delta.expectedReturn > 0 ? "text-emerald-600" : delta.expectedReturn < 0 ? "text-red-500" : ""}>
+                                {delta.expectedReturn >= 0 ? "+" : ""}{delta.expectedReturn}% ({modifiedParams.expectedReturn}%)
+                            </span>
+                        </Label>
+                        <Slider
+                            value={[delta.expectedReturn]}
+                            onValueChange={([v]: number[]) => { setActivePreset(null); setDelta((d) => ({ ...d, expectedReturn: v })); }}
+                            min={-3} max={3} step={0.5}
+                        />
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Comparison table */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-base">Tableau comparatif</CardTitle>
+                    {!hasChange && (
+                        <CardDescription>Appliquez un scénario ou ajustez les curseurs pour voir la comparaison</CardDescription>
+                    )}
+                </CardHeader>
+                <CardContent>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b">
+                                    <th className="pb-2 text-left text-xs font-medium text-muted-foreground">Métrique</th>
+                                    <th className="pb-2 text-right text-xs font-medium text-muted-foreground">Scénario de base</th>
+                                    <th className="pb-2 text-right text-xs font-medium text-muted-foreground">Scénario modifié</th>
+                                    <th className="pb-2 text-right text-xs font-medium text-muted-foreground">Différence</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                <tr>
+                                    <td className="py-2.5 text-xs">Capital final (p50)</td>
+                                    <td className="py-2.5 text-right font-semibold tabular-nums">{formatCurrency(baseCapital)}</td>
+                                    <td className="py-2.5 text-right font-semibold tabular-nums">{formatCurrency(modCapital)}</td>
+                                    <td className={`py-2.5 text-right font-semibold tabular-nums ${modCapital - baseCapital >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                                        {modCapital - baseCapital >= 0 ? "+" : ""}{formatCurrency(modCapital - baseCapital)}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td className="py-2.5 text-xs">Revenu mensuel net</td>
+                                    <td className="py-2.5 text-right font-semibold tabular-nums">{formatCurrency(baseMonthlyNet)}/mois</td>
+                                    <td className="py-2.5 text-right font-semibold tabular-nums">{formatCurrency(modMonthlyNet)}/mois</td>
+                                    <td className={`py-2.5 text-right font-semibold tabular-nums ${modMonthlyNet - baseMonthlyNet >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                                        {modMonthlyNet - baseMonthlyNet >= 0 ? "+" : ""}{formatCurrency(modMonthlyNet - baseMonthlyNet)}/mois
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td className="py-2.5 text-xs">Couverture des dépenses</td>
+                                    <td className={`py-2.5 text-right font-semibold ${baseCovered ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                                        {baseCovered ? "✓ Oui" : "✗ Non"}
+                                    </td>
+                                    <td className={`py-2.5 text-right font-semibold ${modCovered ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                                        {modCovered ? "✓ Oui" : "✗ Non"}
+                                    </td>
+                                    <td className="py-2.5 text-right text-xs text-muted-foreground">—</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Mini dual-curve chart */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-base">Projection p50</CardTitle>
+                    <CardDescription>Courbe de base (pointillés) vs scénario modifié (plein)</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="h-[220px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={chartData}>
+                                <defs>
+                                    <linearGradient id="gradBase" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#9ca3af" stopOpacity={0.15} />
+                                        <stop offset="95%" stopColor="#9ca3af" stopOpacity={0} />
+                                    </linearGradient>
+                                    <linearGradient id="gradMod" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#22d3ee" stopOpacity={0.05} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeOpacity={0.4} />
+                                <XAxis
+                                    dataKey="age"
+                                    tick={{ fill: "#9ca3af", fontSize: 11 }}
+                                    tickFormatter={(v) => `${v} ans`}
+                                    stroke="#4b5563"
+                                />
+                                <YAxis
+                                    tick={{ fill: "#9ca3af", fontSize: 11 }}
+                                    tickFormatter={(v) => formatCurrency(v)}
+                                    stroke="#4b5563"
+                                    width={80}
+                                />
+                                <RechartsTooltip
+                                    formatter={(value) => formatCurrency(Number(value))}
+                                    labelFormatter={(label) => `${label} ans`}
+                                    contentStyle={{
+                                        backgroundColor: "rgba(17, 24, 39, 0.95)",
+                                        border: "1px solid #374151",
+                                        borderRadius: "8px",
+                                        color: "#f3f4f6",
+                                    }}
+                                    labelStyle={{ color: "#9ca3af" }}
+                                />
+                                <Area
+                                    type="monotone"
+                                    dataKey="base"
+                                    stroke="#9ca3af"
+                                    strokeWidth={1.5}
+                                    strokeDasharray="5 3"
+                                    fill="url(#gradBase)"
+                                    name="Base"
+                                    connectNulls
+                                />
+                                <Area
+                                    type="monotone"
+                                    dataKey="mod"
+                                    stroke="#22d3ee"
+                                    strokeWidth={2.5}
+                                    fill="url(#gradMod)"
+                                    name="Modifié"
+                                    connectNulls
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }
