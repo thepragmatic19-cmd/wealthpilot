@@ -16,7 +16,7 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Moon, Sun, Menu, User, LogOut, Settings } from "lucide-react";
 import Link from "next/link";
-import { MobileNav } from "./mobile-nav";
+import { MobileDrawerNav } from "./mobile-drawer-nav";
 import { NotificationBell } from "./notification-bell";
 import { LanguageSwitcher } from "./language-switcher";
 import type { Profile } from "@/types/database";
@@ -62,7 +62,7 @@ export function Topbar({ profile }: TopbarProps) {
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-64 p-0">
-            <MobileNav />
+            <MobileDrawerNav />
           </SheetContent>
         </Sheet>
       ) : (
