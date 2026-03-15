@@ -399,8 +399,8 @@ export default function RetirementPage() {
 
                 {/* Results Panel */}
                 <div className="lg:col-span-2 space-y-6">
-                    {/* KPI Cards */}
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    {/* KPI Cards — hidden in simple mode (plain-language summary replaces them) */}
+                    {(!isSimple || showAdvanced) && <div className="grid gap-4 sm:grid-cols-2">
                         <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10">
                             <CardContent className="p-4">
                                 <p className="text-xs text-muted-foreground">Capital à la retraite (médian)</p>
@@ -431,7 +431,7 @@ export default function RetirementPage() {
                                 </p>
                             </CardContent>
                         </Card>
-                    </div>
+                    </div>}
 
                     {/* Simple mode plain-language summary */}
                     {isSimple && !showAdvanced && (

@@ -380,10 +380,12 @@ export default function DashboardPage() {
   const [loadingSecondary, setLoadingSecondary] = useState(true);
   const [error, setError] = useState(false);
   const [celiBannerDismissed, setCeliBannerDismissed] = useState(false);
+  const [profileBannerDismissed, setProfileBannerDismissed] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && localStorage.getItem("wp_celi_banner_dismissed")) {
-      setCeliBannerDismissed(true);
+    if (typeof window !== "undefined") {
+      if (localStorage.getItem("wp_celi_banner_dismissed")) setCeliBannerDismissed(true);
+      if (localStorage.getItem("wp_profile_banner_dismissed")) setProfileBannerDismissed(true);
     }
   }, []);
 
@@ -594,6 +596,8 @@ export default function DashboardPage() {
     : null;
 
   const showCeliBanner = !celiBannerDismissed && !data.clientInfo?.has_celi;
+  const showProfileBanner = !profileBannerDismissed && !loadingMain && !!data.clientInfo &&
+    (!data.clientInfo.monthly_expenses || !data.clientInfo.total_assets || !data.clientInfo.total_debts);
 
   return (
     <div className="space-y-6 pb-10">
@@ -668,6 +672,34 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Profile incomplete banner */}
+      {showProfileBanner && (
+        <div className="flex items-start gap-3 rounded-2xl border border-blue-400/30 bg-blue-50 dark:bg-blue-950/30 px-4 py-3.5">
+          <User className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-blue-800 dark:text-blue-300">
+              Ton profil est incomplet
+            </p>
+            <p className="text-xs text-blue-700/80 dark:text-blue-400/80 mt-0.5">
+              Ajoute tes dépenses, actifs et dettes pour obtenir des conseils personnalisés.{" "}
+              <Link href="/profile" className="underline underline-offset-2 font-semibold hover:opacity-80">
+                Compléter mon profil →
+              </Link>
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              localStorage.setItem("wp_profile_banner_dismissed", "1");
+              setProfileBannerDismissed(true);
+            }}
+            className="p-1 rounded-full hover:bg-blue-200/60 dark:hover:bg-blue-800/40 transition-colors shrink-0"
+            aria-label="Fermer"
+          >
+            <X className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+          </button>
+        </div>
+      )}
+
       {/* Health Score Card — simple mode only */}
       {isSimple && <HealthScoreCard data={data} />}
 
@@ -710,6 +742,59 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* "Mon prochain dollar" — simple mode only, guides where to invest next */}
+      {isSimple && (() => {
+        const hasCeli = !!data.clientInfo?.has_celi;
+        const hasReer = !!data.clientInfo?.has_reer;
+        const hasCeliapp = !!(data.clientInfo as (ClientInfo & { has_celiapp?: boolean }) | null)?.has_celiapp;
+        const celiBalance = Number(data.clientInfo?.celi_balance || 0);
+        const income = Number(data.clientInfo?.annual_income || 0);
+        const CELI_CUMUL = 109000;
+        const REER_MAX_LIMIT = 32490;
+        const celiRoom = Math.max(0, CELI_CUMUL - celiBalance);
+        const reerRoom = income > 0 ? Math.max(0, Math.min(income * 0.18, REER_MAX_LIMIT) - Number(data.clientInfo?.reer_balance || 0)) : null;
+
+        const steps: { emoji: string; title: string; desc: string; href: string; done?: boolean }[] = [];
+        if (celiRoom > 0) {
+          steps.push({ emoji: "🟢", title: "CELI d'abord", desc: `Il te reste ${Math.round(celiRoom).toLocaleString("fr-CA")} $ de droits. Tes gains ne seront jamais imposés.`, href: "/fiscal" });
+        } else {
+          steps.push({ emoji: "✅", title: "CELI maximisé", desc: "Excellent — tu profites pleinement de tes droits CELI.", href: "/fiscal", done: true });
+        }
+        if (hasReer && reerRoom !== null && reerRoom > 0) {
+          steps.push({ emoji: "🔵", title: "REER ensuite", desc: `${Math.round(reerRoom).toLocaleString("fr-CA")} $ d'espace REER. Tes cotisations réduisent tes impôts maintenant.`, href: "/fiscal" });
+        } else if (!hasReer) {
+          steps.push({ emoji: "💡", title: "Ouvre un REER", desc: "Si ton revenu est élevé, le REER réduit ton impôt annuel.", href: "/profile" });
+        }
+        if (hasCeliapp) {
+          steps.push({ emoji: "🏠", title: "CÉLIAPP (1re maison)", desc: "Profite du double avantage fiscal pour l'achat de ta 1re propriété.", href: "/fiscal" });
+        }
+        steps.push({ emoji: "📈", title: "Compte non enregistré", desc: "Une fois tes comptes enregistrés maximisés, investis ici pour continuer à faire croître ton patrimoine.", href: "/portfolio" });
+
+        return (
+          <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-blue-500/5">
+            <CardContent className="p-5 space-y-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Mon prochain dollar</p>
+              <p className="text-xs text-muted-foreground">Où investir ton épargne en priorité :</p>
+              <ol className="space-y-2">
+                {steps.map((step, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <span className="text-base leading-tight shrink-0">{step.emoji}</span>
+                    <div className="min-w-0">
+                      <Link href={step.href}>
+                        <p className={`text-sm font-semibold ${step.done ? "text-muted-foreground line-through" : "hover:text-primary transition-colors"}`}>
+                          {i + 1}. {step.title}
+                        </p>
+                      </Link>
+                      <p className="text-xs text-muted-foreground leading-snug">{step.desc}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Market Ticker — hidden in simple mode */}
       {!isSimple && <MarketTicker />}

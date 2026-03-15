@@ -45,6 +45,37 @@ import { computeWeightedMer, computeAccountSummary } from "@/lib/portfolio/helpe
 import type { Portfolio, PortfolioAllocation, ClientInfo, Transaction } from "@/types/database";
 import { Input } from "@/components/ui/input";
 
+// Simple French descriptions of common ETFs — shown in beginner mode
+const ETF_SIMPLE_DESC: Record<string, string> = {
+  "VFV.TO": "Grandes entreprises américaines (Apple, Microsoft, Nvidia...)",
+  "XIC.TO": "Entreprises canadiennes (RBC, TD, Shopify, CNR...)",
+  "ZCN.TO": "Entreprises canadiennes — indice TSX complet",
+  "XIU.TO": "60 plus grandes entreprises canadiennes",
+  "XAW.TO": "Entreprises mondiales, hors Canada",
+  "XEF.TO": "Entreprises européennes et asiatiques développées",
+  "XEM.TO": "Marchés émergents (Chine, Inde, Brésil...)",
+  "XEQT.TO": "Actions mondiales complètes en 1 seul ETF",
+  "XBAL.TO": "Portefeuille équilibré mondial (60% actions, 40% obligations)",
+  "XGRO.TO": "Portefeuille croissance mondial (80% actions, 20% obligations)",
+  "VEQT.TO": "Actions mondiales Vanguard en 1 seul ETF",
+  "VGRO.TO": "Portefeuille croissance Vanguard (80% actions)",
+  "VBAL.TO": "Portefeuille équilibré Vanguard (60% actions)",
+  "ZAG.TO": "Obligations canadiennes — stabilité et revenus fixes",
+  "VAB.TO": "Obligations canadiennes Vanguard — protection contre la volatilité",
+  "XBB.TO": "Obligations canadiennes iShares — large spectre",
+  "XSB.TO": "Obligations canadiennes à court terme — peu sensibles aux taux",
+  "ZFL.TO": "Obligations canadiennes à long terme — sensibles aux taux",
+  "ZRE.TO": "Fiducies immobilières canadiennes (FPI/REIT)",
+  "XRE.TO": "Immobilier canadien — loyers et biens immobiliers",
+  "HXS.TO": "S&P 500 — version fiscalement avantageuse (pas de dividendes imposables)",
+  "CASH.TO": "Liquidités à rendement élevé — équivalent compte d'épargne",
+  "PSA.TO": "Liquidités à rendement élevé — très peu de risque",
+  "ZEB.TO": "Banques canadiennes (RBC, TD, BNS, BMO, CIBC, NA)",
+  "ZEO.TO": "Énergie canadienne (pipelines, pétrole et gaz)",
+  "XGD.TO": "Or et mines d'or canadiennes",
+  "CGL.TO": "Or physique — protection contre l'inflation",
+};
+
 interface PortfolioWithAllocations extends Portfolio {
   allocations: PortfolioAllocation[];
 }
@@ -899,6 +930,11 @@ export default function PortfolioPage() {
                               {alloc.instrument_ticker} • {alloc.asset_class}
                               {alloc.mer != null && ` • RFG ${alloc.mer}%`}
                             </p>
+                            {isSimple && alloc.instrument_ticker && ETF_SIMPLE_DESC[alloc.instrument_ticker] && (
+                              <p className="text-[11px] text-muted-foreground/70 truncate italic">
+                                {ETF_SIMPLE_DESC[alloc.instrument_ticker]}
+                              </p>
+                            )}
                           </div>
                           <div className="flex flex-col items-end gap-1 shrink-0">
                             <div className="flex items-center gap-1">

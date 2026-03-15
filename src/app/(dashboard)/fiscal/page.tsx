@@ -130,19 +130,98 @@ export default function FiscalPage() {
     }
 
     if (!canAccess("fiscal_page")) {
+        const ci = data.clientInfo;
+        const freeIncome = Number(ci?.annual_income) || 0;
+        const freeCeliBalance = Number(ci?.celi_balance) || 0;
+        const freeReerBalance = Number(ci?.reer_balance) || 0;
+        const freeCeliRoom = Math.max(0, CELI_CUMULATIVE_LIMIT - freeCeliBalance);
+        const freeCeliUsed = Math.min(100, (freeCeliBalance / CELI_CUMULATIVE_LIMIT) * 100);
+        const freeReerLimit = Math.min(freeIncome * REER_RATE, REER_MAX);
+        const freeReerRoom = Math.max(0, freeReerLimit - freeReerBalance);
+
         return (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500">
-                    <Crown className="h-8 w-8 text-white" />
+            <div className="space-y-6">
+                <div>
+                    <h1 className="text-2xl font-bold">Planification fiscale</h1>
+                    <p className="text-sm text-muted-foreground">Vos comptes enregistrés canadiens</p>
                 </div>
-                <h1 className="text-2xl font-bold">Planification fiscale</h1>
-                <p className="mt-2 text-muted-foreground max-w-md">
-                    Optimisez vos cotisations CELI, REER et REEE avec notre planification fiscale avancée.
-                    Cette fonctionnalité est disponible avec un abonnement Pro ou Élite.
-                </p>
-                <Link href="/billing">
-                    <Button className="mt-6">Voir les plans</Button>
-                </Link>
+
+                {/* Basic CELI + REER cards — always free */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Card className="border-green-200 dark:border-green-900/50">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <PiggyBank className="h-5 w-5 text-green-500" />
+                                CELI
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">Solde actuel</span>
+                                    <span className="font-semibold">{freeCeliBalance.toLocaleString("fr-CA")} $</span>
+                                </div>
+                                <Progress value={freeCeliUsed} className="mt-2 h-2" />
+                                <div className="flex items-center justify-between mt-1">
+                                    <span className="text-xs text-muted-foreground">{freeCeliUsed.toFixed(0)}% utilisé</span>
+                                    <span className="text-xs text-muted-foreground">/ {CELI_CUMULATIVE_LIMIT.toLocaleString("fr-CA")} $</span>
+                                </div>
+                            </div>
+                            <div className="rounded-lg bg-green-50 dark:bg-green-900/20 p-3">
+                                <p className="text-xs font-medium text-muted-foreground">Droits disponibles</p>
+                                <p className="text-xl font-bold text-green-600 dark:text-green-400">{freeCeliRoom.toLocaleString("fr-CA")} $</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">Limite annuelle : {CELI_ANNUAL_LIMIT.toLocaleString("fr-CA")} $ (2026)</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground italic">{ACCOUNT_PLAIN_DESC.CELI}</p>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-blue-200 dark:border-blue-900/50">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <TrendingUp className="h-5 w-5 text-blue-500" />
+                                REER
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">Solde actuel</span>
+                                    <span className="font-semibold">{freeReerBalance.toLocaleString("fr-CA")} $</span>
+                                </div>
+                            </div>
+                            <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3">
+                                <p className="text-xs font-medium text-muted-foreground">Espace estimé</p>
+                                <p className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                                    {freeIncome > 0 ? `${freeReerRoom.toLocaleString("fr-CA")} $` : "—"}
+                                </p>
+                                {freeIncome > 0 && (
+                                    <p className="text-xs text-muted-foreground mt-0.5">18% de {freeIncome.toLocaleString("fr-CA")} $, max {REER_MAX.toLocaleString("fr-CA")} $</p>
+                                )}
+                            </div>
+                            <p className="text-xs text-muted-foreground italic">{ACCOUNT_PLAIN_DESC.REER}</p>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Upgrade teaser */}
+                <Card className="border-amber-200 dark:border-amber-900/40 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30">
+                    <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500">
+                            <Crown className="h-6 w-6 text-white" />
+                        </div>
+                        <div className="flex-1">
+                            <p className="font-semibold text-sm">Analyse fiscale complète</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                                Stratégies de cotisation, optimisation REEE, rééquilibrage fiscal, économies d'impôt estimées...
+                            </p>
+                        </div>
+                        <Link href="/billing">
+                            <Button size="sm" className="shrink-0">Passer à Pro</Button>
+                        </Link>
+                    </CardContent>
+                </Card>
+
                 <UpgradePrompt open={showUpgrade} onOpenChange={setShowUpgrade} feature="Planification fiscale" />
             </div>
         );

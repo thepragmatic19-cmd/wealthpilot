@@ -64,6 +64,17 @@ function daysUntil(dateStr: string | null): number | null {
     return Math.ceil((new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
+function computeCompletionYear(goal: Goal, monthlySavings: number): { year: number; targetYear: number | null } | null {
+    if (goal.current_amount >= goal.target_amount || goal.target_amount <= 0) return null;
+    if (monthlySavings <= 0) return null;
+    const remaining = goal.target_amount - goal.current_amount;
+    const monthsNeeded = Math.ceil(remaining / monthlySavings);
+    const now = new Date();
+    const year = now.getFullYear() + Math.floor((now.getMonth() + monthsNeeded) / 12);
+    const targetYear = goal.target_date ? new Date(goal.target_date).getFullYear() : null;
+    return { year, targetYear };
+}
+
 function getTrajectory(goal: Goal, monthlySavings: number): { status: 'on_track' | 'tight' | 'off_track' | 'overdue'; required: number } | null {
     if (!goal.target_date || goal.current_amount >= goal.target_amount) return null;
     const months = (new Date(goal.target_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.4);
@@ -352,6 +363,24 @@ export default function GoalsPage() {
                                             </div>
                                         );
                                     })()}
+                                    {/* Temporal projection */}
+                                    {!completed && (() => {
+                                        const proj = computeCompletionYear(goal, monthlySavings);
+                                        if (!proj) return null;
+                                        const diff = proj.targetYear ? proj.year - proj.targetYear : null;
+                                        return (
+                                            <p className="text-[11px] text-muted-foreground">
+                                                {diff === null
+                                                    ? `À ce rythme → atteint vers ${proj.year}`
+                                                    : diff === 0
+                                                        ? `✓ À ce rythme → atteint en ${proj.year} (dans les temps)`
+                                                        : diff > 0
+                                                            ? `⚠ À ce rythme → atteint en ${proj.year} (${diff} an${diff > 1 ? 's' : ''} de retard)`
+                                                            : `✓ À ce rythme → atteint en ${proj.year} (${-diff} an${-diff > 1 ? 's' : ''} d'avance)`}
+                                            </p>
+                                        );
+                                    })()}
+
                                     {/* Quick progress update */}
                                     {!completed && (
                                         <div className="flex gap-2 pt-1">
