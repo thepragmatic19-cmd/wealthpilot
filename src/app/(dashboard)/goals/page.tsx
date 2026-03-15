@@ -42,6 +42,7 @@ import {
 import { cn, formatCurrency } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { Goal, GoalType, GoalPriority } from "@/types/database";
+import { useSimpleMode } from "@/contexts/simple-mode-context";
 
 const GOAL_TYPE_CONFIG: Record<GoalType, { label: string; icon: React.ElementType; color: string }> = {
     retraite: { label: "Retraite", icon: TrendingUp, color: "text-blue-500" },
@@ -107,6 +108,7 @@ const EMPTY_FORM: GoalForm = {
 
 export default function GoalsPage() {
     const router = useRouter();
+    const { isSimple } = useSimpleMode();
     const [goals, setGoals] = useState<Goal[]>([]);
     const [monthlySavings, setMonthlySavings] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -115,6 +117,7 @@ export default function GoalsPage() {
     const [deleteGoalId, setDeleteGoalId] = useState<string | null>(null);
     const [form, setForm] = useState<GoalForm>(EMPTY_FORM);
     const [saving, setSaving] = useState(false);
+    const [simpleStep, setSimpleStep] = useState<0 | 1>(0);
     // Quick progress update state per goal
     const [progressInputs, setProgressInputs] = useState<Record<string, string>>({});
 
@@ -138,6 +141,7 @@ export default function GoalsPage() {
     function openAdd() {
         setEditingGoal(null);
         setForm(EMPTY_FORM);
+        if (isSimple) setSimpleStep(0);
         setShowDialog(true);
     }
 
@@ -418,7 +422,73 @@ export default function GoalsPage() {
                     <DialogHeader>
                         <DialogTitle>{editingGoal ? "Modifier l'objectif" : "Nouvel objectif"}</DialogTitle>
                     </DialogHeader>
-                    <div className="grid gap-4 py-2">
+
+                    {/* Simple mode — step 0: choose type */}
+                    {isSimple && !editingGoal && simpleStep === 0 && (
+                        <div className="py-2">
+                            <p className="text-sm text-muted-foreground mb-4">Quel est ton objectif principal ?</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                {[
+                                    { emoji: "🏖️", type: "retraite" as GoalType, label: "Ma retraite" },
+                                    { emoji: "🏠", type: "achat_maison" as GoalType, label: "Acheter une maison" },
+                                    { emoji: "🛡️", type: "fonds_urgence" as GoalType, label: "Fonds d'urgence" },
+                                    { emoji: "🌟", type: "liberté_financière" as GoalType, label: "Liberté financière" },
+                                ].map(({ emoji, type, label }) => (
+                                    <button
+                                        key={type}
+                                        onClick={() => {
+                                            setForm({ ...EMPTY_FORM, type, label });
+                                            setSimpleStep(1);
+                                        }}
+                                        className="flex flex-col items-center gap-2 rounded-xl border bg-card p-4 hover:border-primary hover:bg-primary/5 transition-all text-center"
+                                    >
+                                        <span className="text-3xl">{emoji}</span>
+                                        <span className="text-sm font-medium leading-tight">{label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Simple mode — step 1: amount + date */}
+                    {isSimple && !editingGoal && simpleStep === 1 && (
+                        <>
+                            <div className="grid gap-4 py-2">
+                                <button
+                                    onClick={() => setSimpleStep(0)}
+                                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-fit"
+                                >
+                                    ← Changer
+                                </button>
+                                <div className="grid gap-2">
+                                    <Label>Combien veux-tu épargner ? ($)</Label>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        placeholder="50 000"
+                                        value={form.target_amount}
+                                        onChange={(e) => setForm({ ...form, target_amount: e.target.value })}
+                                    />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label>Pour quand ? (optionnel)</Label>
+                                    <Input
+                                        type="date"
+                                        value={form.target_date}
+                                        onChange={(e) => setForm({ ...form, target_date: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setShowDialog(false)}>Annuler</Button>
+                                <Button onClick={handleSave} disabled={saving}>Créer</Button>
+                            </DialogFooter>
+                        </>
+                    )}
+
+                    {/* Advanced mode or editing — full form */}
+                    {(!isSimple || editingGoal) && (
+                    <><div className="grid gap-4 py-2">
                         <div className="grid gap-2">
                             <Label>Type</Label>
                             <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as GoalType })}>
@@ -496,6 +566,7 @@ export default function GoalsPage() {
                             {editingGoal ? "Enregistrer" : "Créer"}
                         </Button>
                     </DialogFooter>
+                    </>)}
                 </DialogContent>
             </Dialog>
 

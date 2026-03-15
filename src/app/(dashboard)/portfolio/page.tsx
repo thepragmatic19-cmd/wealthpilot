@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { logger } from "@/lib/logger";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,7 +41,7 @@ import { FloatingHelpButton } from "@/components/ui/floating-help-button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FINANCIAL_TERMS } from "@/lib/financial-terms";
 import { toast } from "sonner";
-import { CheckCircle, TrendingUp, Shield, BarChart3, Star, Info, RefreshCw, Loader2, Download, Scale, FileBarChart2, LayoutGrid, Sparkles } from "lucide-react";
+import { CheckCircle, TrendingUp, Shield, BarChart3, Star, Info, RefreshCw, Loader2, Download, Scale, FileBarChart2, LayoutGrid, Sparkles, MessageSquare } from "lucide-react";
 import { computeWeightedMer, computeAccountSummary } from "@/lib/portfolio/helpers";
 import type { Portfolio, PortfolioAllocation, ClientInfo, Transaction } from "@/types/database";
 import { Input } from "@/components/ui/input";
@@ -607,6 +608,21 @@ export default function PortfolioPage() {
               Sélectionner ce portefeuille
             </Button>
           )}
+
+          {/* AI chat CTA */}
+          <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+            <MessageSquare className="h-5 w-5 text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold">Des questions sur ce portefeuille ?</p>
+              <p className="text-xs text-muted-foreground">Ton conseiller IA peut tout expliquer.</p>
+            </div>
+            <Link href={`/chat?q=${encodeURIComponent("Explique-moi mon portefeuille et comment commencer à investir")}`}>
+              <Button size="sm" variant="outline" className="gap-1.5 shrink-0">
+                <MessageSquare className="h-3.5 w-3.5" />
+                Discuter
+              </Button>
+            </Link>
+          </div>
         </>
       ) : (
         <>

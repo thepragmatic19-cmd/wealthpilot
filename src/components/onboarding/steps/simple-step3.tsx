@@ -129,8 +129,8 @@ export function SimpleStep3({ userId, onPrev }: Props) {
         .update({ onboarding_step: "completed", onboarding_completed: true })
         .eq("id", userId);
 
-      // 6. Navigate to dashboard
-      router.push("/dashboard");
+      // 6. Navigate to portfolio
+      router.push("/portfolio");
     } catch {
       toast.error(
         "Une erreur est survenue lors de la génération du portefeuille. Réessaie."

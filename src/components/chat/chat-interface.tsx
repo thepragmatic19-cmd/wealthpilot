@@ -27,6 +27,7 @@ import {
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
 import { useSubscription } from "@/hooks/use-subscription";
+import { useSimpleMode } from "@/contexts/simple-mode-context";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/types/database";
 
@@ -153,6 +154,7 @@ export function ChatInterface({ initialMessage }: ChatInterfaceProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const { isFree, isElite, limits } = useSubscription();
+  const { isSimple } = useSimpleMode();
 
   useEffect(() => {
     async function loadHistory() {
@@ -477,47 +479,79 @@ export function ChatInterface({ initialMessage }: ChatInterfaceProps) {
               </div>
             )}
 
-            {/* Empty state — Alex opens the conversation */}
+            {/* Empty state */}
             {messages.length === 0 && !streaming && (
-              <div className="flex flex-col py-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                {/* Alex's opening bubble */}
-                <div className="flex items-start gap-3 mb-5">
-                  <div className="h-9 w-9 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shrink-0 shadow-lg shadow-primary/20 mt-5">
-                    <Sparkles className="h-4 w-4 text-white" />
+              isSimple ? (
+                /* Simple mode — welcoming start screen */
+                <div className="flex flex-col items-center justify-center gap-6 py-10 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                    <Sparkles className="h-8 w-8 text-primary" />
                   </div>
-                  <div className="flex-1">
-                    <p className="text-[11px] font-bold text-muted-foreground mb-1.5">Alex · Conseiller IA</p>
-                    <div className="rounded-2xl rounded-tl-sm bg-muted/60 px-4 py-3 text-sm leading-relaxed max-w-[340px]">
-                      Bonjour&nbsp;!&nbsp;👋 Je suis <strong>Alex</strong>, votre conseiller financier IA.
-                      <br /><br />
-                      Posez-moi n&apos;importe quelle question sur vos finances — aucune n&apos;est trop simple.
-                      <br /><br />
-                      Par où voulez-vous commencer&nbsp;?
+                  <div>
+                    <h2 className="text-xl font-bold">Ton conseiller financier IA</h2>
+                    <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+                      Pose n&apos;importe quelle question sur tes finances. Je connais ton profil et ton portefeuille.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-md">
+                    {[
+                      { emoji: "📊", q: "Explique-moi mon portefeuille en termes simples" },
+                      { emoji: "💰", q: "Combien devrais-je mettre dans mon CELI ?" },
+                      { emoji: "🎯", q: "Comment atteindre mon objectif plus rapidement ?" },
+                      { emoji: "🏦", q: "CELI ou REER : lequel choisir pour moi ?" },
+                    ].map(({ emoji, q }) => (
+                      <button key={q}
+                        onClick={() => setInput(q)}
+                        className="flex items-center gap-3 rounded-xl border bg-card p-3 text-left hover:border-primary hover:bg-primary/5 transition-all"
+                      >
+                        <span className="text-xl shrink-0">{emoji}</span>
+                        <span className="text-xs font-medium text-foreground leading-snug">{q}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                /* Advanced mode — Alex opens the conversation */
+                <div className="flex flex-col py-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  {/* Alex's opening bubble */}
+                  <div className="flex items-start gap-3 mb-5">
+                    <div className="h-9 w-9 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shrink-0 shadow-lg shadow-primary/20 mt-5">
+                      <Sparkles className="h-4 w-4 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-[11px] font-bold text-muted-foreground mb-1.5">Alex · Conseiller IA</p>
+                      <div className="rounded-2xl rounded-tl-sm bg-muted/60 px-4 py-3 text-sm leading-relaxed max-w-[340px]">
+                        Bonjour&nbsp;!&nbsp;👋 Je suis <strong>Alex</strong>, votre conseiller financier IA.
+                        <br /><br />
+                        Posez-moi n&apos;importe quelle question sur vos finances — aucune n&apos;est trop simple.
+                        <br /><br />
+                        Par où voulez-vous commencer&nbsp;?
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Suggestion cards — single column, aligned with bubble */}
-                <div className="flex flex-col gap-2 w-full max-w-[380px] ml-12">
-                  {suggestions.map((s, i) => {
-                    const Icon = SUGGESTION_ICONS[i] ?? Sparkles;
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => sendMessage(s)}
-                        className="group flex items-center gap-3 px-4 py-3 rounded-xl bg-background/70 border border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 text-left shadow-sm hover:shadow-md"
-                      >
-                        <div className="h-7 w-7 rounded-lg bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center transition-colors shrink-0">
-                          <Icon className="h-3.5 w-3.5 text-primary" />
-                        </div>
-                        <span className="text-xs font-medium leading-snug text-foreground/80 group-hover:text-foreground transition-colors">
-                          {s}
-                        </span>
-                      </button>
-                    );
-                  })}
+                  {/* Suggestion cards — single column, aligned with bubble */}
+                  <div className="flex flex-col gap-2 w-full max-w-[380px] ml-12">
+                    {suggestions.map((s, i) => {
+                      const Icon = SUGGESTION_ICONS[i] ?? Sparkles;
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => sendMessage(s)}
+                          className="group flex items-center gap-3 px-4 py-3 rounded-xl bg-background/70 border border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 text-left shadow-sm hover:shadow-md"
+                        >
+                          <div className="h-7 w-7 rounded-lg bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center transition-colors shrink-0">
+                            <Icon className="h-3.5 w-3.5 text-primary" />
+                          </div>
+                          <span className="text-xs font-medium leading-snug text-foreground/80 group-hover:text-foreground transition-colors">
+                            {s}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )
             )}
 
             {/* Message list */}

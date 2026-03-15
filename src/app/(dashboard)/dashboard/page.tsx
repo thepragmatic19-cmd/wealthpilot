@@ -700,9 +700,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Health Score Card — simple mode only */}
-      {isSimple && <HealthScoreCard data={data} />}
-
       {/* Simple mode: plain-language summary strip */}
       {isSimple && (totalInvested > 0 || monthlySavings > 0) && (
         <div className="grid gap-3 sm:grid-cols-3">
@@ -743,58 +740,28 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* "Mon prochain dollar" — simple mode only, guides where to invest next */}
-      {isSimple && (() => {
-        const hasCeli = !!data.clientInfo?.has_celi;
-        const hasReer = !!data.clientInfo?.has_reer;
-        const hasCeliapp = !!(data.clientInfo as (ClientInfo & { has_celiapp?: boolean }) | null)?.has_celiapp;
-        const celiBalance = Number(data.clientInfo?.celi_balance || 0);
-        const income = Number(data.clientInfo?.annual_income || 0);
-        const CELI_CUMUL = 109000;
-        const REER_MAX_LIMIT = 32490;
-        const celiRoom = Math.max(0, CELI_CUMUL - celiBalance);
-        const reerRoom = income > 0 ? Math.max(0, Math.min(income * 0.18, REER_MAX_LIMIT) - Number(data.clientInfo?.reer_balance || 0)) : null;
-
-        const steps: { emoji: string; title: string; desc: string; href: string; done?: boolean }[] = [];
-        if (celiRoom > 0) {
-          steps.push({ emoji: "🟢", title: "CELI d'abord", desc: `Il te reste ${Math.round(celiRoom).toLocaleString("fr-CA")} $ de droits. Tes gains ne seront jamais imposés.`, href: "/fiscal" });
-        } else {
-          steps.push({ emoji: "✅", title: "CELI maximisé", desc: "Excellent — tu profites pleinement de tes droits CELI.", href: "/fiscal", done: true });
-        }
-        if (hasReer && reerRoom !== null && reerRoom > 0) {
-          steps.push({ emoji: "🔵", title: "REER ensuite", desc: `${Math.round(reerRoom).toLocaleString("fr-CA")} $ d'espace REER. Tes cotisations réduisent tes impôts maintenant.`, href: "/fiscal" });
-        } else if (!hasReer) {
-          steps.push({ emoji: "💡", title: "Ouvre un REER", desc: "Si ton revenu est élevé, le REER réduit ton impôt annuel.", href: "/profile" });
-        }
-        if (hasCeliapp) {
-          steps.push({ emoji: "🏠", title: "CÉLIAPP (1re maison)", desc: "Profite du double avantage fiscal pour l'achat de ta 1re propriété.", href: "/fiscal" });
-        }
-        steps.push({ emoji: "📈", title: "Compte non enregistré", desc: "Une fois tes comptes enregistrés maximisés, investis ici pour continuer à faire croître ton patrimoine.", href: "/portfolio" });
-
-        return (
-          <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-blue-500/5">
-            <CardContent className="p-5 space-y-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Mon prochain dollar</p>
-              <p className="text-xs text-muted-foreground">Où investir ton épargne en priorité :</p>
-              <ol className="space-y-2">
-                {steps.map((step, i) => (
-                  <li key={i} className="flex items-start gap-3">
-                    <span className="text-base leading-tight shrink-0">{step.emoji}</span>
-                    <div className="min-w-0">
-                      <Link href={step.href}>
-                        <p className={`text-sm font-semibold ${step.done ? "text-muted-foreground line-through" : "hover:text-primary transition-colors"}`}>
-                          {i + 1}. {step.title}
-                        </p>
-                      </Link>
-                      <p className="text-xs text-muted-foreground leading-snug">{step.desc}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </CardContent>
-          </Card>
-        );
-      })()}
+      {/* Chat CTA — simple mode only */}
+      {isSimple && (
+        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-blue-500/5">
+          <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="h-12 w-12 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center">
+              <MessageSquare className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-sm">Ton conseiller IA est disponible</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Pose une question sur ton portefeuille, tes objectifs ou ta stratégie fiscale.
+              </p>
+            </div>
+            <Link href="/chat">
+              <Button size="sm" className="shrink-0 gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Discuter
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Market Ticker — hidden in simple mode */}
       {!isSimple && <MarketTicker />}
@@ -1152,8 +1119,8 @@ export default function DashboardPage() {
         </>}
       </div>
 
-      {/* Strategic Insights Row — 3-column layout */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      {/* Strategic Insights Row — 3-column layout (advanced mode only) */}
+      {!isSimple && <div className="grid gap-4 lg:grid-cols-3">
         {/* Col 1: Stress Test (if portfolio) or Quick Actions fallback */}
         {data.selectedPortfolio?.stress_test ? (
           <Card className="border-yellow-200/50 bg-yellow-50/10 dark:bg-yellow-950/10">
@@ -1246,7 +1213,7 @@ export default function DashboardPage() {
           </div>
           <ChecklistWidget data={data} />
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
