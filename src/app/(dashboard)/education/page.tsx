@@ -790,6 +790,13 @@ export default function EducationPage() {
     return base;
   }, [activeCategory, search, recommendedIds, readArticles]);
 
+  const displayedArticles = isSimple
+    ? [...filtered].sort((a, b) =>
+        a.difficulty === "Débutant" && b.difficulty !== "Débutant" ? -1 :
+        a.difficulty !== "Débutant" && b.difficulty === "Débutant" ? 1 : 0
+      )
+    : filtered;
+
   const readCount = readArticles.size;
   const progressPct = Math.round((readCount / TOTAL) * 100);
 
@@ -896,12 +903,12 @@ export default function EducationPage() {
 
       {/* Articles */}
       <div className="space-y-3">
-        {filtered.length === 0 ? (
+        {displayedArticles.length === 0 ? (
           <p className="text-center text-muted-foreground py-12">
             Aucun article trouvé pour &quot;{search}&quot;
           </p>
         ) : (
-          filtered.map((article) => {
+          displayedArticles.map((article) => {
             const Icon = article.categoryIcon;
             const isExpanded = expandedId === article.id;
             const isRead = readArticles.has(article.id);

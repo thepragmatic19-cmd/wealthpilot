@@ -887,6 +887,34 @@ export default function DashboardPage() {
       {/* Simple mode: show checklist widget prominently — hidden once all steps done */}
       {isSimple && !checklistDone && <ChecklistWidget data={data} />}
 
+      {/* Simple mode: graduation card once checklist is complete */}
+      {isSimple && checklistDone && (
+        <Card className="border-emerald-200/50 bg-gradient-to-br from-emerald-50/50 to-teal-50/50 dark:from-emerald-950/20 dark:to-teal-950/20">
+          <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="h-12 w-12 shrink-0 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+              <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-sm">Démarrage complété — tu es prêt·e !</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Profil configuré, portefeuille généré, objectif créé. Continue à explorer.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 shrink-0">
+              <Link href="/portfolio">
+                <Button size="sm" variant="outline">Mon portefeuille</Button>
+              </Link>
+              <Link href="/chat">
+                <Button size="sm" className="gap-1.5">
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  Discuter
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Net Worth Chart — hidden in simple mode */}
       {!isSimple && (
         <ErrorBoundary>

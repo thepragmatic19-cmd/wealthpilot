@@ -397,7 +397,7 @@ export default function FiscalPage() {
                 </Card>
 
                 {/* REEE Card — improved with SCEE calculator */}
-                <Card className="border-purple-200 dark:border-purple-900/50">
+                {!isSimple && <Card className="border-purple-200 dark:border-purple-900/50">
                     <CardHeader className="pb-2">
                         <CardTitle className="flex items-center gap-2 text-base">
                             <PiggyBank className="h-5 w-5 text-purple-500" />
@@ -435,13 +435,8 @@ export default function FiscalPage() {
                                 )}
                             </div>
                         </div>
-                        {isSimple && (
-                            <p className="mt-3 text-xs text-muted-foreground italic border-t pt-2">
-                                {ACCOUNT_PLAIN_DESC.REEE}
-                            </p>
-                        )}
                     </CardContent>
-                </Card>
+                </Card>}
                 {/* CELIAPP Card — shown only if user has CELIAPP */}
                 {hasCeliapp && (
                     <Card className="border-teal-200 dark:border-teal-900/50">
@@ -696,7 +691,8 @@ export default function FiscalPage() {
                                         Taux combiné : {(combinedRate * 100).toFixed(1)}%
                                     </p>
                                 </div>
-                                <div className="space-y-2 text-sm">
+                                {!isSimple && (
+                                  <div className="space-y-2 text-sm">
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Revenu annuel</span>
                                         <span>${annualIncome.toLocaleString("fr-CA")}</span>
@@ -717,7 +713,8 @@ export default function FiscalPage() {
                                         <span>Réduction d&apos;impôt estimée</span>
                                         <span>${estimatedTaxSavings.toLocaleString("fr-CA", { maximumFractionDigits: 0 })}</span>
                                     </div>
-                                </div>
+                                  </div>
+                                )}
                             </>
                         ) : (
                             <div className="flex flex-col items-center py-8 text-center">
@@ -731,7 +728,7 @@ export default function FiscalPage() {
                 </Card>
 
                 {/* Rebalancing Suggestions */}
-                <Card>
+                {!isSimple && <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
                             <TrendingUp className="h-5 w-5" />
@@ -795,7 +792,7 @@ export default function FiscalPage() {
                             </div>
                         )}
                     </CardContent>
-                </Card>
+                </Card>}
             </div>
 
             {isSimple && showAdvanced && (

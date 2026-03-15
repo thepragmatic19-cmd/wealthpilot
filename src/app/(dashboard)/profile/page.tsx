@@ -45,6 +45,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import type { Profile, ClientInfo, RiskAssessment } from "@/types/database";
+import { useSimpleMode } from "@/contexts/simple-mode-context";
 
 const profileFormSchema = z.object({
   full_name: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
@@ -93,6 +94,7 @@ export default function ProfilePage() {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const router = useRouter();
+  const { isSimple } = useSimpleMode();
 
   const profileForm = useForm<ProfileFormInput>({
     resolver: zodResolver(profileFormSchema),
@@ -394,17 +396,19 @@ export default function ProfilePage() {
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={clientInfoForm.control}
-                      name="monthly_expenses"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Dépenses mensuelles ($)</FormLabel>
-                          <FormControl><Input type="number" min={0} {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    {!isSimple && (
+                      <FormField
+                        control={clientInfoForm.control}
+                        name="monthly_expenses"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Dépenses mensuelles ($)</FormLabel>
+                            <FormControl><Input type="number" min={0} {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
                     <FormField
                       control={clientInfoForm.control}
                       name="monthly_savings"
@@ -427,17 +431,19 @@ export default function ProfilePage() {
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={clientInfoForm.control}
-                      name="total_debts"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Dettes totales ($)</FormLabel>
-                          <FormControl><Input type="number" min={0} {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    {!isSimple && (
+                      <FormField
+                        control={clientInfoForm.control}
+                        name="total_debts"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Dettes totales ($)</FormLabel>
+                            <FormControl><Input type="number" min={0} {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
                     {clientInfo.has_celi && (
                       <FormField
                         control={clientInfoForm.control}
@@ -477,7 +483,7 @@ export default function ProfilePage() {
                         )}
                       />
                     )}
-                    {clientInfo.has_celiapp && (
+                    {!isSimple && clientInfo.has_celiapp && (
                       <FormField
                         control={clientInfoForm.control}
                         name="celiapp_balance"
@@ -490,7 +496,7 @@ export default function ProfilePage() {
                         )}
                       />
                     )}
-                    {clientInfo.has_cri && (
+                    {!isSimple && clientInfo.has_cri && (
                       <FormField
                         control={clientInfoForm.control}
                         name="cri_balance"
@@ -503,7 +509,7 @@ export default function ProfilePage() {
                         )}
                       />
                     )}
-                    {clientInfo.has_frv && (
+                    {!isSimple && clientInfo.has_frv && (
                       <FormField
                         control={clientInfoForm.control}
                         name="frv_balance"
@@ -563,11 +569,15 @@ export default function ProfilePage() {
                     <span className="font-medium">{formatCurrency(Number(clientInfo.total_assets || 0))}</span>
                   </div>
                   <Separator />
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Dettes totales</span>
-                    <span className="font-medium">{formatCurrency(Number(clientInfo.total_debts || 0))}</span>
-                  </div>
-                  <Separator />
+                  {!isSimple && (
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Dettes totales</span>
+                        <span className="font-medium">{formatCurrency(Number(clientInfo.total_debts || 0))}</span>
+                      </div>
+                      <Separator />
+                    </>
+                  )}
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Épargne mensuelle</span>
                     <span className="font-medium">{formatCurrency(Number(clientInfo.monthly_savings || 0))}/mois</span>
@@ -578,26 +588,30 @@ export default function ProfilePage() {
                     <span className="text-muted-foreground">Âge</span>
                     <span className="font-medium">{clientInfo.age || "—"} ans</span>
                   </div>
-                  <Separator />
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Profession</span>
-                    <span className="font-medium">{clientInfo.profession || "—"}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Expérience</span>
-                    <span className="font-medium capitalize">{clientInfo.investment_experience || "—"}</span>
-                  </div>
+                  {!isSimple && (
+                    <>
+                      <Separator />
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Profession</span>
+                        <span className="font-medium">{clientInfo.profession || "—"}</span>
+                      </div>
+                      <Separator />
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Expérience</span>
+                        <span className="font-medium capitalize">{clientInfo.investment_experience || "—"}</span>
+                      </div>
+                    </>
+                  )}
                   <Separator />
                   <div className="flex flex-wrap items-center justify-between gap-1 text-sm">
                     <span className="text-muted-foreground">Comptes</span>
                     <div className="flex flex-wrap gap-1">
                       {clientInfo.has_celi && <Badge variant="outline">CELI {clientInfo.celi_balance ? `· ${formatCurrency(Number(clientInfo.celi_balance))}` : ""}</Badge>}
                       {clientInfo.has_reer && <Badge variant="outline">REER {clientInfo.reer_balance ? `· ${formatCurrency(Number(clientInfo.reer_balance))}` : ""}</Badge>}
-                      {clientInfo.has_reee && <Badge variant="outline">REEE</Badge>}
-                      {clientInfo.has_celiapp && <Badge variant="outline">CELIAPP {clientInfo.celiapp_balance ? `· ${formatCurrency(Number(clientInfo.celiapp_balance))}` : ""}</Badge>}
-                      {clientInfo.has_cri && <Badge variant="outline">CRI {clientInfo.cri_balance ? `· ${formatCurrency(Number(clientInfo.cri_balance))}` : ""}</Badge>}
-                      {clientInfo.has_frv && <Badge variant="outline">FRV {clientInfo.frv_balance ? `· ${formatCurrency(Number(clientInfo.frv_balance))}` : ""}</Badge>}
+                      {!isSimple && clientInfo.has_reee && <Badge variant="outline">REEE</Badge>}
+                      {!isSimple && clientInfo.has_celiapp && <Badge variant="outline">CELIAPP {clientInfo.celiapp_balance ? `· ${formatCurrency(Number(clientInfo.celiapp_balance))}` : ""}</Badge>}
+                      {!isSimple && clientInfo.has_cri && <Badge variant="outline">CRI {clientInfo.cri_balance ? `· ${formatCurrency(Number(clientInfo.cri_balance))}` : ""}</Badge>}
+                      {!isSimple && clientInfo.has_frv && <Badge variant="outline">FRV {clientInfo.frv_balance ? `· ${formatCurrency(Number(clientInfo.frv_balance))}` : ""}</Badge>}
                     </div>
                   </div>
                 </div>
@@ -636,95 +650,101 @@ export default function ProfilePage() {
               <p className="text-sm text-muted-foreground">{riskAssessment.ai_analysis}</p>
             )}
 
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => router.push("/onboarding")}
-            >
-              <RefreshCw className="h-4 w-4" />
-              Refaire le questionnaire
-            </Button>
+            {!isSimple && (
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => router.push("/onboarding")}
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refaire le questionnaire
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
 
       {/* Password Change */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Paramètres du compte
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Form {...passwordForm}>
-            <form onSubmit={passwordForm.handleSubmit(onChangePassword)} className="space-y-4">
-              <FormField
-                control={passwordForm.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nouveau mot de passe</FormLabel>
-                    <FormControl>
-                      <Input type="password" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={passwordForm.control}
-                name="confirm_password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirmer le mot de passe</FormLabel>
-                    <FormControl>
-                      <Input type="password" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" variant="outline" disabled={changingPassword} className="gap-2">
-                {changingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-                Changer le mot de passe
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+      {!isSimple && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Paramètres du compte
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Form {...passwordForm}>
+              <form onSubmit={passwordForm.handleSubmit(onChangePassword)} className="space-y-4">
+                <FormField
+                  control={passwordForm.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nouveau mot de passe</FormLabel>
+                      <FormControl>
+                        <Input type="password" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={passwordForm.control}
+                  name="confirm_password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirmer le mot de passe</FormLabel>
+                      <FormControl>
+                        <Input type="password" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" variant="outline" disabled={changingPassword} className="gap-2">
+                  {changingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                  Changer le mot de passe
+                </Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Danger Zone */}
-      <Card className="border-destructive/40">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-destructive">
-            <AlertTriangle className="h-5 w-5" />
-            Zone de danger
-          </CardTitle>
-          <CardDescription>
-            Ces actions sont irréversibles. Procédez avec prudence.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="font-medium text-sm">Supprimer mon compte</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Supprime définitivement votre compte et toutes vos données.
-              </p>
+      {!isSimple && (
+        <Card className="border-destructive/40">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Zone de danger
+            </CardTitle>
+            <CardDescription>
+              Ces actions sont irréversibles. Procédez avec prudence.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-medium text-sm">Supprimer mon compte</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Supprime définitivement votre compte et toutes vos données.
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="gap-2 sm:shrink-0"
+                onClick={() => { setDeleteConfirm(""); setShowDeleteDialog(true); }}
+              >
+                <Trash2 className="h-4 w-4" />
+                Supprimer
+              </Button>
             </div>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="gap-2 sm:shrink-0"
-              onClick={() => { setDeleteConfirm(""); setShowDeleteDialog(true); }}
-            >
-              <Trash2 className="h-4 w-4" />
-              Supprimer
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Delete Account Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
