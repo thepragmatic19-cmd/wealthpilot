@@ -280,14 +280,14 @@ export default function RetirementPage() {
                                 min={50} max={75} step={1}
                             />
                         </div>
-                        <div className="space-y-2">
+                        {(!isSimple || showAdvanced) && <div className="space-y-2">
                             <Label>Espérance de vie: {params.lifeExpectancy} ans</Label>
                             <Slider
                                 value={[params.lifeExpectancy]}
                                 onValueChange={([v]: number[]) => updateParam("lifeExpectancy", v)}
                                 min={70} max={100} step={1}
                             />
-                        </div>
+                        </div>}
                         <div className="space-y-2">
                             <Label htmlFor="savings">Épargne actuelle ($)</Label>
                             <Input
@@ -315,30 +315,30 @@ export default function RetirementPage() {
                                 onChange={(e) => updateParam("monthlyExpenses", Number(e.target.value))}
                             />
                         </div>
-                        <div className="space-y-2">
+                        {(!isSimple || showAdvanced) && <div className="space-y-2">
                             <Label>Rendement espéré: {params.expectedReturn}%</Label>
                             <Slider
                                 value={[params.expectedReturn]}
                                 onValueChange={([v]: number[]) => updateParam("expectedReturn", v)}
                                 min={1} max={15} step={0.5}
                             />
-                        </div>
-                        <div className="space-y-2">
+                        </div>}
+                        {(!isSimple || showAdvanced) && <div className="space-y-2">
                             <Label>Inflation: {params.inflationRate}%</Label>
                             <Slider
                                 value={[params.inflationRate]}
                                 onValueChange={([v]: number[]) => updateParam("inflationRate", v)}
                                 min={0} max={6} step={0.5}
                             />
-                        </div>
-                        <div className="space-y-2">
+                        </div>}
+                        {(!isSimple || showAdvanced) && <div className="space-y-2">
                             <Label>Volatilité du portefeuille: {params.portfolioVolatility}%</Label>
                             <Slider
                                 value={[params.portfolioVolatility]}
                                 onValueChange={([v]: number[]) => updateParam("portfolioVolatility", v)}
                                 min={1} max={30} step={0.5}
                             />
-                        </div>
+                        </div>}
                         <div className="space-y-2">
                             <Label htmlFor="rrq">Pension gouvernementale annuelle ($)</Label>
                             <Input
@@ -378,7 +378,7 @@ export default function RetirementPage() {
                                 </button>
                             )}
                         </div>
-                        <div className="space-y-2">
+                        {(!isSimple || showAdvanced) && <div className="space-y-2">
                             <Label>Taux d&apos;imposition à la retraite: {params.withdrawalTaxRate}%</Label>
                             <Slider
                                 value={[params.withdrawalTaxRate]}
@@ -388,7 +388,13 @@ export default function RetirementPage() {
                             <p className="text-xs text-muted-foreground">
                                 Taux marginal effectif sur retraits REER/FERR et pension gouvernementale
                             </p>
-                        </div>
+                        </div>}
+
+                        {isSimple && !showAdvanced && (
+                            <p className="text-xs text-muted-foreground rounded-lg bg-muted/50 px-3 py-2">
+                                Hypothèses appliquées : rendement 7%, inflation 2.5%, taux d&apos;imposition 30%.
+                            </p>
+                        )}
 
                         <Button onClick={() => setSimKey((k) => k + 1)} className="w-full gap-2">
                             <RefreshCw className="h-4 w-4" />

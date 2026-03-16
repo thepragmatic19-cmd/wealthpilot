@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { Transaction, TransactionType, Portfolio } from "@/types/database";
+import { useSimpleMode } from "@/contexts/simple-mode-context";
 
 const TYPE_LABELS: Record<TransactionType, string> = {
     achat: "Achat",
@@ -113,6 +114,7 @@ export default function TransactionsPage() {
     const [showCount, setShowCount] = useState(50);
     const [showAddDialog, setShowAddDialog] = useState(false);
     const [txToDelete, setTxToDelete] = useState<string | null>(null);
+    const { isSimple } = useSimpleMode();
 
     // New transaction form state
     const [newTx, setNewTx] = useState({
@@ -379,6 +381,7 @@ export default function TransactionsPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
+                            {!isSimple && (
                             <div className="grid gap-2">
                                 <Label>Notes</Label>
                                 <Input
@@ -387,6 +390,7 @@ export default function TransactionsPage() {
                                     onChange={(e) => setNewTx({ ...newTx, notes: e.target.value })}
                                 />
                             </div>
+                            )}
                             <Button onClick={handleAddTransaction} disabled={!newTx.instrument_ticker || !newTx.amount}>
                                 Enregistrer
                             </Button>
@@ -408,6 +412,7 @@ export default function TransactionsPage() {
                         </div>
                     </CardContent>
                 </Card>
+                {!isSimple && (
                 <Card>
                     <CardContent className="flex items-center gap-3 p-4 sm:p-6">
                         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
@@ -419,6 +424,7 @@ export default function TransactionsPage() {
                         </div>
                     </CardContent>
                 </Card>
+                )}
                 <Card>
                     <CardContent className="flex items-center gap-3 p-4 sm:p-6">
                         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
@@ -455,7 +461,7 @@ export default function TransactionsPage() {
                                 <thead>
                                     <tr className="border-b text-muted-foreground">
                                         <th className="pb-2 text-left font-medium">Titre</th>
-                                        <th className="pb-2 text-right font-medium">Parts</th>
+                                        {!isSimple && <th className="pb-2 text-right font-medium">Parts</th>}
                                         <th className="pb-2 text-right font-medium hidden sm:table-cell">Coût moyen</th>
                                         <th className="pb-2 text-right font-medium hidden sm:table-cell">Coût total</th>
                                         <th className="pb-2 text-right font-medium">G/P réalisé</th>
@@ -470,9 +476,11 @@ export default function TransactionsPage() {
                                                     <Badge variant="outline" className="text-[10px]">{pos.ticker}</Badge>
                                                 </div>
                                             </td>
+                                            {!isSimple && (
                                             <td className="py-3 text-right font-mono text-xs">
                                                 {pos.sharesHeld > 0 ? pos.sharesHeld.toFixed(4) : "—"}
                                             </td>
+                                            )}
                                             <td className="py-3 text-right font-mono text-xs hidden sm:table-cell">
                                                 {pos.avgCost > 0 ? `$${pos.avgCost.toLocaleString("fr-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
                                             </td>
@@ -494,7 +502,9 @@ export default function TransactionsPage() {
                             </table>
                         </div>
                         <p className="mt-3 text-xs text-muted-foreground">
-                            Méthode du coût moyen pondéré. G/P réalisé calculé sur les ventes seulement.
+                            {isSimple
+                                ? "Vos titres détenus, montant investi et gains/pertes réalisés sur ventes."
+                                : "Méthode du coût moyen pondéré. G/P réalisé calculé sur les ventes seulement."}
                         </p>
                     </CardContent>
                 </Card>
@@ -583,9 +593,11 @@ export default function TransactionsPage() {
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-1.5 sm:gap-2">
                                                 <p className="font-medium truncate text-sm sm:text-base">{tx.instrument_name}</p>
-                                                <Badge variant="outline" className="text-[10px]">
-                                                    {tx.instrument_ticker}
-                                                </Badge>
+                                                {!isSimple && (
+                                                    <Badge variant="outline" className="text-[10px]">
+                                                        {tx.instrument_ticker}
+                                                    </Badge>
+                                                )}
                                             </div>
                                             <div className="flex items-center gap-2 mt-0.5">
                                                 <Badge className={`text-[10px] ${TYPE_COLORS[tx.type]}`}>
@@ -605,7 +617,7 @@ export default function TransactionsPage() {
                                             <p className={`font-semibold ${tx.type === "vente" ? "text-red-500" : "text-green-500"}`}>
                                                 {tx.type === "vente" ? "-" : "+"}${Math.abs(tx.amount).toLocaleString("fr-CA", { minimumFractionDigits: 2 })}
                                             </p>
-                                            {tx.quantity && tx.price && (
+                                            {!isSimple && tx.quantity && tx.price && (
                                                 <p className="text-xs text-muted-foreground">
                                                     {tx.quantity} × ${tx.price}
                                                 </p>
