@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Search, BookMarked } from "lucide-react";
 import { FINANCIAL_TERMS } from "@/lib/financial-terms";
+import { useSimpleMode } from "@/contexts/simple-mode-context";
 
 const TERM_CATEGORIES = [
   { label: "Comptes enregistrés",        terms: ["CELI","REER","REEE","CELIAPP","CRI","FRV"] },
@@ -14,8 +15,15 @@ const TERM_CATEGORIES = [
 
 const ALL_CATEGORIZED_TERMS = new Set(TERM_CATEGORIES.flatMap((c) => c.terms));
 
+const BEGINNER_CATEGORY_LABELS = new Set([
+  "Comptes enregistrés",
+  "Concepts d'investissement",
+]);
+
 export default function LexiquePage() {
   const [search, setSearch] = useState("");
+  const [showAllCategories, setShowAllCategories] = useState(false);
+  const { isSimple } = useSimpleMode();
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -31,6 +39,13 @@ export default function LexiquePage() {
       }))
       .filter((cat) => cat.terms.length > 0);
   }, [search]);
+
+  const displayedCategories = useMemo(() => {
+    if (isSimple && !search && !showAllCategories) {
+      return filtered.filter((cat) => BEGINNER_CATEGORY_LABELS.has(cat.label));
+    }
+    return filtered;
+  }, [filtered, isSimple, search, showAllCategories]);
 
   const uncategorizedMatches = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -52,7 +67,9 @@ export default function LexiquePage() {
         <div>
           <h1 className="text-2xl font-bold">Lexique financier</h1>
           <p className="text-sm text-muted-foreground">
-            Définitions claires de tous les termes utilisés dans WealthPilot
+            {isSimple
+              ? "Les termes essentiels pour démarrer"
+              : "Définitions claires de tous les termes utilisés dans WealthPilot"}
           </p>
         </div>
       </div>
@@ -75,7 +92,7 @@ export default function LexiquePage() {
         </div>
       ) : (
         <>
-          {filtered.map((cat) => (
+          {displayedCategories.map((cat) => (
             <div key={cat.label} className="space-y-3">
               <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground/60">
                 {cat.label}
@@ -94,6 +111,18 @@ export default function LexiquePage() {
               </div>
             </div>
           ))}
+
+          {/* Simple mode toggle */}
+          {isSimple && !search && (
+            <button
+              onClick={() => setShowAllCategories((v) => !v)}
+              className="text-xs text-primary/70 hover:text-primary underline"
+            >
+              {showAllCategories
+                ? "Voir moins"
+                : "Voir tous les termes (indicateurs, retraite…)"}
+            </button>
+          )}
 
           {/* Uncategorized matches when searching */}
           {uncategorizedMatches.length > 0 && (

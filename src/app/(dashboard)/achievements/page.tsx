@@ -20,6 +20,7 @@ import {
     Crown,
 } from "lucide-react";
 import type { Profile, ClientInfo, Goal, Portfolio, ChatMessage } from "@/types/database";
+import { useSimpleMode } from "@/contexts/simple-mode-context";
 
 interface BadgeProgress {
     current: number;
@@ -272,6 +273,7 @@ export default function GamificationPage() {
         chatMessages: [],
     });
     const [loading, setLoading] = useState(true);
+    const { isSimple } = useSimpleMode();
 
     useEffect(() => {
         async function load() {
@@ -370,6 +372,7 @@ export default function GamificationPage() {
                             <div className="mt-3">
                                 <Progress value={healthScore} className="h-2" />
                             </div>
+                            {!isSimple && (
                             <div className="mt-4 grid gap-1.5 sm:grid-cols-2">
                                 {scoreBreakdown.map((factor) => (
                                     <div key={factor.label} className="flex items-center justify-between text-xs">
@@ -380,6 +383,12 @@ export default function GamificationPage() {
                                     </div>
                                 ))}
                             </div>
+                            )}
+                            {isSimple && lockedBadges.length > 0 && (
+                                <p className="mt-3 text-xs text-muted-foreground">
+                                    Prochaine étape : <span className="font-medium text-foreground">{lockedBadges[0].hint ?? lockedBadges[0].description}</span>
+                                </p>
+                            )}
                         </div>
                     </div>
                 </CardContent>
