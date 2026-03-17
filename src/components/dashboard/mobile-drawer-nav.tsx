@@ -3,13 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { TrendingUp, LayoutDashboard, PieChart, MessageSquare, User, ClipboardList, ArrowRightLeft, Calculator, Hourglass, Trophy, CreditCard, Target, BookOpen, BookMarked } from "lucide-react";
+import { TrendingUp, LayoutDashboard, PieChart, MessageSquare, User, ClipboardList, Calculator, Hourglass, Trophy, CreditCard, Target, BookOpen, BookMarked } from "lucide-react";
 const NAV_FULL = [
   { label: "Synthèse", items: [
     { href: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
     { href: "/portfolio", icon: PieChart, label: "Portefeuille" },
-    { href: "/transactions", icon: ArrowRightLeft, label: "Transactions" },
-    { href: "/goals", icon: Target, label: "Objectifs" },
+{ href: "/goals", icon: Target, label: "Objectifs" },
   ]},
   { label: "Planification", items: [
     { href: "/fiscal", icon: Calculator, label: "Fiscal" },

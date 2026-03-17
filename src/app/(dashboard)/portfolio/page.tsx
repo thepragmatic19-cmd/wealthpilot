@@ -1347,11 +1347,6 @@ function PortfolioTransactionsTab({ portfolioId }: { portfolioId: string | null 
           </p>
         </div>
       ))}
-      <div className="flex justify-center pt-2">
-        <Link href="/transactions">
-          <Button variant="outline" size="sm">Voir tout l&apos;historique →</Button>
-        </Link>
-      </div>
     </div>
   );
 }

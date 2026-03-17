@@ -94,7 +94,7 @@ function QuickActionsCard() {
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       {[
         { href: "/chat", icon: MessageSquare, label: "Chat IA", sublabel: "Conseiller IA", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10 hover:bg-blue-500/20" },
-        { href: "/transactions", icon: Calculator, label: "Transaction", sublabel: "Ajouter", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10 hover:bg-emerald-500/20" },
+        { href: "/fiscal", icon: Calculator, label: "Fiscal", sublabel: "Optimiser", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10 hover:bg-emerald-500/20" },
         { href: "/portfolio", icon: PieChart, label: "Portefeuille", sublabel: "Voir mon plan", color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-500/10 hover:bg-orange-500/20" },
         { href: "/goals", icon: Target, label: "Objectifs", sublabel: "Ma progression", color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10 hover:bg-purple-500/20" },
       ].map((action, i) => (
