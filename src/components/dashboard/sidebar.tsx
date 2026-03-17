@@ -20,7 +20,6 @@ import {
   BookOpen,
 } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
-import { useSimpleMode } from "@/contexts/simple-mode-context";
 
 const navGroups = [
   {
@@ -60,7 +59,6 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const { isFree } = useSubscription();
-  const { isSimple, toggle } = useSimpleMode();
 
   return (
     <aside
@@ -128,40 +126,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </nav>
       </div>
 
-      <div className="border-t p-2 space-y-1">
-        {/* Level selector */}
-        {!collapsed && (
-          <div className="px-1 space-y-1.5">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
-              Mon niveau
-            </p>
-            <div className="flex gap-1 rounded-lg border p-1">
-              <button
-                onClick={() => { if (!isSimple) toggle(); }}
-                className={cn(
-                  "flex-1 rounded py-1 text-xs font-medium transition-colors",
-                  isSimple
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                Débutant
-              </button>
-              <button
-                onClick={() => { if (isSimple) toggle(); }}
-                className={cn(
-                  "flex-1 rounded py-1 text-xs font-medium transition-colors",
-                  !isSimple
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                Intermédiaire
-              </button>
-            </div>
-          </div>
-        )}
-
+      <div className="border-t p-2">
         <Button variant="ghost" className="w-full" onClick={onToggle} aria-label={collapsed ? "Ouvrir le menu" : "Réduire le menu"}>
           {collapsed ? (
             <ChevronRight className="h-4 w-4" />

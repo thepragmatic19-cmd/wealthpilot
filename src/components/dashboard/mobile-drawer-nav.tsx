@@ -4,8 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { TrendingUp, LayoutDashboard, PieChart, MessageSquare, User, ClipboardList, ArrowRightLeft, Calculator, Hourglass, Trophy, CreditCard, Target, BookOpen, BookMarked } from "lucide-react";
-import { useSimpleMode } from "@/contexts/simple-mode-context";
-
 const NAV_FULL = [
   { label: "Synthèse", items: [
     { href: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
@@ -30,26 +28,9 @@ const NAV_FULL = [
   ]},
 ];
 
-const NAV_SIMPLE = [
-  { label: "Principal", items: [
-    { href: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
-    { href: "/portfolio", icon: PieChart, label: "Mon portefeuille" },
-    { href: "/goals", icon: Target, label: "Mes objectifs" },
-  ]},
-  { label: "Aide", items: [
-    { href: "/chat", icon: MessageSquare, label: "Conseiller IA" },
-    { href: "/education", icon: BookOpen, label: "Apprendre" },
-    { href: "/lexique", icon: BookMarked, label: "Lexique" },
-  ]},
-  { label: "Compte", items: [
-    { href: "/profile", icon: User, label: "Mon Profil" },
-  ]},
-];
-
 export function MobileDrawerNav() {
   const pathname = usePathname();
-  const { isSimple } = useSimpleMode();
-  const groups = isSimple ? NAV_SIMPLE : NAV_FULL;
+  const groups = NAV_FULL;
 
   return (
     <div className="flex h-full flex-col">

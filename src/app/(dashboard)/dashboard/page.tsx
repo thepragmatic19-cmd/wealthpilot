@@ -384,6 +384,50 @@ export default function DashboardPage() {
   const [celiBannerDismissed, setCeliBannerDismissed] = useState(false);
   const [profileBannerDismissed, setProfileBannerDismissed] = useState(false);
 
+  // ✅ All hooks before any early return (React rules of hooks)
+  const { isSimple } = useSimpleMode();
+
+  const mainAccount = useMemo(() => {
+    const ci = data.clientInfo;
+    if (!ci) return { label: "Ouvrir un CELI", sub: "Votre bouclier fiscal" };
+    if (ci.has_celi) return {
+      label: "CELI",
+      sub: ci.celi_balance ? formatCurrency(Number(ci.celi_balance)) : "Actif",
+    };
+    if (ci.has_reer) return {
+      label: "REER",
+      sub: ci.reer_balance ? formatCurrency(Number(ci.reer_balance)) : "Actif",
+    };
+    return { label: "Ouvrir un CELI", sub: "Premier compte recommandé" };
+  }, [data.clientInfo]);
+
+  const alexInsights = useMemo(() => {
+    const items: { text: string; href: string }[] = [];
+    const clientInfo = data.clientInfo;
+    const goals = data.goals;
+
+    if (clientInfo && !clientInfo.has_celi)
+      items.push({ text: "Vous n'avez pas de CELI — c'est le meilleur premier compte au Canada.", href: "/chat?q=Comment+ouvrir+un+CELI" });
+
+    if (goals.length === 0)
+      items.push({ text: "Définissez un objectif pour que je crée votre plan personnalisé.", href: "/goals" });
+    else {
+      const g = goals[0];
+      const pct = g.target_amount > 0 ? Math.round(g.current_amount / g.target_amount * 100) : 0;
+      items.push({ text: `${g.label} : ${pct}% atteint.`, href: "/goals" });
+    }
+
+    if (clientInfo?.monthly_savings && clientInfo.annual_income) {
+      const rate = Math.round(Number(clientInfo.monthly_savings) * 12 / Number(clientInfo.annual_income) * 100);
+      items.push(rate < 10
+        ? { text: `Taux d'épargne de ${rate}% — viser 15–20% accélérerait vos objectifs.`, href: "/chat?q=Comment+augmenter+mon+taux+d%27épargne" }
+        : { text: `Taux d'épargne de ${rate}% — excellent travail !`, href: "/chat" }
+      );
+    }
+
+    return items.slice(0, 3);
+  }, [data.clientInfo, data.goals]);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       if (localStorage.getItem("wp_celi_banner_dismissed")) setCeliBannerDismissed(true);
@@ -549,49 +593,6 @@ export default function DashboardPage() {
     );
   }
 
-  const { isSimple } = useSimpleMode();
-
-  const mainAccount = useMemo(() => {
-    const clientInfo = data.clientInfo;
-    if (!clientInfo) return { label: "Ouvrir un CELI", sub: "Votre bouclier fiscal" };
-    if (clientInfo.has_celi) return {
-      label: "CELI",
-      sub: clientInfo.celi_balance ? formatCurrency(Number(clientInfo.celi_balance)) : "Actif",
-    };
-    if (clientInfo.has_reer) return {
-      label: "REER",
-      sub: clientInfo.reer_balance ? formatCurrency(Number(clientInfo.reer_balance)) : "Actif",
-    };
-    return { label: "Ouvrir un CELI", sub: "Premier compte recommandé" };
-  }, [data.clientInfo]);
-
-  const alexInsights = useMemo(() => {
-    const items: { text: string; href: string }[] = [];
-    const clientInfo = data.clientInfo;
-    const goals = data.goals;
-
-    if (clientInfo && !clientInfo.has_celi)
-      items.push({ text: "Vous n'avez pas de CELI — c'est le meilleur premier compte au Canada.", href: "/chat?q=Comment+ouvrir+un+CELI" });
-
-    if (goals.length === 0)
-      items.push({ text: "Définissez un objectif pour que je crée votre plan personnalisé.", href: "/goals" });
-    else {
-      const g = goals[0];
-      const pct = g.target_amount > 0 ? Math.round(g.current_amount / g.target_amount * 100) : 0;
-      items.push({ text: `${g.label} : ${pct}% atteint.`, href: "/goals" });
-    }
-
-    if (clientInfo?.monthly_savings && clientInfo.annual_income) {
-      const rate = Math.round(Number(clientInfo.monthly_savings) * 12 / Number(clientInfo.annual_income) * 100);
-      items.push(rate < 10
-        ? { text: `Taux d'épargne de ${rate}% — viser 15–20% accélérerait vos objectifs.`, href: "/chat?q=Comment+augmenter+mon+taux+d%27épargne" }
-        : { text: `Taux d'épargne de ${rate}% — excellent travail !`, href: "/chat" }
-      );
-    }
-
-    return items.slice(0, 3);
-  }, [data.clientInfo, data.goals]);
-
   const riskProfile = data.riskAssessment?.risk_profile
     ? RISK_PROFILES[data.riskAssessment.risk_profile]
     : null;
@@ -657,15 +658,13 @@ export default function DashboardPage() {
                 Bonjour, {data.profile?.full_name?.split(" ")[0] || "investisseur"} 👋
               </h1>
               <p className="text-sm text-muted-foreground mt-0.5">
-                {isSimple
-                  ? "Voici un résumé simple de votre situation financière."
-                  : "Votre cockpit financier est à jour."}
+                Votre cockpit financier est à jour.
               </p>
             </div>
           </div>
 
-          {/* Taux d'épargne — masqué en mode simplifié (valeur souvent confuse) */}
-          {!isSimple && savingsRate > 0 && savingsRate <= 100 && (
+          {/* Taux d'épargne */}
+          {savingsRate > 0 && savingsRate <= 100 && (
             <div className="flex items-center gap-4 p-3 rounded-2xl border bg-card/50 backdrop-blur-sm shadow-sm">
               <div className="relative h-12 w-12">
                 <svg className="h-full w-full" viewBox="0 0 36 36">
@@ -760,11 +759,11 @@ export default function DashboardPage() {
                 </div>
               )}
               {trendPct === null && (
-                <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 border-none text-[10px]">MON ÉPARGNE</Badge>
+                <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 border-none text-[10px]">PATRIMOINE</Badge>
               )}
             </div>
             <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">J&apos;ai investi</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Actifs totaux</p>
               <p className="text-2xl sm:text-3xl font-black mt-1 tracking-tight">{formatCurrency(totalInvested)}</p>
             </div>
           </CardContent>
@@ -781,7 +780,7 @@ export default function DashboardPage() {
               <Badge variant="secondary" className="bg-purple-500/10 text-purple-600 border-none text-[10px]">MENSUEL</Badge>
             </div>
             <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Je mets de côté / mois</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Épargne mensuelle</p>
               <p className="text-2xl sm:text-3xl font-black mt-1 tracking-tight text-purple-700 dark:text-purple-300">
                 {monthlySavings > 0 ? `${formatCurrency(monthlySavings)}/mois` : "—"}
               </p>
@@ -808,7 +807,7 @@ export default function DashboardPage() {
               <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-none text-[10px]">PROJECTION</Badge>
             </div>
             <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Dans 1 an j&apos;aurai</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Projection 1 an</p>
               <p className="text-2xl sm:text-3xl font-black mt-1 tracking-tight text-blue-700 dark:text-blue-300">
                 {projectedValue > 0 ? formatCurrency(projectedValue) : "—"}
               </p>
@@ -831,7 +830,7 @@ export default function DashboardPage() {
                 <Badge variant="secondary" className="bg-teal-500/10 text-teal-600 border-none text-[10px]">COMPTE</Badge>
               </div>
               <div>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Mon compte prioritaire</p>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Compte enregistré</p>
                 <p className="text-2xl sm:text-3xl font-black mt-1 tracking-tight text-teal-700 dark:text-teal-300">
                   {mainAccount.label}
                 </p>

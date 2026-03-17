@@ -1,12 +1,9 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { MessageSquare } from "lucide-react";
-import { useSimpleMode } from "@/contexts/simple-mode-context";
 
 export function FloatingHelpButton({ question }: { question: string }) {
-  const { isSimple } = useSimpleMode();
   const router = useRouter();
-  if (!isSimple) return null;
   return (
     <div className="fixed bottom-6 right-6 z-50">
       <span className="absolute inset-0 rounded-full bg-primary/30 animate-ping" />
