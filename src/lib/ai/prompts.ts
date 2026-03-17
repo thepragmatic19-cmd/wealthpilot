@@ -417,6 +417,12 @@ export function getChatSystemPrompt(context: {
   hasCeli: boolean;
   hasReer: boolean;
   hasReee: boolean;
+  hasCeliapp?: boolean;
+  celiappBalance?: number | null;
+  hasCri?: boolean;
+  criBalance?: number | null;
+  hasFrv?: boolean;
+  frvBalance?: number | null;
   riskScore: number;
   riskProfile: string;
   riskAnalysis?: string | null;
@@ -458,6 +464,9 @@ export function getChatSystemPrompt(context: {
   else financialSection += `- REER : Non ouvert\n`;
   if (context.hasReee) financialSection += `- REEE : ${fmt(context.reeeBalance)}\n`;
   else if (context.clientDependents && context.clientDependents > 0) financialSection += `- REEE : Non ouvert ⚠️ (enfants à charge — subventions SCEE/IQEE manquées)\n`;
+  if (context.hasCeliapp) financialSection += `- CELIAPP : ${fmt(context.celiappBalance ?? null)}\n`;
+  if (context.hasCri) financialSection += `- CRI (Compte de retraite immobilisé) : ${fmt(context.criBalance ?? null)}\n`;
+  if (context.hasFrv) financialSection += `- FRV (Fonds de revenu viager) : ${fmt(context.frvBalance ?? null)}\n`;
 
   // ── Profil de risque ──────────────────────────────────────────────────────
   let riskSection = `\n## Profil de risque (KYC)\n`;
@@ -522,6 +531,72 @@ export function getChatSystemPrompt(context: {
     }
   }
 
+  // ── Mandat de gestion personnalisé ────────────────────────────────────────
+  const mandateLines: string[] = [];
+
+  // Primary mandate from goals
+  if (context.goals.length > 0) {
+    const g = context.goals[0];
+    const pct = g.targetAmount > 0 ? Math.round((g.currentAmount / g.targetAmount) * 100) : 0;
+    const horizonYrs = g.targetDate
+      ? Math.max(1, new Date(g.targetDate).getFullYear() - new Date().getFullYear())
+      : null;
+    mandateLines.push(`**Mission :** Accompagner vers « ${g.label} » — cible ${fmt(g.targetAmount)}, ${pct}% atteint${horizonYrs ? `, ${horizonYrs} an${horizonYrs > 1 ? 's' : ''} restant${horizonYrs > 1 ? 's' : ''}` : ''}`);
+  } else {
+    mandateLines.push(`**Mission :** Optimisation de la croissance patrimoniale — aucun objectif formalisé (suggérer d'en créer un)`);
+  }
+
+  // Savings lever
+  if (savingsRate !== null) {
+    if (savingsRate < 10) {
+      mandateLines.push(`**⚠️ Levier critique :** Taux d'épargne de ${savingsRate}% — significativement sous la cible de 15–20% (${fmt(context.monthlySavings)}/mois sur revenu de ${fmt(context.annualIncome)})`);
+    } else if (savingsRate < 15) {
+      mandateLines.push(`**Levier principal :** Taux d'épargne de ${savingsRate}% — augmenter vers 15–20% pour accélérer la trajectoire`);
+    } else {
+      mandateLines.push(`**Levier principal :** Optimisation de l'allocation fiscale — taux d'épargne solide à ${savingsRate}% (${fmt(context.monthlySavings)}/mois)`);
+    }
+  }
+
+  // Top tax opportunity
+  if (!context.hasCeli) {
+    const room = context.clientAge && context.clientAge > 17
+      ? Math.min((context.clientAge - 17) * 6500, 102000)
+      : 70000;
+    mandateLines.push(`**Priorité fiscale :** CELI non ouvert — espace cumulatif estimé ~${room.toLocaleString('fr-CA')} $ de croissance libre d'impôt inexploitée`);
+  } else if (!context.hasReer && context.annualIncome && context.annualIncome > 55000) {
+    const reerRoom = Math.min(Math.round(context.annualIncome * 0.18), 32490);
+    mandateLines.push(`**Priorité fiscale :** REER non ouvert — déduction disponible ~${reerRoom.toLocaleString('fr-CA')} $ pour réduire l'impôt immédiatement`);
+  }
+
+  // Portfolio–goal trajectory gap
+  if (context.portfolio && context.goals.length > 0 && context.totalAssets !== null) {
+    const g = context.goals[0];
+    if (g.targetAmount > 0) {
+      const horizonYrs = g.targetDate
+        ? Math.max(1, new Date(g.targetDate).getFullYear() - new Date().getFullYear())
+        : 15;
+      const r = context.portfolio.expectedReturn / 100;
+      const pv = context.totalAssets;
+      const pmt = (context.monthlySavings ?? 0) * 12;
+      const fv = r > 0
+        ? pv * Math.pow(1 + r, horizonYrs) + pmt * ((Math.pow(1 + r, horizonYrs) - 1) / r)
+        : pv + pmt * horizonYrs;
+      const gap = g.targetAmount - fv;
+      if (gap > 5000) {
+        mandateLines.push(`**⚠️ Écart objectif/portefeuille :** Projection ${Math.round(fv).toLocaleString('fr-CA')} $ en ${horizonYrs} ans vs cible ${fmt(g.targetAmount)} — écart de ${Math.round(gap).toLocaleString('fr-CA')} $ à combler (ajuster épargne ou portefeuille)`);
+      } else if (fv > 0) {
+        mandateLines.push(`**✓ Trajectoire :** Projection ${Math.round(fv).toLocaleString('fr-CA')} $ en ${horizonYrs} ans — objectif ${fmt(g.targetAmount)} atteignable avec la stratégie actuelle`);
+      }
+    }
+  }
+
+  // Family-specific opportunity
+  if (context.clientDependents && context.clientDependents > 0 && !context.hasReee) {
+    mandateLines.push(`**Subventions manquées :** REEE non ouvert malgré ${context.clientDependents} enfant(s) — SCEE fédérale = 500 $/an/enfant gratuits (20% sur 2 500 $)`);
+  }
+
+  const mandateSection = `\n## 🎯 Mandat de gestion — ${context.clientName}\n${mandateLines.map(l => `- ${l}`).join('\n')}\n\n> **Règle cardinale :** Chaque réponse doit s'ancrer dans ce mandat et les chiffres réels du client. **Ne demande jamais** les informations déjà présentes dans ce profil — tu les connais.\n`;
+
   // ── Jalons détectés ───────────────────────────────────────────────────────
   let milestonesSection = '';
   if (context.milestones && context.milestones.length > 0) {
@@ -568,6 +643,7 @@ ${financialSection}
 ${riskSection}
 ${portfolioSection}
 ${goalsSection}
+${mandateSection}
 ${milestonesSection}
 ${personaSection}
 ${marketSection}
@@ -575,23 +651,25 @@ ${marketSection}
 # Référentiel de connaissances — Réglementation canadienne (essentiel)
 ${CANADIAN_FINANCIAL_KNOWLEDGE_COMPACT}
 
-# Directives professionnelles — Comment tu conseilles
+# Directives professionnelles — Conduite du gestionnaire de portefeuille
 
 ## Méthode de raisonnement CFA
 Pour chaque question posée, structure ta réponse ainsi :
-1. **Situation** : rappelle brièvement le contexte client pertinent (2-3 faits chiffrés du profil)
+1. **Ancrage client** : ouvre avec 1–2 faits précis tirés du profil (prénom + chiffre + contexte) — jamais de réponse générique
 2. **Analyse** : raisonne à partir des données réelles (calculs si nécessaire — utilise tes outils)
-3. **Recommandation** : 1-3 actions concrètes, chiffrées, et ordonnées par priorité
-4. **Prochaine étape** : une action immédiate que le client peut faire aujourd'hui
+3. **Recommandation** : 1–3 actions concrètes, chiffrées, ordonnées par priorité, ancrées dans le mandat
+4. **Prochaine étape** : une action immédiate et spécifique que le client peut faire aujourd'hui
 
 ## Règles absolues
 1. **Langue** : Français canadien exclusivement. Utilise les termes locaux (cotisation, tranche marginale, espace de cotisation, etc.)
-2. **Données** : Base-toi UNIQUEMENT sur les vraies données du profil client ci-dessus — pas de placeholders, pas de 'X$'
+2. **Données** : Base-toi UNIQUEMENT sur les vraies données du profil client ci-dessus — pas de placeholders, pas de 'X$'. **Ne demande JAMAIS au client des informations déjà présentes dans son profil.**
 3. **Ton** : adapte ton langage au style prescrit dans le profil de vie (éducatif / collaboratif / stratégique / préservatif)
 4. **Calculs** : utilise TOUJOURS tes outils de calcul pour les projections, économies fiscales, et simulations — ne calcule jamais mentalement
 5. **CFA standard** : chaque recommandation doit être dans l'intérêt supérieur du client (best-interest duty), documentée et justifiée
 6. **Longueur** : réponds précisément à la question — ni trop court ni verbeux. Utilise des bullet points et des chiffres.
 7. **Limites** : Tu ne peux pas recommander des titres individuels (actions, cryptos). Tu peux recommander des FNB, classes d'actifs, et stratégies.
+8. **Comportement gestionnaire** : Quand le client pose une question générale (ex: "comment investir ?"), réponds immédiatement avec son contexte spécifique. Jamais de théorie sans application directe à ses chiffres.
+9. **Proactivité** : Si le client pose une question sur un sujet, signale aussi toute opportunité ou risque connexe visible dans son profil que tu aurais identifié en tant que gestionnaire professionnel.
 
 ## ⚠️ RÈGLE CRITIQUE — Complétude des réponses
 **Tu DOIS absolument terminer chaque réponse complètement.** Ne te coupe jamais au milieu d'une phrase, d'une liste ou d'un raisonnement. Si ta réponse est longue, résume plutôt que de la tronquer. Une réponse incomplète est une faute professionnelle. Termine toujours par une conclusion ou une prochaine étape avant de t'arrêter.

@@ -22,26 +22,42 @@ const GOALS: { type: GoalType; emoji: string; label: string }[] = [
   { type: "liberté_financière", emoji: "🌟", label: "Ma liberté financière" },
 ];
 
+const FAMILY_OPTIONS: { label: string; sublabel: string; value: string; dependents: number }[] = [
+  { label: "Seul(e)", sublabel: "Célibataire ou sans personnes à charge", value: "célibataire", dependents: 0 },
+  { label: "En couple", sublabel: "Avec conjoint(e), sans enfants", value: "en_couple", dependents: 0 },
+  { label: "Avec enfants", sublabel: "Enfants ou personnes à charge", value: "famille", dependents: 1 },
+];
+
 export function SimpleStep2({ userId, onNext, onPrev }: Props) {
   const [hasCeli, setHasCeli] = useState(false);
   const [hasReer, setHasReer] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<GoalType | null>(null);
+  const [familySituation, setFamilySituation] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const canSubmit = selectedGoal !== null && familySituation !== null;
+
   async function handleSubmit() {
-    if (!selectedGoal) {
-      toast.error("Choisis ton objectif principal pour continuer.");
+    if (!canSubmit) {
+      toast.error("Choisis ton objectif et ta situation familiale pour continuer.");
       return;
     }
     setLoading(true);
     try {
       const supabase = createClient();
+      const selectedFamily = FAMILY_OPTIONS.find((f) => f.value === familySituation)!;
 
-      // Upsert account info
+      // Upsert account info + family situation
       await supabase
         .from("client_info")
         .upsert(
-          { user_id: userId, has_celi: hasCeli, has_reer: hasReer },
+          {
+            user_id: userId,
+            has_celi: hasCeli,
+            has_reer: hasReer,
+            family_situation: selectedFamily.value,
+            dependents: selectedFamily.dependents,
+          },
           { onConflict: "user_id" }
         );
 
@@ -134,6 +150,31 @@ export function SimpleStep2({ userId, onNext, onPrev }: Props) {
         </div>
       </div>
 
+      {/* Family situation */}
+      <div className="space-y-3">
+        <p className="text-sm font-semibold">Ta situation familiale</p>
+        <div className="grid grid-cols-3 gap-2">
+          {FAMILY_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setFamilySituation(opt.value)}
+              className={cn(
+                "flex flex-col gap-1 rounded-xl border p-4 text-left transition-colors",
+                familySituation === opt.value
+                  ? "border-primary bg-primary/10"
+                  : "border-border bg-card hover:border-primary/50"
+              )}
+            >
+              <span className={cn("text-sm font-semibold", familySituation === opt.value ? "text-primary" : "")}>
+                {opt.label}
+              </span>
+              <span className="text-[11px] text-muted-foreground leading-tight">{opt.sublabel}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="flex gap-3">
         <Button variant="outline" onClick={onPrev} disabled={loading}>
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -141,7 +182,7 @@ export function SimpleStep2({ userId, onNext, onPrev }: Props) {
         </Button>
         <Button
           onClick={handleSubmit}
-          disabled={loading || !selectedGoal}
+          disabled={loading || !canSubmit}
           className="flex-1"
           size="lg"
         >

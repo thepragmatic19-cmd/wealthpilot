@@ -37,11 +37,15 @@ const SAVINGS_OPTIONS = [
   { label: "Plus de 600 $", value: 750 },
 ];
 
-// Map sentinel values to DB values
-function toDbIncome(v: number) {
-  return v === -1 ? 0 : v;
-}
-function toDbSavings(v: number) {
+const ASSETS_OPTIONS = [
+  { label: "Je commence (< 5 000 $)", value: 2500 },
+  { label: "5 000 – 25 000 $", value: 15000 },
+  { label: "25 000 – 100 000 $", value: 62500 },
+  { label: "100 000 – 300 000 $", value: 200000 },
+  { label: "Plus de 300 000 $", value: 400000 },
+];
+
+function toDbValue(v: number) {
   return v === -1 ? 0 : v;
 }
 
@@ -74,9 +78,10 @@ export function SimpleStep1({ userId, onNext }: Props) {
   const [age, setAge] = useState<number | null>(null);
   const [income, setIncome] = useState<number | null>(null);
   const [savings, setSavings] = useState<number | null>(null);
+  const [assets, setAssets] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const canSubmit = age !== null && income !== null && savings !== null;
+  const canSubmit = age !== null && income !== null && savings !== null && assets !== null;
 
   async function handleSubmit() {
     if (!canSubmit) {
@@ -92,8 +97,9 @@ export function SimpleStep1({ userId, onNext }: Props) {
           {
             user_id: userId,
             age,
-            annual_income: toDbIncome(income),
-            monthly_savings: toDbSavings(savings),
+            annual_income: toDbValue(income),
+            monthly_savings: toDbValue(savings),
+            total_assets: assets,
           },
           { onConflict: "user_id" }
         );
@@ -153,6 +159,22 @@ export function SimpleStep1({ userId, onNext }: Props) {
               selected={savings === opt.value}
               onClick={() => setSavings(opt.value)}
               className="flex-1 min-w-[140px]"
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Actifs totaux */}
+      <div className="space-y-3">
+        <p className="text-sm font-semibold">Valeur approximative de ton épargne et de tes placements actuels</p>
+        <p className="text-xs text-muted-foreground -mt-1">CELI, REER, épargne, placements — sans compter ton domicile principal ni tes dettes.</p>
+        <div className="grid grid-cols-2 gap-2">
+          {ASSETS_OPTIONS.map((opt) => (
+            <RadioCard
+              key={opt.label}
+              label={opt.label}
+              selected={assets === opt.value}
+              onClick={() => setAssets(opt.value)}
             />
           ))}
         </div>
