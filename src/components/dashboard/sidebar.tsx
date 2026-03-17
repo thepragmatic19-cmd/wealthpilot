@@ -10,84 +10,46 @@ import {
   PieChart,
   MessageSquare,
   User,
-  ClipboardList,
   TrendingUp,
-  ArrowRightLeft,
   Calculator,
   Hourglass,
-  Trophy,
   CreditCard,
   ChevronLeft,
   ChevronRight,
   Target,
   BookOpen,
-  BookMarked,
-  Layers,
 } from "lucide-react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useSimpleMode } from "@/contexts/simple-mode-context";
 
-// Full nav (advanced mode)
-const navGroupsFull = [
+const navGroups = [
   {
-    label: "Synthèse",
+    label: "Principal",
+    pro: false,
     items: [
-      { href: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
-      { href: "/portfolio", icon: PieChart, label: "Portefeuille" },
-      { href: "/transactions", icon: ArrowRightLeft, label: "Transactions" },
-      { href: "/goals", icon: Target, label: "Objectifs" },
-    ]
+      { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
+      { href: "/chat",      label: "Alex — Conseiller", icon: MessageSquare },
+      { href: "/portfolio", label: "Portefeuille",      icon: PieChart },
+      { href: "/goals",     label: "Objectifs",         icon: Target },
+      { href: "/education", label: "Apprendre",         icon: BookOpen },
+    ],
   },
   {
     label: "Planification",
+    pro: true,
     items: [
-      { href: "/fiscal", icon: Calculator, label: "Fiscal", proBadge: true },
-      { href: "/retirement", icon: Hourglass, label: "Retraite", proBadge: true },
-    ]
-  },
-  {
-    label: "Conseil IA",
-    items: [
-      { href: "/chat", icon: MessageSquare, label: "Conseiller IA" },
-      { href: "/education", icon: BookOpen, label: "Hub Éducatif" },
-      { href: "/lexique", icon: BookMarked, label: "Lexique" },
-      { href: "/onboarding", icon: ClipboardList, label: "Évaluation" },
-    ]
+      { href: "/fiscal",     label: "Fiscal",   icon: Calculator },
+      { href: "/retirement", label: "Retraite", icon: Hourglass },
+    ],
   },
   {
     label: "Compte",
+    pro: false,
     items: [
-      { href: "/billing", icon: CreditCard, label: "Abonnement" },
-      { href: "/achievements", icon: Trophy, label: "Réalisations" },
-      { href: "/profile", icon: User, label: "Mon Profil" },
-    ]
-  }
-];
-
-// Simplified nav — only essentials for beginners
-const navGroupsSimple = [
-  {
-    label: "Principal",
-    items: [
-      { href: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
-      { href: "/portfolio", icon: PieChart, label: "Mon portefeuille" },
-      { href: "/goals", icon: Target, label: "Mes objectifs" },
-    ]
+      { href: "/profile", label: "Mon profil",  icon: User },
+      { href: "/billing", label: "Abonnement",  icon: CreditCard },
+    ],
   },
-  {
-    label: "Aide",
-    items: [
-      { href: "/chat", icon: MessageSquare, label: "Conseiller IA" },
-      { href: "/education", icon: BookOpen, label: "Apprendre" },
-      { href: "/lexique", icon: BookMarked, label: "Lexique" },
-    ]
-  },
-  {
-    label: "Compte",
-    items: [
-      { href: "/profile", icon: User, label: "Mon Profil" },
-    ]
-  }
 ];
 
 interface SidebarProps {
@@ -98,9 +60,7 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const { isFree } = useSubscription();
-  const { isSimple, toggle: toggleSimple } = useSimpleMode();
-
-  const navGroups = isSimple ? navGroupsSimple : navGroupsFull;
+  const { isSimple, toggle } = useSimpleMode();
 
   return (
     <aside
@@ -131,6 +91,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               {!collapsed && (
                 <h3 className="px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
                   {group.label}
+                  {group.pro && isFree && (
+                    <Badge variant="outline" className="ml-2 text-[9px] px-1 py-0 border-primary/20 text-primary bg-primary/5">
+                      PRO
+                    </Badge>
+                  )}
                 </h3>
               )}
               <div className="space-y-1">
@@ -153,11 +118,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                           isActive ? "text-primary" : "text-muted-foreground"
                         )} aria-hidden="true" />
                         {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
-                        {!collapsed && (item as { proBadge?: boolean }).proBadge && isFree && (
-                          <Badge variant="outline" className="ml-auto text-[9px] px-1 py-0 border-primary/20 text-primary bg-primary/5">
-                            PRO
-                          </Badge>
-                        )}
                       </Button>
                     </Link>
                   );
@@ -169,33 +129,38 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </div>
 
       <div className="border-t p-2 space-y-1">
-        {/* Mode toggle — clear for beginners */}
-        <Button
-          variant="ghost"
-          className={cn(
-            "w-full gap-2 text-muted-foreground hover:text-foreground",
-            collapsed && "justify-center px-0"
-          )}
-          onClick={toggleSimple}
-          aria-label={isSimple ? "Afficher toutes les fonctionnalités" : "Passer en vue simplifiée"}
-        >
-          <Layers className="h-4 w-4 shrink-0" />
-          {!collapsed && (
-            <>
-              <span className="text-xs flex-1 text-left">
-                {isSimple ? "Vue simplifiée" : "Vue complète"}
-              </span>
-              <span className={cn(
-                "text-[9px] font-bold px-1.5 py-0.5 rounded-full border",
-                isSimple
-                  ? "bg-primary/10 text-primary border-primary/20"
-                  : "bg-muted text-muted-foreground border-border"
-              )}>
-                {isSimple ? "ACTIF" : "AVANCÉ"}
-              </span>
-            </>
-          )}
-        </Button>
+        {/* Level selector */}
+        {!collapsed && (
+          <div className="px-1 space-y-1.5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+              Mon niveau
+            </p>
+            <div className="flex gap-1 rounded-lg border p-1">
+              <button
+                onClick={() => { if (!isSimple) toggle(); }}
+                className={cn(
+                  "flex-1 rounded py-1 text-xs font-medium transition-colors",
+                  isSimple
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Débutant
+              </button>
+              <button
+                onClick={() => { if (isSimple) toggle(); }}
+                className={cn(
+                  "flex-1 rounded py-1 text-xs font-medium transition-colors",
+                  !isSimple
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Intermédiaire
+              </button>
+            </div>
+          </div>
+        )}
 
         <Button variant="ghost" className="w-full" onClick={onToggle} aria-label={collapsed ? "Ouvrir le menu" : "Réduire le menu"}>
           {collapsed ? (

@@ -41,7 +41,7 @@ import { FloatingHelpButton } from "@/components/ui/floating-help-button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FINANCIAL_TERMS } from "@/lib/financial-terms";
 import { toast } from "sonner";
-import { CheckCircle, TrendingUp, Shield, BarChart3, Star, Info, RefreshCw, Loader2, Download, Scale, FileBarChart2, LayoutGrid, Sparkles, MessageSquare } from "lucide-react";
+import { CheckCircle, TrendingUp, Shield, BarChart3, Star, Info, RefreshCw, Loader2, Download, Scale, FileBarChart2, LayoutGrid, Sparkles, MessageSquare, ArrowRightLeft, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { computeWeightedMer, computeAccountSummary } from "@/lib/portfolio/helpers";
 import type { Portfolio, PortfolioAllocation, ClientInfo, Transaction } from "@/types/database";
 import { Input } from "@/components/ui/input";
@@ -783,7 +783,7 @@ export default function PortfolioPage() {
 
       {/* Portfolio tabs */}
       {!compareMode && <Tabs value={activeTab || selected?.type || "suggéré"} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="conservateur" className="text-xs sm:text-sm gap-1">
             <Shield className="hidden sm:block h-4 w-4" />
             <span className="truncate">Conservateur</span>
@@ -794,6 +794,10 @@ export default function PortfolioPage() {
           <TabsTrigger value="ambitieux" className="text-xs sm:text-sm gap-1">
             <TrendingUp className="hidden sm:block h-4 w-4" />
             <span className="truncate">Ambitieux</span>
+          </TabsTrigger>
+          <TabsTrigger value="historique" className="text-xs sm:text-sm gap-1">
+            <ArrowRightLeft className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Historique</span>
           </TabsTrigger>
         </TabsList>
 
@@ -1248,10 +1252,106 @@ export default function PortfolioPage() {
             </TabsContent>
           );
         })}
+
+        {/* Historique tab */}
+        <TabsContent value="historique" className="mt-4">
+          <PortfolioTransactionsTab portfolioId={selected?.id ?? null} />
+        </TabsContent>
       </Tabs>}
         </>
       )}
       <FloatingHelpButton question="Explique-moi les différences entre mes 3 portefeuilles et lequel choisir" />
+    </div>
+  );
+}
+
+// ─── Inline Transactions Tab ──────────────────────────────────────────────────
+
+const TYPE_LABELS: Record<string, string> = {
+  achat: "Achat",
+  vente: "Vente",
+  dividende: "Dividende",
+  rééquilibrage: "Rééquilibrage",
+  cotisation: "Cotisation",
+};
+
+const TYPE_COLORS: Record<string, string> = {
+  achat: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  vente: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  dividende: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  rééquilibrage: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  cotisation: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+};
+
+function PortfolioTransactionsTab({ portfolioId }: { portfolioId: string | null }) {
+  const [txs, setTxs] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!portfolioId) { setLoading(false); return; }
+    const supabase = createClient();
+    supabase
+      .from("transactions")
+      .select("*")
+      .eq("portfolio_id", portfolioId)
+      .order("executed_at", { ascending: false })
+      .limit(30)
+      .then(({ data }) => { setTxs((data ?? []) as Transaction[]); setLoading(false); });
+  }, [portfolioId]);
+
+  if (loading) return <div className="h-32 animate-pulse rounded-lg bg-muted" />;
+
+  if (!portfolioId) return (
+    <Card className="border-dashed">
+      <CardContent className="flex flex-col items-center justify-center py-12 text-center gap-3">
+        <ArrowRightLeft className="h-10 w-10 text-muted-foreground/30" />
+        <p className="text-sm text-muted-foreground">Sélectionnez un portefeuille pour voir les transactions.</p>
+      </CardContent>
+    </Card>
+  );
+
+  if (txs.length === 0) return (
+    <Card className="border-dashed">
+      <CardContent className="flex flex-col items-center justify-center py-12 text-center gap-3">
+        <ArrowRightLeft className="h-10 w-10 text-muted-foreground/30" />
+        <p className="font-medium text-sm">Aucune transaction</p>
+        <p className="text-xs text-muted-foreground">Ajoutez des transactions dans la section Transactions.</p>
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <div className="space-y-2">
+      {txs.map((tx) => (
+        <div key={tx.id} className="flex items-center justify-between rounded-lg border p-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
+              {tx.type === "vente"
+                ? <ArrowDownLeft className="h-4 w-4 text-red-500" />
+                : <ArrowUpRight className="h-4 w-4 text-green-500" />}
+            </div>
+            <div>
+              <p className="text-sm font-medium">{tx.instrument_name}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <Badge className={`text-[10px] border-none ${TYPE_COLORS[tx.type] ?? ""}`}>
+                  {TYPE_LABELS[tx.type] ?? tx.type}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(tx.executed_at).toLocaleDateString("fr-CA")}
+                </span>
+              </div>
+            </div>
+          </div>
+          <p className={`font-semibold text-sm ${tx.type === "vente" ? "text-red-500" : "text-green-500"}`}>
+            {tx.type === "vente" ? "-" : "+"}${Math.abs(tx.amount).toLocaleString("fr-CA", { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+      ))}
+      <div className="flex justify-center pt-2">
+        <Link href="/transactions">
+          <Button variant="outline" size="sm">Voir tout l&apos;historique →</Button>
+        </Link>
+      </div>
     </div>
   );
 }

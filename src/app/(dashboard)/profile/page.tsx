@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -43,7 +44,10 @@ import {
   X,
   Trash2,
   AlertTriangle,
+  Trophy,
+  Award,
 } from "lucide-react";
+import { BADGE_DEFINITIONS, GamificationData } from "@/lib/achievements";
 import type { Profile, ClientInfo, RiskAssessment } from "@/types/database";
 import { useSimpleMode } from "@/contexts/simple-mode-context";
 
@@ -93,6 +97,9 @@ export default function ProfilePage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [gamificationData, setGamificationData] = useState<GamificationData>({
+    profile: null, clientInfo: null, goals: [], portfolios: [], chatMessages: [],
+  });
   const router = useRouter();
   const { isSimple } = useSimpleMode();
 
@@ -131,7 +138,7 @@ export default function ProfilePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const [{ data: p }, { data: ci }, { data: ra }] = await Promise.all([
+      const [{ data: p }, { data: ci }, { data: ra }, { data: chatMsgs }, { data: portfolios }, { data: goals }] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
         supabase.from("client_info").select("*").eq("user_id", user.id).maybeSingle(),
         supabase
@@ -141,6 +148,9 @@ export default function ProfilePage() {
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
+        supabase.from("chat_messages").select("id, role").eq("user_id", user.id),
+        supabase.from("portfolios").select("*, portfolio_allocations(id)").eq("user_id", user.id),
+        supabase.from("goals").select("*").eq("user_id", user.id),
       ]);
 
       if (p) {
@@ -167,6 +177,17 @@ export default function ProfilePage() {
         });
       }
       if (ra) setRiskAssessment(ra as RiskAssessment);
+
+      setGamificationData({
+        profile: p as Profile | null,
+        clientInfo: ci as ClientInfo | null,
+        goals: (goals ?? []) as never[],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        portfolios: (portfolios ?? []) as any[],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        chatMessages: (chatMsgs ?? []) as any[],
+      });
+
       setLoading(false);
     }
     load();
@@ -295,6 +316,15 @@ export default function ProfilePage() {
   const riskProfile = riskAssessment?.risk_profile
     ? RISK_PROFILES[riskAssessment.risk_profile]
     : null;
+
+  const earnedBadges = useMemo(
+    () => BADGE_DEFINITIONS.filter((b) => b.check(gamificationData)),
+    [gamificationData]
+  );
+  const lockedBadges = useMemo(
+    () => BADGE_DEFINITIONS.filter((b) => !b.check(gamificationData)),
+    [gamificationData]
+  );
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 sm:space-y-6">
@@ -663,6 +693,42 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Achievements preview */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Trophy className="h-5 w-5 text-yellow-500" />
+            Mes badges
+            <Badge variant="secondary" className="ml-auto">
+              {earnedBadges.length}/{BADGE_DEFINITIONS.length}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {earnedBadges.slice(0, 8).map((badge) => (
+              <div
+                key={badge.id}
+                title={badge.name}
+                className={`flex h-10 w-10 items-center justify-center rounded-full ${badge.bgColor}`}
+              >
+                <badge.icon className={`h-5 w-5 ${badge.color}`} />
+              </div>
+            ))}
+            {lockedBadges.length > 0 && (
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted border border-dashed text-xs text-muted-foreground">
+                +{lockedBadges.length}
+              </div>
+            )}
+          </div>
+          <Link href="/achievements">
+            <Button variant="outline" size="sm" className="w-full gap-2">
+              <Award className="h-4 w-4" /> Voir tous mes badges
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
 
       {/* Password Change */}
       {!isSimple && (

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/sheet";
 import {
   BookOpen,
+  BookMarked,
   Search,
   ChevronDown,
   ChevronUp,
@@ -32,6 +34,8 @@ import {
   Sparkles,
   Star,
 } from "lucide-react";
+import { FINANCIAL_TERMS } from "@/lib/financial-terms";
+import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import type { ClientInfo } from "@/types/database";
 import { useSimpleMode } from "@/contexts/simple-mode-context";
@@ -588,13 +592,23 @@ const BEGINNER_PATH = [
   { id: "reequilibrage", label: "Rééquilibrer son portefeuille" },
 ];
 
-export default function EducationPage() {
+function EducationPageInner() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Tous");
+  const [activeSection, setActiveSection] = useState<"articles" | "lexique">("articles");
   const [readArticles, setReadArticles] = useState<Set<string>>(new Set());
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
   const { isSimple } = useSimpleMode();
+  const searchParams = useSearchParams();
+
+  // Lexique sub-state
+  const [lexSearch, setLexSearch] = useState("");
+  const [showAllLexCategories, setShowAllLexCategories] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("section") === "lexique") setActiveSection("lexique");
+  }, [searchParams]);
 
   // Chat panel
   const [chatOpen, setChatOpen] = useState(false);
@@ -810,10 +824,10 @@ export default function EducationPage() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <BookOpen className="h-6 w-6 text-primary" />
-              Hub Éducatif
+              Apprendre
             </h1>
             <p className="text-muted-foreground mt-0.5 text-sm">
-              15 articles pour maîtriser les bases de l&apos;investissement canadien
+              Articles et lexique pour maîtriser l&apos;investissement canadien
             </p>
           </div>
           <div className="text-right">
@@ -828,7 +842,39 @@ export default function EducationPage() {
             </div>
           </div>
         </div>
+
+        {/* Section selector */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveSection("articles")}
+            className={cn(
+              "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
+              activeSection === "articles"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "text-muted-foreground hover:border-primary/50"
+            )}
+          >
+            Articles
+          </button>
+          <button
+            onClick={() => setActiveSection("lexique")}
+            className={cn(
+              "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
+              activeSection === "lexique"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "text-muted-foreground hover:border-primary/50"
+            )}
+          >
+            <BookMarked className="h-3.5 w-3.5 inline mr-1.5" />Lexique
+          </button>
+        </div>
       </div>
+
+      {/* Lexique section */}
+      {activeSection === "lexique" && <LexiqueInline isSimple={isSimple} search={lexSearch} setSearch={setLexSearch} showAll={showAllLexCategories} setShowAll={setShowAllLexCategories} />}
+
+      {/* Articles section */}
+      {activeSection === "articles" && (<>
 
       {/* Search */}
       <div className="relative">
@@ -1017,6 +1063,8 @@ export default function EducationPage() {
         )}
       </div>
 
+      </>)}
+
       {/* ─── Inline Alex Chat Panel ──────────────────────────────────────────── */}
       <Sheet open={chatOpen} onOpenChange={setChatOpen}>
         <SheetContent
@@ -1133,5 +1181,128 @@ export default function EducationPage() {
         </SheetContent>
       </Sheet>
     </div>
+  );
+}
+
+// ─── Lexique Inline Component ──────────────────────────────────────────────
+
+const TERM_CATEGORIES = [
+  { label: "Comptes enregistrés",        terms: ["CELI","REER","REEE","CELIAPP","CRI","FRV"] },
+  { label: "Indicateurs de performance", terms: ["Rendement attendu","Volatilité","Ratio de Sharpe","RFG moyen","RFG moyen pondéré","Perte max. historique","Drawdown"] },
+  { label: "Concepts d'investissement",  terms: ["ETF","Rééquilibrage","Monte Carlo","Diversification"] },
+  { label: "Retraite",                   terms: ["RRQ","PSV","Taux de remplacement"] },
+];
+
+const ALL_CATEGORIZED_TERMS = new Set(TERM_CATEGORIES.flatMap((c) => c.terms));
+const BEGINNER_CATEGORY_LABELS = new Set(["Comptes enregistrés", "Concepts d'investissement"]);
+
+function LexiqueInline({ isSimple, search, setSearch, showAll, setShowAll }: {
+  isSimple: boolean;
+  search: string;
+  setSearch: (v: string) => void;
+  showAll: boolean;
+  setShowAll: (v: boolean) => void;
+}) {
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return TERM_CATEGORIES;
+    return TERM_CATEGORIES
+      .map((cat) => ({
+        ...cat,
+        terms: cat.terms.filter(
+          (t) => t.toLowerCase().includes(q) || (FINANCIAL_TERMS[t] ?? "").toLowerCase().includes(q)
+        ),
+      }))
+      .filter((cat) => cat.terms.length > 0);
+  }, [search]);
+
+  const displayedCategories = useMemo(() => {
+    if (isSimple && !search && !showAll) {
+      return filtered.filter((cat) => BEGINNER_CATEGORY_LABELS.has(cat.label));
+    }
+    return filtered;
+  }, [filtered, isSimple, search, showAll]);
+
+  const uncategorizedMatches = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    return Object.entries(FINANCIAL_TERMS).filter(
+      ([term, def]) =>
+        !ALL_CATEGORIZED_TERMS.has(term) &&
+        (term.toLowerCase().includes(q) || def.toLowerCase().includes(q))
+    );
+  }, [search]);
+
+  return (
+    <div className="space-y-6">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Rechercher un terme… (ex: CELI, ETF, Sharpe)"
+          className="pl-9"
+        />
+      </div>
+
+      {filtered.length === 0 && uncategorizedMatches.length === 0 ? (
+        <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">
+          Aucun résultat pour &ldquo;{search}&rdquo;
+        </div>
+      ) : (
+        <>
+          {displayedCategories.map((cat) => (
+            <div key={cat.label} className="space-y-3">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground/60">
+                {cat.label}
+              </h2>
+              <div className="space-y-2">
+                {cat.terms.map((term) => (
+                  <div key={term} className="rounded-xl border bg-card p-4 space-y-2">
+                    <Badge variant="outline" className="font-mono text-xs">{term}</Badge>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {FINANCIAL_TERMS[term] ?? "Définition à venir."}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {isSimple && !search && (
+            <button
+              onClick={() => setShowAll(!showAll)}
+              className="text-xs text-primary/70 hover:text-primary underline"
+            >
+              {showAll ? "Voir moins" : "Voir tous les termes (indicateurs, retraite…)"}
+            </button>
+          )}
+
+          {uncategorizedMatches.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground/60">
+                Autres résultats
+              </h2>
+              <div className="space-y-2">
+                {uncategorizedMatches.map(([term, def]) => (
+                  <div key={term} className="rounded-xl border bg-card p-4 space-y-2">
+                    <Badge variant="outline" className="font-mono text-xs">{term}</Badge>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{def}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function EducationPage() {
+  return (
+    <Suspense>
+      <EducationPageInner />
+    </Suspense>
   );
 }

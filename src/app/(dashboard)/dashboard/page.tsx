@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { logger } from "@/lib/logger";
@@ -51,10 +51,12 @@ import {
   Wallet,
   PiggyBank,
   CheckCircle2,
-  Circle,
   User,
   X,
   AlertCircle,
+  Bot,
+  ChevronRight,
+  Landmark,
 } from "lucide-react";
 import { WelcomeModal } from "@/components/dashboard/welcome-modal";
 import type {
@@ -549,6 +551,47 @@ export default function DashboardPage() {
 
   const { isSimple } = useSimpleMode();
 
+  const mainAccount = useMemo(() => {
+    const clientInfo = data.clientInfo;
+    if (!clientInfo) return { label: "Ouvrir un CELI", sub: "Votre bouclier fiscal" };
+    if (clientInfo.has_celi) return {
+      label: "CELI",
+      sub: clientInfo.celi_balance ? formatCurrency(Number(clientInfo.celi_balance)) : "Actif",
+    };
+    if (clientInfo.has_reer) return {
+      label: "REER",
+      sub: clientInfo.reer_balance ? formatCurrency(Number(clientInfo.reer_balance)) : "Actif",
+    };
+    return { label: "Ouvrir un CELI", sub: "Premier compte recommandé" };
+  }, [data.clientInfo]);
+
+  const alexInsights = useMemo(() => {
+    const items: { text: string; href: string }[] = [];
+    const clientInfo = data.clientInfo;
+    const goals = data.goals;
+
+    if (clientInfo && !clientInfo.has_celi)
+      items.push({ text: "Vous n'avez pas de CELI — c'est le meilleur premier compte au Canada.", href: "/chat?q=Comment+ouvrir+un+CELI" });
+
+    if (goals.length === 0)
+      items.push({ text: "Définissez un objectif pour que je crée votre plan personnalisé.", href: "/goals" });
+    else {
+      const g = goals[0];
+      const pct = g.target_amount > 0 ? Math.round(g.current_amount / g.target_amount * 100) : 0;
+      items.push({ text: `${g.label} : ${pct}% atteint.`, href: "/goals" });
+    }
+
+    if (clientInfo?.monthly_savings && clientInfo.annual_income) {
+      const rate = Math.round(Number(clientInfo.monthly_savings) * 12 / Number(clientInfo.annual_income) * 100);
+      items.push(rate < 10
+        ? { text: `Taux d'épargne de ${rate}% — viser 15–20% accélérerait vos objectifs.`, href: "/chat?q=Comment+augmenter+mon+taux+d%27épargne" }
+        : { text: `Taux d'épargne de ${rate}% — excellent travail !`, href: "/chat" }
+      );
+    }
+
+    return items.slice(0, 3);
+  }, [data.clientInfo, data.goals]);
+
   const riskProfile = data.riskAssessment?.risk_profile
     ? RISK_PROFILES[data.riskAssessment.risk_profile]
     : null;
@@ -700,75 +743,9 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Simple mode: plain-language summary strip */}
-      {isSimple && (totalInvested > 0 || monthlySavings > 0) && (
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="relative overflow-hidden flex items-center gap-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 px-5 py-5 shadow-sm">
-            <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-t-2xl" />
-            <div className="h-12 w-12 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
-              <Wallet className="h-6 w-6 text-emerald-600" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium text-muted-foreground">J&apos;ai en ce moment</p>
-              <p className="text-2xl font-black text-emerald-700 dark:text-emerald-400 leading-tight truncate">{formatCurrency(totalInvested)}</p>
-            </div>
-          </div>
-          <div className="relative overflow-hidden flex items-center gap-4 rounded-2xl bg-purple-50 dark:bg-purple-950/40 px-5 py-5 shadow-sm">
-            <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-purple-400 to-purple-500 rounded-t-2xl" />
-            <div className="h-12 w-12 rounded-xl bg-purple-500/15 flex items-center justify-center shrink-0">
-              <PiggyBank className="h-6 w-6 text-purple-600" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium text-muted-foreground">J&apos;épargne chaque mois</p>
-              <p className="text-2xl font-black text-purple-700 dark:text-purple-400 leading-tight truncate">
-                {monthlySavings > 0 ? formatCurrency(monthlySavings) : "—"}
-              </p>
-            </div>
-          </div>
-          <div className="relative overflow-hidden flex items-center gap-4 rounded-2xl bg-blue-50 dark:bg-blue-950/40 px-5 py-5 shadow-sm">
-            <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-blue-400 to-blue-500 rounded-t-2xl" />
-            <div className="h-12 w-12 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
-              <TrendingUp className="h-6 w-6 text-blue-600" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium text-muted-foreground">Dans 1 an, j&apos;aurai environ</p>
-              <p className="text-2xl font-black text-blue-700 dark:text-blue-400 leading-tight truncate">
-                {projectedValue > 0 ? formatCurrency(projectedValue) : "—"}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Chat CTA — simple mode only */}
-      {isSimple && (
-        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-blue-500/5">
-          <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <div className="h-12 w-12 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center">
-              <MessageSquare className="h-6 w-6 text-primary" />
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-sm">Ton conseiller IA est disponible</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Pose une question sur ton portefeuille, tes objectifs ou ta stratégie fiscale.
-              </p>
-            </div>
-            <Link href="/chat">
-              <Button size="sm" className="shrink-0 gap-2">
-                <MessageSquare className="h-4 w-4" />
-                Discuter
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Market Ticker — hidden in simple mode */}
-      {!isSimple && <MarketTicker />}
-
-      {/* Summary Cards — advanced mode only */}
-      {!isSimple && <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* C.1 — Net Worth */}
+      {/* Unified 4-card KPI grid */}
+      <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* C.1 — J'ai investi */}
         <Card className="group relative overflow-hidden border-none shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20 opacity-100 group-hover:opacity-80 transition-opacity" />
           <CardContent className="p-6 relative">
@@ -782,30 +759,45 @@ export default function DashboardPage() {
                   {trendPct >= 0 ? "+" : ""}{trendPct.toFixed(1)}%
                 </div>
               )}
+              {trendPct === null && (
+                <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 border-none text-[10px]">MON ÉPARGNE</Badge>
+              )}
             </div>
             <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Actifs Totaux</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">J&apos;ai investi</p>
               <p className="text-2xl sm:text-3xl font-black mt-1 tracking-tight">{formatCurrency(totalInvested)}</p>
+            </div>
+          </CardContent>
+        </Card>
 
-              {totalRegistered > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-4">
-                  {celiBalance > 0 && (
-                    <Badge variant="outline" className="text-[9px] h-5 bg-background/50 border-emerald-500/20">
-                      CELI {Math.round(celiBalance / totalRegistered * 100)}%
-                    </Badge>
-                  )}
-                  {reerBalance > 0 && (
-                    <Badge variant="outline" className="text-[9px] h-5 bg-background/50 border-blue-500/20">
-                      REER {Math.round(reerBalance / totalRegistered * 100)}%
-                    </Badge>
-                  )}
+        {/* C.2 — Je mets de côté */}
+        <Card className="group relative overflow-hidden border-none shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-pink-500/10 dark:from-purple-500/20 dark:to-pink-500/20" />
+          <CardContent className="p-6 relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="h-10 w-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                <PiggyBank className="h-5 w-5" />
+              </div>
+              <Badge variant="secondary" className="bg-purple-500/10 text-purple-600 border-none text-[10px]">MENSUEL</Badge>
+            </div>
+            <div>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Je mets de côté / mois</p>
+              <p className="text-2xl sm:text-3xl font-black mt-1 tracking-tight text-purple-700 dark:text-purple-300">
+                {monthlySavings > 0 ? `${formatCurrency(monthlySavings)}/mois` : "—"}
+              </p>
+              {savingsRate > 0 && (
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full bg-purple-500 rounded-full" style={{ width: `${Math.min(100, savingsRate * 2)}%` }} />
+                  </div>
+                  <span className="text-[10px] font-bold text-purple-600">{savingsRate}%</span>
                 </div>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* C.2 — Projection 1 an */}
+        {/* C.3 — Dans 1 an j'aurai */}
         <Card className="group relative overflow-hidden border-none shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20" />
           <CardContent className="p-6 relative">
@@ -816,7 +808,7 @@ export default function DashboardPage() {
               <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-none text-[10px]">PROJECTION</Badge>
             </div>
             <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Cible 1 an</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Dans 1 an j&apos;aurai</p>
               <p className="text-2xl sm:text-3xl font-black mt-1 tracking-tight text-blue-700 dark:text-blue-300">
                 {projectedValue > 0 ? formatCurrency(projectedValue) : "—"}
               </p>
@@ -827,100 +819,59 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Score de Risque — hidden in simple mode */}
-        {!isSimple && (
-          <Card className="group relative overflow-hidden border-none shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
-            <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-rose-500/10 dark:from-orange-500/20 dark:to-rose-500/20" />
+        {/* C.4 — Mon compte prioritaire */}
+        <Link href="/profile">
+          <Card className="group relative overflow-hidden border-none shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
+            <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 to-emerald-500/10 dark:from-teal-500/20 dark:to-emerald-500/20" />
             <CardContent className="p-6 relative">
               <div className="flex items-center justify-between mb-4">
-                <div className="h-10 w-10 rounded-xl bg-orange-500/20 flex items-center justify-center text-orange-600 dark:text-orange-400">
-                  <Shield className="h-5 w-5" />
+                <div className="h-10 w-10 rounded-xl bg-teal-500/20 flex items-center justify-center text-teal-600 dark:text-teal-400">
+                  <Landmark className="h-5 w-5" />
                 </div>
-                <Badge variant="secondary" className="bg-orange-500/10 text-orange-600 border-none text-[10px]">PROFIL</Badge>
+                <Badge variant="secondary" className="bg-teal-500/10 text-teal-600 border-none text-[10px]">COMPTE</Badge>
               </div>
               <div>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Score de Risque</p>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-2xl sm:text-3xl font-black mt-1 tracking-tight text-orange-700 dark:text-orange-300">
-                    {data.riskAssessment?.risk_score || "—"}<span className="text-sm font-medium opacity-50">/10</span>
-                  </p>
-                </div>
-                <div className="mt-2">
-                  <Badge className="bg-orange-600 text-white border-none text-[9px] tracking-wide uppercase">
-                    {riskProfile?.label || "Non évalué"}
-                  </Badge>
-                </div>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Mon compte prioritaire</p>
+                <p className="text-2xl sm:text-3xl font-black mt-1 tracking-tight text-teal-700 dark:text-teal-300">
+                  {mainAccount.label}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-2 font-medium">{mainAccount.sub}</p>
               </div>
             </CardContent>
           </Card>
-        )}
+        </Link>
+      </div>
 
-        {/* C.4 — Épargne mensuelle */}
-        <Card className="group relative overflow-hidden border-none shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]">
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-pink-500/10 dark:from-purple-500/20 dark:to-pink-500/20" />
-          <CardContent className="p-6 relative">
-            <div className="flex items-center justify-between mb-4">
-              <div className="h-10 w-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400">
-                <PiggyBank className="h-5 w-5" />
-              </div>
-              <Badge variant="secondary" className="bg-purple-500/10 text-purple-600 border-none text-[10px]">ÉPARGNE</Badge>
+      {/* Alex vous dit */}
+      {alexInsights.length > 0 && (
+        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-blue-500/5">
+          <CardContent className="p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <Bot className="h-4 w-4 text-primary" />
+              <p className="text-sm font-semibold">Alex vous dit</p>
+              <Link href="/chat" className="ml-auto text-xs text-primary/60 hover:text-primary">
+                Discuter →
+              </Link>
             </div>
-            <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Capacité Mensuelle</p>
-              <p className="text-2xl sm:text-3xl font-black mt-1 tracking-tight text-purple-700 dark:text-purple-300">
-                {monthlySavings > 0 ? formatCurrency(monthlySavings) : "—"}
-              </p>
-              <div className="mt-2 flex items-center gap-2">
-                <div className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full bg-purple-500 rounded-full" style={{ width: `${Math.min(100, savingsRate * 2)}%` }} />
-                </div>
-                <span className="text-[10px] font-bold text-purple-600">{savingsRate}%</span>
-              </div>
-            </div>
+            {alexInsights.map((insight, i) => (
+              <Link key={i} href={insight.href} className="flex items-start gap-2 group">
+                <ChevronRight className="h-4 w-4 shrink-0 mt-0.5 text-primary/40 group-hover:text-primary transition-colors" />
+                <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                  {insight.text}
+                </span>
+              </Link>
+            ))}
           </CardContent>
         </Card>
-      </div>}
+      )}
 
       {/* Quick Actions — always visible after KPI cards */}
       <QuickActionsCard />
 
-      {/* Simple mode: show checklist widget prominently — hidden once all steps done */}
-      {isSimple && !checklistDone && <ChecklistWidget data={data} />}
-
-      {/* Simple mode: graduation card once checklist is complete */}
-      {isSimple && checklistDone && (
-        <Card className="border-emerald-200/50 bg-gradient-to-br from-emerald-50/50 to-teal-50/50 dark:from-emerald-950/20 dark:to-teal-950/20">
-          <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <div className="h-12 w-12 shrink-0 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-              <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-sm">Démarrage complété — tu es prêt·e !</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Profil configuré, portefeuille généré, objectif créé. Continue à explorer.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2 shrink-0">
-              <Link href="/portfolio">
-                <Button size="sm" variant="outline">Mon portefeuille</Button>
-              </Link>
-              <Link href="/chat">
-                <Button size="sm" className="gap-1.5">
-                  <MessageSquare className="h-3.5 w-3.5" />
-                  Discuter
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Net Worth Chart — hidden in simple mode */}
-      {!isSimple && (
-        <ErrorBoundary>
-          {loadingSecondary ? <Skeleton className="h-[260px] w-full" /> : <NetWorthChart snapshots={data.snapshots} />}
-        </ErrorBoundary>
-      )}
+      {/* Net Worth Chart */}
+      <ErrorBoundary>
+        {loadingSecondary ? <Skeleton className="h-[260px] w-full" /> : <NetWorthChart snapshots={data.snapshots} />}
+      </ErrorBoundary>
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Secondary loading skeletons */}
@@ -932,24 +883,6 @@ export default function DashboardPage() {
         )}
 
         {!loadingSecondary && <>
-        {/* Simple mode: empty portfolio CTA */}
-        {isSimple && !data.selectedPortfolio && (
-          <Card className="lg:col-span-2 border-dashed border-2 flex items-center justify-center p-8 text-center bg-muted/10">
-            <div>
-              <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                <PieChart className="h-7 w-7 text-primary" />
-              </div>
-              <h3 className="font-bold mb-1">Découvrez votre portefeuille idéal</h3>
-              <p className="text-sm text-muted-foreground mb-4 max-w-xs mx-auto">
-                En 5 minutes, obtenez une allocation personnalisée en ETFs canadiens.
-              </p>
-              <Link href="/portfolio">
-                <Button>Voir les portefeuilles <ArrowRight className="h-4 w-4 ml-1" /></Button>
-              </Link>
-            </div>
-          </Card>
-        )}
-
         {/* Portfolio allocation + metrics row */}
         {data.selectedPortfolio && (
           <ErrorBoundary>
@@ -1148,7 +1081,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Strategic Insights Row — 3-column layout (advanced mode only) */}
-      {!isSimple && <div className="grid gap-4 lg:grid-cols-3">
+      {!isSimple && (<div className="grid gap-4 lg:grid-cols-3">
         {/* Col 1: Stress Test (if portfolio) or Quick Actions fallback */}
         {data.selectedPortfolio?.stress_test ? (
           <Card className="border-yellow-200/50 bg-yellow-50/10 dark:bg-yellow-950/10">
@@ -1241,7 +1174,7 @@ export default function DashboardPage() {
           </div>
           <ChecklistWidget data={data} />
         </div>
-      </div>}
+      </div>)}
     </div>
   );
 }
